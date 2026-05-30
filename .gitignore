@@ -431,4 +431,5 @@ tools/*.txt
 # Dev/build helper scripts & screenshot harness (NOT app source)
 tools/
 # Unused branding intermediates (favicon.ico is the build input; logos live in docs/)
-Assets/logo-*.png
+# (pattern with leading **/ so it matches the nested "Olden Era - Template Editor/Assets/" path)
+**/Assets/logo-*.png
