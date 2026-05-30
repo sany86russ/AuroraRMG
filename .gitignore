@@ -427,3 +427,8 @@ tools/*.txt
 
 # Icon backups (scratch)
 *.bak
+
+# Dev/build helper scripts & screenshot harness (NOT app source)
+tools/
+# Unused branding intermediates (favicon.ico is the build input; logos live in docs/)
+Assets/logo-*.png
