@@ -1,0 +1,115 @@
+name: Build & Release
+
+# Собирает single-file .exe на раннерах GitHub, генерирует подписанный
+# build-provenance attestation и публикует .exe как ассет GitHub Release.
+#
+# Триггеры:
+#   * push тега вида vX.Y.Z   — основной путь релиза (запушьте тег → выйдет релиз)
+#   * workflow_dispatch       — ручной запуск с указанием тега
+#
+# Проверка происхождения бинарника пользователем:
+#   gh attestation verify AuroraRMG.exe --repo sany86russ/AuroraRMG
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Тег релиза для сборки и публикации (например v0.8.2)'
+        required: true
+        type: string
+
+permissions:
+  contents: write       # создавать релизы и загружать ассеты
+  id-token: write       # OIDC-токен для подписи attestation
+  attestations: write   # запись build-provenance attestation
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    env:
+      SLN: "Olden Era - Template Editor.slnx"
+      APP_CSPROJ: "Olden Era - Template Editor/Olden Era - Template Editor.csproj"
+      # Имя ассета ДОЛЖНО быть ровно AuroraRMG.exe — его ищет UpdateService автообновления.
+      ASSET: "AuroraRMG.exe"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Resolve tag & version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          # Снимаем ведущую 'v': v0.8.2 -> 0.8.2
+          VERSION="${TAG#v}"
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Тег '$TAG' не в формате vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          echo "tag=$TAG"          >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION"  >> "$GITHUB_OUTPUT"
+          echo "Релиз $TAG (версия сборки $VERSION)"
+
+      - name: Restore
+        run: dotnet restore "$env:SLN"
+
+      - name: Build (Release)
+        run: dotnet build "$env:SLN" -c Release --no-restore
+
+      - name: Test (gate — не релизим сломанное)
+        run: dotnet test "$env:SLN" -c Release --no-build --verbosity normal
+
+      - name: Publish single-file exe
+        shell: bash
+        run: |
+          dotnet publish "$APP_CSPROJ" \
+            -c Release -r win-x64 --self-contained true \
+            -p:Version=${{ steps.ver.outputs.version }} \
+            -p:AssemblyVersion=${{ steps.ver.outputs.version }}.0 \
+            -p:FileVersion=${{ steps.ver.outputs.version }}.0 \
+            -o publish
+          # AssemblyName=OldenEraTemplateGenerator -> переименовываем в требуемое имя ассета
+          mv "publish/OldenEraTemplateGenerator.exe" "$ASSET"
+          ls -l "$ASSET"
+
+      - name: Generate build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ env.ASSET }}
+
+      - name: Create release & upload asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Релиз $TAG уже существует — обновляю ассет."
+            gh release upload "$TAG" "$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            echo "Создаю релиз $TAG."
+            gh release create "$TAG" "$ASSET" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "AuroraRMG $TAG" \
+              --generate-notes \
+              --latest \
+              --target "$GITHUB_SHA"
+          fi
