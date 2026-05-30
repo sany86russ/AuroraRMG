@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="https://github.com/sany86russ/AuroraRMG/releases/latest/download/logo-256.png" width="128" alt="AuroraRMG"/>
-
-# AuroraRMG
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/logo-wide.png" width="520" alt="AuroraRMG"/>
 
 ### Генератор случайных шаблонов карт для **Heroes of Might and Magic: Olden Era**
 
