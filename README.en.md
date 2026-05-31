@@ -171,28 +171,28 @@ The window has three areas:
 <details open>
 <summary><b>"Rules" tab</b> — basic parameters, heroes, victory conditions, environment</summary>
 
-<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-rules.png" alt="Rules tab" width="100%"/>
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-rules-en.png" alt="Rules tab" width="100%"/>
 
 </details>
 
 <details>
 <summary><b>"Map & Zones" tab</b> — map topology and zone setup</summary>
 
-<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-map-zones.png" alt="Map & Zones tab" width="100%"/>
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-map-zones-en.png" alt="Map & Zones tab" width="100%"/>
 
 </details>
 
 <details>
 <summary><b>"Bonuses & Bans" tab</b> — starting bonuses and item/spell/hero bans</summary>
 
-<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-bonuses-bans.png" alt="Bonuses & Bans tab" width="100%"/>
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-bonuses-bans-en.png" alt="Bonuses & Bans tab" width="100%"/>
 
 </details>
 
 <details>
 <summary><b>"Extra Content [EXP.]" tab</b> — guaranteed objects in zones</summary>
 
-<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-extra-content.png" alt="Extra Content tab" width="100%"/>
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-extra-content-en.png" alt="Extra Content tab" width="100%"/>
 
 </details>
 
@@ -314,6 +314,8 @@ Content is configured separately for five zone types (sub-tabs: **Player zones, 
 ## 🗺 Visual zone editor
 
 The **"🗺 Editor"** header button opens an interactive **zone-graph canvas editor** — see and edit the template's structure by hand, in the spirit of community visual editors.
+
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-editor-en.png" alt="Visual zone editor" width="100%"/>
 
 - **Canvas:** zones are nodes (🟢 player · 🔵 hub · 🟤/⚪/🟡 neutral by quality), connections are edges (gold = direct, dashed cyan = portal, dashed brown = road). There's a grid, a **legend** and a controls hint.
 - **Navigation:** wheel to zoom (or **−/+** buttons), drag the background to pan, **"Reset view"** and **"Auto-layout"**.
