@@ -1,0 +1,136 @@
+<Window x:Class="Olden_Era___Template_Editor.TemplateEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource S.Ed.001}"
+        Height="820" Width="1200"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BrushPanel}"
+        UseLayoutRounding="True"
+        KeyDown="Window_KeyDown">
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0" Background="{StaticResource BrushPanelAlt}" Padding="10,7"
+                BorderBrush="{StaticResource BrushBorder}" BorderThickness="0,0,0,1">
+            <DockPanel LastChildFill="False">
+                <TextBlock Text="{DynamicResource S.Ed.001}" Foreground="{StaticResource BrushGold}"
+                           FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"
+                           Margin="0,0,16,0" DockPanel.Dock="Left"/>
+                <Button x:Name="BtnLoad" Content="{DynamicResource S.Ed.002}" DockPanel.Dock="Left"
+                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnLoad_Click"/>
+                <Button x:Name="BtnAddZone" Content="{DynamicResource S.Ed.003}" DockPanel.Dock="Left"
+                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnAddZone_Click"/>
+                <Button x:Name="BtnConnectMode" Content="{DynamicResource S.Ed.004}" DockPanel.Dock="Left"
+                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnConnectMode_Click"/>
+                <Button x:Name="BtnDelete" Content="{DynamicResource S.Ed.005}" DockPanel.Dock="Left"
+                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnDelete_Click"/>
+                <Button x:Name="BtnValidate" Content="{DynamicResource S.Ed.006}" DockPanel.Dock="Left"
+                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnValidate_Click"/>
+                <Button x:Name="BtnSave" Content="{DynamicResource S.Ed.007}" DockPanel.Dock="Left"
+                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnSave_Click"/>
+                <Button x:Name="BtnExportPng" Content="{DynamicResource S.Ed.ExportPng}" DockPanel.Dock="Left"
+                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnExportPng_Click"/>
+
+                <Button x:Name="BtnZoomReset" Content="{DynamicResource S.Ed.008}" DockPanel.Dock="Right"
+                        Style="{StaticResource ToolbarButton}" Click="BtnZoomReset_Click"/>
+                <Button x:Name="BtnRelayout" Content="{DynamicResource S.Ed.009}" DockPanel.Dock="Right" Margin="0,0,8,0"
+                        Style="{StaticResource ToolbarButton}" Click="BtnRelayout_Click"/>
+                <Button x:Name="BtnZoomIn" Content="+" Width="30" DockPanel.Dock="Right" Margin="0,0,4,0"
+                        Style="{StaticResource ToolbarButton}" Click="BtnZoomIn_Click" ToolTip="{DynamicResource S.Ed.ZoomIn}"/>
+                <Button x:Name="BtnZoomOut" Content="−" Width="30" DockPanel.Dock="Right" Margin="0,0,8,0"
+                        Style="{StaticResource ToolbarButton}" Click="BtnZoomOut_Click" ToolTip="{DynamicResource S.Ed.ZoomOut}"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Body: canvas + inspector -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="14"/>
+                <ColumnDefinition Width="300"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Canvas host (graph + floating legend) -->
+            <Border Grid.Column="0" ClipToBounds="True" Background="#0E0B16"
+                    x:Name="CanvasHost" Focusable="True"
+                    MouseWheel="CanvasHost_MouseWheel"
+                    MouseLeftButtonDown="CanvasHost_MouseLeftButtonDown"
+                    MouseMove="CanvasHost_MouseMove"
+                    MouseLeftButtonUp="CanvasHost_MouseLeftButtonUp">
+                <Grid>
+                    <Canvas x:Name="GraphCanvas" Width="700" Height="700"
+                            HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <Canvas.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform x:Name="CanvasScale" ScaleX="1" ScaleY="1"/>
+                                <TranslateTransform x:Name="CanvasTranslate" X="0" Y="0"/>
+                            </TransformGroup>
+                        </Canvas.RenderTransform>
+                    </Canvas>
+
+                    <!-- Floating legend (not transformed) -->
+                    <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="12"
+                            Background="#CC12161F" BorderBrush="{StaticResource BrushBorder}"
+                            BorderThickness="1" CornerRadius="6" Padding="10,8" IsHitTestVisible="False">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S.Ed.LegZones}" Foreground="{StaticResource BrushTextDim}" FontSize="11" Margin="0,0,0,4"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,1">
+                                <Ellipse Width="10" Height="10" Fill="#5EB36E" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource S.Ed.LegPlayer}" Foreground="{StaticResource BrushText}" FontSize="11" VerticalAlignment="Center"/>
+                                <Ellipse Width="10" Height="10" Fill="#5080A0" Margin="12,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource S.Ed.LegHub}" Foreground="{StaticResource BrushText}" FontSize="11" VerticalAlignment="Center"/>
+                                <Ellipse Width="10" Height="10" Fill="#CD7F32" Margin="12,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource S.Ed.LegNeutral}" Foreground="{StaticResource BrushText}" FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="{DynamicResource S.Ed.LegConns}" Foreground="{StaticResource BrushTextDim}" FontSize="11" Margin="0,6,0,4"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,1">
+                                <Rectangle Width="18" Height="3" Fill="#B4913C" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource S.Ed.LegDirect}" Foreground="{StaticResource BrushText}" FontSize="11" VerticalAlignment="Center"/>
+                                <Rectangle Width="18" Height="2" Fill="#5AAAD2" Margin="14,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource S.Ed.LegPortal}" Foreground="{StaticResource BrushText}" FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Hint (top-left) -->
+                    <TextBlock x:Name="TxtCanvasHint" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,10"
+                               Foreground="{StaticResource BrushTextDim}" FontSize="11" IsHitTestVisible="False"
+                               Text="{DynamicResource S.Ed.CanvasHint}"/>
+                </Grid>
+            </Border>
+
+            <!-- Inspector -->
+            <Border Grid.Column="2" Background="{StaticResource BrushPanelAlt}"
+                    BorderBrush="{StaticResource BrushBorder}" BorderThickness="1,0,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,10">
+                    <StackPanel x:Name="InspectorPanel">
+                        <TextBlock Text="{DynamicResource S.Ed.010}" Foreground="{StaticResource BrushGold}"
+                                   FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <TextBlock x:Name="TxtInspectorHint"
+                                   Text="{DynamicResource S.Ed.011}"
+                                   Foreground="{StaticResource BrushTextDim}" TextWrapping="Wrap"/>
+                        <StackPanel x:Name="InspectorFields" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="2" Background="{StaticResource BrushPanelAlt}"
+                BorderBrush="{StaticResource BrushBorder}" BorderThickness="0,1,0,0" Padding="10,5">
+            <DockPanel LastChildFill="False">
+                <TextBlock x:Name="TxtStatus" DockPanel.Dock="Left"
+                           Foreground="{StaticResource BrushTextDim}" FontSize="12"
+                           Text="{DynamicResource S.Ed.012}"/>
+                <TextBlock x:Name="TxtZoomLabel" DockPanel.Dock="Right"
+                           Foreground="{StaticResource BrushTextDim}" FontSize="12"
+                           Text="100%"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -177,6 +177,170 @@ namespace OldenEraTemplateEditor.Services.ContentManagement
         public static readonly SidMapping PandoraBoxArmyHighTier = new() { Sid = "content_list_pickup_pandora_box_army_high_tier", Name = "Ящик Пандоры: армия (высокий ур.)" };
     }
 
+    /// <summary>
+    /// English display names for content items, keyed by SID. Lets the content combos localize
+    /// without touching the ~150 definitions above (Russian stays in <see cref="SidMapping.Name"/>).
+    /// </summary>
+    public static class ContentNamesEn
+    {
+        public static readonly Dictionary<string, string> Map = new()
+        {
+            ["alchemy_lab"] = "Alchemy Lab",
+            ["arena"] = "Arena",
+            ["beer_fountain"] = "Beer Fountain",
+            ["boreal_call"] = "Boreal Call",
+            ["celestial_sphere"] = "Celestial Sphere",
+            ["altar_of_magic_1"] = "Shrine of Night Shadow",
+            ["altar_of_magic_2"] = "Shrine of Daylight",
+            ["altar_of_magic_3"] = "Arcane Shrine",
+            ["altar_of_magic_4"] = "Primordial Shrine",
+            ["magic_amplifier_1"] = "Night Shadow Amplifier",
+            ["magic_amplifier_2"] = "Daylight Amplifier",
+            ["magic_amplifier_3"] = "Arcane Amplifier",
+            ["magic_amplifier_4"] = "Primordial Amplifier",
+            ["chimerologist"] = "Chimerologist",
+            ["circus"] = "Circus",
+            ["college_of_wonder"] = "College of Wonder",
+            ["crystal_trail"] = "Crystal Trail",
+            ["dragon_utopia"] = "Dragon Utopia",
+            ["eternal_dragon"] = "Eternal Dragon",
+            ["fickle_shrine"] = "Fickle Shrine",
+            ["flattering_mirror"] = "Flattering Mirror",
+            ["forge"] = "Forge",
+            ["fort"] = "Fort",
+            ["fountain"] = "Fountain",
+            ["fountain_2"] = "Fountain 2",
+            ["huntsmans_camp"] = "Huntsman's Camp",
+            ["infernal_cirque"] = "Infernal Cirque",
+            ["insaras_eye"] = "Insara's Eye",
+            ["jousting_range"] = "Jousting Range",
+            ["mana_well"] = "Mana Well",
+            ["market"] = "Market",
+            ["mine_crystals"] = "Crystal Vein",
+            ["mine_gemstones"] = "Gemstone Hill",
+            ["mine_gold"] = "Gold Mine",
+            ["mine_mercury"] = "Mercury Rift",
+            ["mine_ore"] = "Ore Pit",
+            ["mine_wood"] = "Sawmill",
+            ["mirage"] = "Mirage",
+            ["mysterious_stone"] = "Mysterious Stone",
+            ["mystical_tower"] = "Mystical Tower",
+            ["scroll_box"] = "Magic Scroll",
+            ["enchanted_scroll_box"] = "Enchanted Scroll",
+            ["mythic_scroll_box"] = "Mythic Scroll",
+            ["orb_observatory"] = "Orb Observatory",
+            ["pandora_box"] = "Pandora's Box",
+            ["petrified_memorial"] = "Petrified Memorial",
+            ["pile_of_books"] = "Pile of Books",
+            ["point_of_balance"] = "Point of Balance",
+            ["prison"] = "Prison",
+            ["quixs_path"] = "Quix's Path",
+            ["random_hire_1"] = "Random Hire (Tier 1)",
+            ["random_hire_2"] = "Random Hire (Tier 2)",
+            ["random_hire_3"] = "Random Hire (Tier 3)",
+            ["random_hire_4"] = "Random Hire (Tier 4)",
+            ["random_hire_5"] = "Random Hire (Tier 5)",
+            ["random_hire_6"] = "Random Hire (Tier 6)",
+            ["random_hire_7"] = "Random Hire (Tier 7)",
+            ["random_item_common"] = "Random Item (Common)",
+            ["random_item_epic"] = "Random Item (Epic)",
+            ["random_item_legendary"] = "Random Item (Legendary)",
+            ["random_item_rare"] = "Random Item (Rare)",
+            ["remote_foothold"] = "Remote Foothold",
+            ["research_laboratory"] = "Research Laboratory",
+            ["ritual_pyre"] = "Ritual Pyre",
+            ["sacrificial_shrine"] = "Sacrificial Shrine",
+            ["shady_den"] = "Shady Den",
+            ["stables"] = "Stables",
+            ["tavern"] = "Tavern",
+            ["tear_of_truth"] = "Tear of Truth",
+            ["the_gorge"] = "Pile of Carrion",
+            ["town_gate"] = "Town Gate",
+            ["tree_of_abundance"] = "Tree of Abundance",
+            ["troglodyte_throne"] = "Troglodyte Throne",
+            ["twilight_bloom"] = "Twilight Bloom",
+            ["unforgotten_grave"] = "Unforgotten Grave",
+            ["university"] = "University",
+            ["unstable_ruins"] = "Unstable Ruins",
+            ["watchtower"] = "Watchtower",
+            ["wind_rose"] = "Wind Rose",
+            ["wise_owl"] = "Wise Owl",
+            ["storage_wood"] = "Wood Storage",
+            ["storage_ore"] = "Ore Storage",
+            ["storage_gold"] = "Gold Storage",
+            ["storage_mercury"] = "Mercury Storage",
+            ["storage_crystals"] = "Crystal Storage",
+            ["storage_gemstones"] = "Gemstone Storage",
+            ["storage_dust"] = "Dust Storage",
+            ["gardener"] = "Gardener",
+            ["windmill"] = "Windmill",
+            ["village"] = "Village",
+            ["gingerbread_house"] = "Gingerbread House",
+            ["peasant_cart"] = "Peasant Cart",
+            ["abandoned_corpse"] = "Abandoned Corpse",
+            ["abandoned_mansion"] = "Abandoned Mansion",
+            ["abnormal_structure"] = "Abnormal Structure",
+            ["alvars_eye"] = "Alvar's Eye",
+            ["black_tower"] = "Black Tower",
+            ["circle_of_life"] = "Circle of Life",
+            ["cursed_old_house"] = "Cursed Old House",
+            ["crow_nest"] = "Crow's Nest",
+            ["goblin_cache"] = "Goblin Cache",
+            ["iridescent_abbey"] = "Iridescent Abbey",
+            ["legions_memorial"] = "Legion's Memorial",
+            ["mereas_shrine"] = "Merea's Shrine",
+            ["monty_hall"] = "Monty Hall",
+            ["overgrown_grave"] = "Overgrown Grave",
+            ["prismatic_lair"] = "Prismatic Lair",
+            ["raiders_camp"] = "Raiders' Camp",
+            ["heros_crypt"] = "Hero's Crypt",
+            ["uncanny_rite"] = "Uncanny Rite",
+            ["learning_stone"] = "Learning Stone",
+            ["lost_library"] = "Lost Library",
+            ["tree_of_knowledge"] = "Tree of Knowledge",
+            ["stinging_sword"] = "Stinging Sword",
+            ["armory_automaton"] = "Armory Automaton",
+            ["magic_wheel"] = "Magic Wheel",
+            ["knowledge_garden"] = "Knowledge Garden",
+            ["maze"] = "Maze",
+            ["trial_scales"] = "Trial Scales",
+            ["mercenary_guild"] = "Mercenary Guild",
+            // ── Include lists (AuroraRMG's own grouping labels) ──
+            ["content_list_building_random_hires_low_tier"]  = "Random Hire (Low Tier)",
+            ["content_list_building_random_hires_high_tier"] = "Random Hire (High Tier)",
+            ["basic_content_list_building_random_hires"]     = "Random Hire (Any Tier)",
+            ["content_list_building_random_hires"]           = "Random Hire (Any Tier, weighted)",
+            ["basic_content_list_building_guarded_resource_banks_tier_1"] = "Resource Banks T1",
+            ["basic_content_list_building_guarded_resource_banks_tier_2"] = "Resource Banks T2",
+            ["basic_content_list_building_guarded_resource_banks_tier_3"] = "Guarded Banks T3",
+            ["basic_content_list_basic_storage"]             = "Random Basic Storage",
+            ["basic_content_list_rare_mines"]                = "Random Rare Mine",
+            ["basic_content_list_rare_mines_by_biome"]       = "Random Rare Mine (by biome)",
+            ["basic_content_list_building_guarded_units_banks"] = "Random Guarded Unit Bank",
+            ["basic_content_list_building_hero_buff_tier_1"] = "Random Hero Buff T1",
+            ["basic_content_list_building_hero_exp_tier_2"]  = "Random Hero XP T2",
+            ["basic_content_list_building_hero_stats_and_skills_tier_1"] = "Random Hero Stat/Skill T1",
+            ["basic_content_list_building_hero_stats_and_skills_tier_2"] = "Random Hero Stat/Skill T2",
+            ["basic_content_list_building_hero_stats_and_skills_tier_3"] = "Random Hero Stat/Skill T3",
+            ["basic_content_list_building_magic_tier_1"]     = "Random Magic Building T1",
+            ["basic_content_list_building_magic_tier_2"]     = "Random Magic Building T2",
+            ["content_list_building_uncommon_hero_banks"]    = "Uncommon Hero Development",
+            ["basic_content_list_vision_buildings_tier_1"]   = "Random Vision Building T1",
+            ["basic_content_list_pickup_random_items"]       = "Random Pickup Items",
+            ["content_list_building_utopia"]                 = "Utopia (Dragon/Ruins/Lab)",
+            ["content_list_building_epic_guarded_resource_banks"] = "Epic Guarded Banks",
+            ["basic_content_list_building_guarded_units_banks_only_biome_restriction"] = "Guarded Unit Bank (by biome)",
+            ["basic_content_list_building_guarded_units_banks_no_biome_restriction"]   = "Guarded Unit Bank (no biome)",
+            ["basic_content_list_pickup_mythic_scroll_box"]  = "Random Mythic Scroll",
+            ["content_list_pickup_pandora_box_army_low_tier"]  = "Pandora's Box: army (low tier)",
+            ["content_list_pickup_pandora_box_army_high_tier"] = "Pandora's Box: army (high tier)",
+        };
+
+        /// <summary>RU <see cref="SidMapping.Name"/> by default; the English name when <paramref name="english"/> and a translation exists.</summary>
+        public static string Of(SidMapping m, bool english) =>
+            english && Map.TryGetValue(m.Sid, out var en) && en.Length > 0 ? en : m.Name;
+    }
+
     public static class GlobalContent
     {
         public static readonly IReadOnlyList<SidMapping> GlobalContentList =
@@ -199,8 +363,11 @@ namespace OldenEraTemplateEditor.Services.ContentManagement
                 return null;
             }
 
+            // Match the Russian name OR the English display name, so the "Add" path works
+            // regardless of the current UI language.
             return GlobalContentList.FirstOrDefault(item =>
-                string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+                string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)
+             || string.Equals(ContentNamesEn.Map.GetValueOrDefault(item.Sid), name, StringComparison.OrdinalIgnoreCase));
         }
 
 

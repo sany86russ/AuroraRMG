@@ -415,7 +415,8 @@ AGENTS.md
 # Build staging / release artifacts (the .exe is a release asset, not source)
 dist/
 # Datamined game assets (studio copyright; not used at runtime — excluded by choice)
-GameData/
+# Anchored to the app's datamined folder so it does NOT match Services/GameData/ (real source).
+/Olden Era - Template Editor/GameData/
 # Branding source art (usable logos live in Assets/ and docs/)
 /ICO.png
 /Logo.png
@@ -433,3 +434,6 @@ tools/
 # Unused branding intermediates (favicon.ico is the build input; logos live in docs/)
 # (pattern with leading **/ so it matches the nested "Olden Era - Template Editor/Assets/" path)
 **/Assets/logo-*.png
+
+# Reference clones / unrelated projects (kept locally, not published)
+/Other Projects/

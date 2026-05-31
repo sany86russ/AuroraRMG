@@ -78,7 +78,7 @@ namespace Olden_Era___Template_Editor.Services
                 SizeZ = settings.MapSize,
                 GameRules = BuildGameRules(settings, effectiveVictoryCondition),
                 ValueOverrides = BuildValueOverrides(settings.ValueOverridesText),
-                GlobalBans = BuildGlobalBans(settings.BannedItems, settings.BannedMagics),
+                GlobalBans = BuildGlobalBans(settings.BannedItems, settings.BannedMagics, settings.BannedHeroes),
                 Variants = [BuildVariant(settings, playerLetters, neutralZones, tuning, holdCityNeutralLetter, useCityHold && settings.Topology == MapTopology.HubAndSpoke)],
                 ZoneLayouts = BuildZoneLayouts(settings),
                 MandatoryContent = BuildAllMandatoryContent(playerLetters, neutralZones, settings),
@@ -391,10 +391,10 @@ namespace Olden_Era___Template_Editor.Services
         }
 
         /// <summary>
-        /// Builds a GlobalBans object from newline-separated item and magic ID strings.
-        /// Returns null when both are empty.
+        /// Builds a GlobalBans object from newline-separated item, magic and hero ID strings.
+        /// Returns null when all are empty.
         /// </summary>
-        private static GlobalBans? BuildGlobalBans(string rawItems, string rawMagics)
+        private static GlobalBans? BuildGlobalBans(string rawItems, string rawMagics, string rawHeroes)
         {
             static List<string>? ParseLines(string raw)
             {
@@ -408,8 +408,9 @@ namespace Olden_Era___Template_Editor.Services
 
             var items  = ParseLines(rawItems);
             var magics = ParseLines(rawMagics);
-            if (items == null && magics == null) return null;
-            return new GlobalBans { Items = items, Magics = magics };
+            var heroes = ParseLines(rawHeroes);
+            if (items == null && magics == null && heroes == null) return null;
+            return new GlobalBans { Items = items, Magics = magics, Heroes = heroes };
         }
 
 

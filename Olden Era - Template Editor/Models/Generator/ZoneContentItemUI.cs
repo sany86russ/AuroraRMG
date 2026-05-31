@@ -17,8 +17,18 @@ namespace Olden_Era___Template_Editor.Models
         public SidMapping? SidMapping
         {
             get => _sidMapping;
-            set { _sidMapping = value; OnPropertyChanged(); }
+            set { _sidMapping = value; OnPropertyChanged(); OnPropertyChanged(nameof(DisplayName)); }
         }
+
+        /// <summary>Localized content name shown in the row (RU by default, EN when that language is active).</summary>
+        public string DisplayName => _sidMapping is null
+            ? string.Empty
+            : ContentNamesEn.Of(_sidMapping,
+                Olden_Era___Template_Editor.Services.Localization.LocalizationManager.Instance.CurrentLanguage
+                    == Olden_Era___Template_Editor.Services.Localization.AppLanguage.En);
+
+        /// <summary>Notifies the UI to re-read <see cref="DisplayName"/> (call on language change).</summary>
+        public void RefreshDisplayName() => OnPropertyChanged(nameof(DisplayName));
 
         public int Count
         {

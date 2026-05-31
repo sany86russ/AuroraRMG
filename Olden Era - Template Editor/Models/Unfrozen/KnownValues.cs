@@ -567,6 +567,58 @@ namespace OldenEraTemplateEditor.Models
             new("neutral_magic_shadow_form",      "Shadow Form"),
         ];
 
+        /// <summary>
+        /// Record for a hero that can appear in globalBans.heroes.
+        /// <see cref="Category"/> is the hero's faction (Demon / Dungeon / Human / Nature / Unfrozen).
+        /// Hero SIDs follow the pattern <c>&lt;faction&gt;_hero_&lt;N&gt;</c>.
+        /// </summary>
+        public record BannableHero(string Id, string DisplayName, string Category);
+
+        /// <summary>
+        /// Hero IDs verified against official game templates (e.g. Arcade.rmg.json globalBans.heroes).
+        /// The full named roster with icons lives in the game's Unity assets — this list is the
+        /// verified subset; the picker also accepts any custom <c>&lt;faction&gt;_hero_&lt;N&gt;</c> SID.
+        /// </summary>
+        public static readonly BannableHero[] BannableHeroes =
+        [
+            new("demon_hero_3",     "Demon Hero 3",     "Demon"),
+            new("demon_hero_5",     "Demon Hero 5",     "Demon"),
+            new("dungeon_hero_3",   "Dungeon Hero 3",   "Dungeon"),
+            new("dungeon_hero_10",  "Dungeon Hero 10",  "Dungeon"),
+            new("human_hero_8",     "Human Hero 8",     "Human"),
+            new("human_hero_9",     "Human Hero 9",     "Human"),
+            new("human_hero_11",    "Human Hero 11",    "Human"),
+            new("nature_hero_9",    "Nature Hero 9",    "Nature"),
+            new("nature_hero_17",   "Nature Hero 17",   "Nature"),
+            new("unfrozen_hero_8",  "Unfrozen Hero 8",  "Unfrozen"),
+            new("unfrozen_hero_14", "Unfrozen Hero 14", "Unfrozen"),
+        ];
+
+        /// <summary>Factions used to group heroes in the ban picker / custom-SID prefix.</summary>
+        public static readonly string[] HeroFactions =
+        [
+            "Demon", "Dungeon", "Human", "Nature", "Unfrozen",
+        ];
+
+        /// <summary>
+        /// Turns a hero SID (<c>&lt;faction&gt;_hero_&lt;N&gt;</c>) into a readable name and faction.
+        /// Falls back gracefully for unknown patterns.
+        /// </summary>
+        public static (string DisplayName, string Faction) DescribeHeroSid(string sid)
+        {
+            int idx = sid.IndexOf("_hero_", System.StringComparison.OrdinalIgnoreCase);
+            if (idx > 0)
+            {
+                string faction = sid[..idx];
+                string number  = sid[(idx + "_hero_".Length)..];
+                string factionTitle = faction.Length > 0
+                    ? char.ToUpper(faction[0]) + faction[1..]
+                    : "Hero";
+                return ($"{factionTitle} Hero {number}", factionTitle);
+            }
+            return (SidToDisplayName(sid), "Hero");
+        }
+
         /// <summary>A single learnable spell from the game's spell library.</summary>
         public record SpellEntry(string Id, string Name, string School, int Tier);
 

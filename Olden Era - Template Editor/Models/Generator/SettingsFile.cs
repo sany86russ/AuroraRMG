@@ -71,6 +71,7 @@ namespace Olden_Era___Template_Editor.Models
         [JsonPropertyName("tournamentSaveArmy")] public bool TournamentSaveArmy             { get; set; } = true;
         [JsonPropertyName("bannedItems")]        public string BannedItems                  { get; set; } = "";
         [JsonPropertyName("bannedMagics")]       public string BannedMagics                 { get; set; } = "";
+        [JsonPropertyName("bannedHeroes")]       public string BannedHeroes                 { get; set; } = "";
         [JsonPropertyName("valueOverrides")]     public string ValueOverridesText           { get; set; } = "";
         [JsonPropertyName("bonuses")]            public string BonusesJson                  { get; set; } = "";
         [JsonPropertyName("playerZoneContentRows")]      public List<ZoneContentRowSave>? PlayerZoneContentRows      { get; set; }

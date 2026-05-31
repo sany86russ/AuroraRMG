@@ -185,7 +185,7 @@ namespace Olden_Era___Template_Editor
         private void UpdateAddButton()
         {
             int n = _checkedLeaves.Count;
-            BtnAdd.Content   = n > 1 ? $"Добавить выбранное ({n})" : "Добавить выбранное";
+            BtnAdd.Content   = n > 1 ? Services.Localization.LocalizationManager.T("S.P.AddSelectedN", n) : Services.Localization.LocalizationManager.T("S.P.AddSelected");
             BtnAdd.IsEnabled = n > 0;
         }
 

@@ -23,7 +23,7 @@ namespace Olden_Era___Template_Editor
         {
             InitializeComponent();
             _info = info;
-            TitleText.Text = $"Загрузка AuroraRMG {Format(info.Version)}";
+            TitleText.Text = Services.Localization.LocalizationManager.T("S.Upd.DownTitle", Format(info.Version));
             Loaded += async (_, _) => await RunAsync();
         }
 
@@ -34,23 +34,23 @@ namespace Olden_Era___Template_Editor
                 if (p < 0)
                 {
                     ProgressBar.IsIndeterminate = true;
-                    StatusText.Text = "Загрузка…";
+                    StatusText.Text = Services.Localization.LocalizationManager.T("S.Upd.Loading");
                 }
                 else
                 {
                     ProgressBar.IsIndeterminate = false;
                     ProgressBar.Value = p * 100;
-                    StatusText.Text = $"Загружено {p * 100:0}%"
-                        + (_info.AssetSize > 0 ? $"  ({Mb(_info.AssetSize * p)} из {Mb(_info.AssetSize)} МБ)" : "");
+                    StatusText.Text = Services.Localization.LocalizationManager.T("S.Upd.Pct", (p * 100).ToString("0"))
+                        + (_info.AssetSize > 0 ? Services.Localization.LocalizationManager.T("S.Upd.OfMb", Mb(_info.AssetSize * p), Mb(_info.AssetSize)) : "");
                 }
             });
 
             try
             {
-                StatusText.Text = "Подключение к GitHub…";
+                StatusText.Text = Services.Localization.LocalizationManager.T("S.Upd.ConnGitHub");
                 string file = await UpdateService.DownloadAsync(_info, progress, _cts.Token);
 
-                StatusText.Text = "Подготовка к установке…";
+                StatusText.Text = Services.Localization.LocalizationManager.T("S.Upd.Preparing");
                 _installing = true;
                 UpdateService.InstallAndRestart(file);
 
@@ -66,9 +66,8 @@ namespace Olden_Era___Template_Editor
                 _installing = false;
                 ProgressBar.IsIndeterminate = false;
                 MessageBox.Show(this,
-                    $"Не удалось загрузить обновление:\n\n{ex.Message}\n\n" +
-                    "Можно скачать новую версию вручную со страницы релизов на GitHub.",
-                    "Обновление AuroraRMG", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    Services.Localization.LocalizationManager.T("S.Upd.Failed", ex.Message),
+                    Services.Localization.LocalizationManager.T("S.Upd.001"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 DialogResult = false;
             }
         }

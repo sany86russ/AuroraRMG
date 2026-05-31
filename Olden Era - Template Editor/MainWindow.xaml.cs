@@ -32,7 +32,10 @@ namespace Olden_Era___Template_Editor
         // Ban lists
         private readonly ObservableCollection<BanEntry>   _bannedItems  = [];
         private readonly ObservableCollection<BanEntry>   _bannedMagics = [];
+        private readonly ObservableCollection<BanEntry>   _bannedHeroes = [];
         private readonly ObservableCollection<BonusEntry> _bonuses      = [];
+        private bool _suppressAssetToggle;
+        private bool _refreshingLists;
         private bool _isRefreshingMapSizes = false;
         private string _baseTitle = string.Empty;
 
@@ -42,42 +45,48 @@ namespace Olden_Era___Template_Editor
         private ZoneMandatoryContent _highNeutralMandatoryContent = new();
         private ZoneMandatoryContent _hubZoneMandatoryContent = new();
 
+        // Option-combo sources. The string fields hold LOCALIZATION KEYS (resolved via L.Get),
+        // not literal text. The enum is the stable value; combos map back by SelectedIndex.
         private static readonly (MapTopology Topology, string Label, string Description)[] TopologyOptions =
         [
-            (MapTopology.Balanced,    "Сбалансированная",      "Зоны размещаются концентрическими кольцами по уровню качества. Игроки на внешнем кольце, нейтральные зоны — на внутренних. Каждая зона соединяется с соседними на смежных кольцах."),
-            (MapTopology.Random,      "Случайная",        "Зоны размещаются в случайных позициях. Каждая зона соединяется со всеми граничащими — без фиксированной структуры."),
-            (MapTopology.Default,     "Кольцо",          "Все зоны расположены по кругу. Каждая зона соединяется с двумя соседними."),
-            (MapTopology.HubAndSpoke, "Хаб",   "Все зоны соединяются с общим центральным хабом. Игроки никогда не граничат напрямую."),
-            (MapTopology.Chain,       "Цепь",         "Зоны соединены прямой линией от одного конца к другому, без замыкания.")
-            ];
+            (MapTopology.Balanced,    "S.Topo.Balanced", "S.TopoDesc.Balanced"),
+            (MapTopology.Random,      "S.Topo.Random",   "S.TopoDesc.Random"),
+            (MapTopology.Default,     "S.Topo.Ring",     "S.TopoDesc.Ring"),
+            (MapTopology.HubAndSpoke, "S.Topo.Hub",      "S.TopoDesc.Hub"),
+            (MapTopology.Chain,       "S.Topo.Chain",    "S.TopoDesc.Chain"),
+        ];
 
         private static readonly (TerrainTheme Theme, string Label)[] TerrainOptions =
         [
-            (TerrainTheme.FactionBased, "По фракции"),
-            (TerrainTheme.Random,       "Случайный микс"),
-            (TerrainTheme.Grass,        "Трава"),
-            (TerrainTheme.Snow,         "Снег"),
-            (TerrainTheme.Lava,         "Лава"),
-            (TerrainTheme.Sand,         "Песок"),
-            (TerrainTheme.Dirt,         "Грязь"),
-            (TerrainTheme.Deathland,    "Мёртвые земли"),
-            (TerrainTheme.Autumn,       "Осень"),
+            (TerrainTheme.FactionBased, "S.Terrain.FactionBased"),
+            (TerrainTheme.Random,       "S.Terrain.Random"),
+            (TerrainTheme.Grass,        "S.Terrain.Grass"),
+            (TerrainTheme.Snow,         "S.Terrain.Snow"),
+            (TerrainTheme.Lava,         "S.Terrain.Lava"),
+            (TerrainTheme.Sand,         "S.Terrain.Sand"),
+            (TerrainTheme.Dirt,         "S.Terrain.Dirt"),
+            (TerrainTheme.Deathland,    "S.Terrain.Deathland"),
+            (TerrainTheme.Autumn,       "S.Terrain.Autumn"),
         ];
 
         private static readonly (MonsterAggression Level, string Label)[] AggressionOptions =
         [
-            (MonsterAggression.Passive,    "Пассивная"),
-            (MonsterAggression.Normal,     "Обычная"),
-            (MonsterAggression.Aggressive, "Агрессивная"),
+            (MonsterAggression.Passive,    "S.Aggr.Passive"),
+            (MonsterAggression.Normal,     "S.Aggr.Normal"),
+            (MonsterAggression.Aggressive, "S.Aggr.Aggressive"),
         ];
 
         private static readonly (WaterLevel Level, string Label)[] WaterOptions =
         [
-            (WaterLevel.None,   "Нет"),
-            (WaterLevel.Small,  "Немного"),
-            (WaterLevel.Medium, "Средне"),
-            (WaterLevel.Large,  "Много"),
+            (WaterLevel.None,   "S.Water.None"),
+            (WaterLevel.Small,  "S.Water.Small"),
+            (WaterLevel.Medium, "S.Water.Medium"),
+            (WaterLevel.Large,  "S.Water.Large"),
         ];
+
+        /// <summary>Shorthand for the localization manager.</summary>
+        private static Services.Localization.LocalizationManager L =>
+            Services.Localization.LocalizationManager.Instance;
 
         public MainWindow()
         {
@@ -111,6 +120,17 @@ namespace Olden_Era___Template_Editor
                 ContentRendered += async (_, _) => await ShootTabsAsync(shotDir);
             }
 
+            // --shoot-editor <dir>: render the visual zone editor to a PNG (off-screen), then exit.
+            int shootEditorIdx = Array.FindIndex(cmdLine, a => a.Equals("--shoot-editor", StringComparison.OrdinalIgnoreCase));
+            if (shootEditorIdx >= 0 && shootEditorIdx + 1 < cmdLine.Length)
+            {
+                ShowActivated = false;
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = -5000; Top = 100;
+                string editorShotDir = cmdLine[shootEditorIdx + 1];
+                ContentRendered += async (_, _) => await ShootEditorAsync(editorShotDir);
+            }
+
             // Clamp startup size to the available work area so the window never
             // overflows the screen at high-DPI scaling (e.g. 125 %, 150 %, 200 %).
             var area = SystemParameters.WorkArea;
@@ -123,24 +143,19 @@ namespace Olden_Era___Template_Editor
             _baseTitle = $"AuroraRMG {versionLabel}";           // taskbar / window title
             TxtVersionBadge.Text = versionLabel;                 // badge next to the wordmark
             TxtAppTitle.Text = $"AuroraRMG {versionLabel}";
-            TxtWipWarning.Text = $"⚠️ В разработке — некоторые сгенерированные шаблоны могут содержать критические для игры ошибки.";
+            TxtWipWarning.Text = L.Get("S.CB.Wip");
 
             CmbGameMode.ItemsSource = KnownValues.GameModes;
             CmbGameMode.SelectedIndex = 0;
             RefreshMapSizeOptions(160);
-            CmbVictory.ItemsSource = KnownValues.VictoryConditionLabels;
+            RefreshLocalizedLists();      // fills the option combos in the current language
             CmbVictory.SelectedIndex = 0; // Classic (win_condition_1)
-            CmbTopology.ItemsSource = TopologyOptions.Select(t => t.Label).ToList();
-            CmbTopology.SelectedIndex = 0; // Random is first
-            CmbTerrain.ItemsSource = TerrainOptions.Select(t => t.Label).ToList();
+            CmbTopology.SelectedIndex = 0;
             CmbTerrain.SelectedIndex = 0; // Faction-based
-            CmbMonsterAggression.ItemsSource = AggressionOptions.Select(a => a.Label).ToList();
             CmbMonsterAggression.SelectedIndex = 1; // Normal
-            CmbWaterLevel.ItemsSource = WaterOptions.Select(w => w.Label).ToList();
             CmbWaterLevel.SelectedIndex = 0; // None
-            CmbPreset.ItemsSource = new[] { PresetPlaceholder }
-                .Concat(Presets.All.Select(p => p.Name)).ToList();
-            CmbPreset.SelectedIndex = 0;
+            BuildPresetMenu();
+            Services.Localization.LocalizationManager.Instance.LanguageChanged += OnLanguageChanged;
             UpdateValueLabels();
             UpdateAdvancedZoneSettingsVisibility();
             UpdatePlayerCastleFactionVisibility();
@@ -148,7 +163,17 @@ namespace Olden_Era___Template_Editor
             // Wire ban-list ObservableCollections to the ListBoxes.
             LbBannedItems.ItemsSource  = _bannedItems;
             LbBannedMagics.ItemsSource = _bannedMagics;
+            LbBannedHeroes.ItemsSource = _bannedHeroes;
             LbBonuses.ItemsSource      = _bonuses;
+
+            // Game-asset integration is opt-in (default OFF → fully works out of the box).
+            _suppressAssetToggle = true;
+            ChkUseGameAssets.IsChecked = Services.GameData.AppSettings.Current.UseGameAssets;
+            _suppressAssetToggle = false;
+            if (Services.GameData.AppSettings.Current.UseGameAssets)
+                _ = PrimeGameCatalogAsync(); // warm names/icons only when the user has opted in
+
+            UpdateLanguageButtons();
 
             InitializeZoneContentPresets();
             InitializeDefaultPlayerZoneContents();
@@ -346,22 +371,41 @@ namespace Olden_Era___Template_Editor
             _hubZoneMandatoryContent.treasures.Add(CreateZoneContentItem(ContentIds.PandoraBox));
         }
 
+        // Registered content pick-lists, so their displayed names can be re-localized on language change.
+        private readonly List<(ComboBox Combo, ComboBox? Sticky, List<SidMapping> Group)> _contentMenus = [];
+
         private void PopulateZoneContentMenu(ComboBox comboBox, ComboBox? comboBoxSticky, List<SidMapping> contentGroup)
         {
-            var names = new List<string>();
-            foreach (SidMapping sidMapping in contentGroup)
-            {
-                names.Add(sidMapping.Name);
-            }
-            comboBox.ItemsSource = names;
-            comboBox.SelectedIndex = 0;
+            _contentMenus.Add((comboBox, comboBoxSticky, contentGroup));
+            SetContentMenuItems(comboBox, comboBoxSticky, contentGroup);
             if (comboBoxSticky != null)
             {
-                comboBoxSticky.ItemsSource = names;
-                comboBoxSticky.SelectedIndex = 0;
                 comboBox.SelectionChanged       += (_, _) => comboBoxSticky.SelectedIndex = comboBox.SelectedIndex;
                 comboBoxSticky.SelectionChanged += (_, _) => comboBox.SelectedIndex       = comboBoxSticky.SelectedIndex;
             }
+        }
+
+        /// <summary>(Re)fills a content pick-list with current-language names, preserving the selection.</summary>
+        private void SetContentMenuItems(ComboBox comboBox, ComboBox? sticky, List<SidMapping> group)
+        {
+            bool en = L.CurrentLanguage == Services.Localization.AppLanguage.En;
+            var names = group.Select(sm => OldenEraTemplateEditor.Services.ContentManagement.ContentNamesEn.Of(sm, en)).ToList();
+            int sel = comboBox.SelectedIndex;
+            comboBox.ItemsSource = names;
+            comboBox.SelectedIndex = sel >= 0 && sel < names.Count ? sel : (names.Count > 0 ? 0 : -1);
+            if (sticky != null)
+            {
+                int ss = sticky.SelectedIndex;
+                sticky.ItemsSource = names;
+                sticky.SelectedIndex = ss >= 0 && ss < names.Count ? ss : (names.Count > 0 ? 0 : -1);
+            }
+        }
+
+        /// <summary>Re-localizes all registered content pick-lists (called on language change).</summary>
+        private void RefreshContentMenuLanguage()
+        {
+            foreach (var (combo, sticky, group) in _contentMenus)
+                SetContentMenuItems(combo, sticky, group);
         }
 
         private void InitializeZoneContentPresets()
@@ -416,7 +460,7 @@ namespace Olden_Era___Template_Editor
 
         private void MarkDirty()
         {
-            if (!IsInitialized) return;
+            if (!IsInitialized || _refreshingLists) return;
             _isDirty = true;
             if (_generatedTemplate is not null)
                 _templateOutdated = true;
@@ -446,7 +490,7 @@ namespace Olden_Era___Template_Editor
         {
             string file = _currentSettingsPath is not null
                 ? System.IO.Path.GetFileName(_currentSettingsPath)
-                : "Без имени";
+                : L.Get("S.CB.Untitled");
             string fileLabel = _isDirty ? $"{file}*" : file;
             // Taskbar / OS window title keeps the full brand + version + file.
             Title = $"{_baseTitle}  —  {fileLabel}";
@@ -481,12 +525,12 @@ namespace Olden_Era___Template_Editor
             if (WindowState == WindowState.Maximized)
             {
                 BtnMaximize.Content = "🗗";
-                BtnMaximize.ToolTip = "Восстановить";
+                BtnMaximize.ToolTip = L.Get("S.CB.Restore");
             }
             else
             {
                 BtnMaximize.Content = "🗖";
-                BtnMaximize.ToolTip = "Развернуть";
+                BtnMaximize.ToolTip = L.Get("S.CB.Maximize");
             }
         }
 
@@ -503,6 +547,51 @@ namespace Olden_Era___Template_Editor
             UpdateAdvancedZoneSettingsVisibility();
             MarkDirty();
             Validate();
+        }
+
+        // ── Free numeric entry for hero-count fields ──────────────────────────────
+        // The editable TextBoxes feed their value into the backing slider (the single
+        // source of truth read everywhere else). The slider's ValueChanged then
+        // normalises the TextBox text. Commit on Enter or focus loss.
+        private void HeroBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                CommitHeroBox(sender as System.Windows.Controls.TextBox);
+                e.Handled = true;
+            }
+        }
+
+        private void HeroBox_LostFocus(object sender, RoutedEventArgs e)
+            => CommitHeroBox(sender as System.Windows.Controls.TextBox);
+
+        // Stepper (−/+) buttons. Tag is "+SldHeroMin" / "-SldHeroMin" etc.
+        private void HeroStep_Click(object sender, RoutedEventArgs e)
+        {
+            if (!IsInitialized || ChkSingleHeroMode.IsChecked == true) return;
+            if (sender is not System.Windows.Controls.Button { Tag: string tag } || tag.Length < 2) return;
+            int dir = tag[0] == '+' ? 1 : -1;
+            if (FindName(tag[1..]) is not System.Windows.Controls.Slider slider) return;
+            slider.Value = System.Math.Clamp(slider.Value + dir, slider.Minimum, slider.Maximum);
+        }
+
+        private void CommitHeroBox(System.Windows.Controls.TextBox? box)
+        {
+            if (box is null || !IsInitialized) return;
+            var slider = box.Name switch
+            {
+                nameof(TxtHeroMin)       => SldHeroMin,
+                nameof(TxtHeroMax)       => SldHeroMax,
+                nameof(TxtHeroIncrement) => SldHeroIncrement,
+                _                        => null,
+            };
+            if (slider is null) return;
+
+            if (int.TryParse(box.Text.Trim(), out int value))
+                slider.Value = System.Math.Clamp(value, (int)slider.Minimum, (int)slider.Maximum);
+
+            // Re-sync the text to the (possibly clamped / corrected) slider value.
+            box.Text = ((int)slider.Value).ToString();
         }
 
         private void UpdateValueLabels()
@@ -567,7 +656,7 @@ namespace Olden_Era___Template_Editor
 
             if (heroMin > heroMax)
             {
-                SetValidationError("Минимум героев не может превышать максимум.");
+                SetValidationError(L.Get("S.CB.V.HeroMinMax"));
                 BtnPreview.IsEnabled = false;
                 return false;
             }
@@ -575,14 +664,14 @@ namespace Olden_Era___Template_Editor
             int maxZones = _advancedZoneSettings ? AdvancedModeMaxZones : SimpleModeMaxZones;
             if (players + neutral > maxZones)
             {
-                SetValidationError($"Всего зон (игроки + нейтральные) не может превышать {maxZones}.");
+                SetValidationError(L.Get("S.CB.V.MaxZones", maxZones));
                 BtnPreview.IsEnabled = false;
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(TxtTemplateName.Text))
             {
-                SetValidationError("Название шаблона не может быть пустым.");
+                SetValidationError(L.Get("S.CB.V.NameEmpty"));
                 BtnPreview.IsEnabled = false;
                 return false;
             }
@@ -590,8 +679,8 @@ namespace Olden_Era___Template_Editor
             var warnBrush = (System.Windows.Media.Brush)FindResource("BrushWarnText");
             var warnings = new System.Collections.Generic.List<ValidationMessage>();
 
-            if (TxtTemplateName.Text.Trim().Equals("Свой шаблон", StringComparison.OrdinalIgnoreCase))
-                warnings.Add(new ValidationMessage("Шаблон всё ещё использует имя по умолчанию \"Свой шаблон\". Переименуйте его перед сохранением.", warnBrush));
+            if (TxtTemplateName.Text.Trim().Equals(L.Get("S.M.014"), StringComparison.OrdinalIgnoreCase))
+                warnings.Add(new ValidationMessage(L.Get("S.CB.V.DefaultName"), warnBrush));
 
             int selectedMapSize = SelectedMapSize();
             int totalZones = players + neutral;
@@ -599,17 +688,17 @@ namespace Olden_Era___Template_Editor
             // Hub layout has an extra central zone that also occupies map area.
             int totalZonesIncludingHub = selectedTopology == MapTopology.HubAndSpoke ? totalZones + 1 : totalZones;
             if (totalZonesIncludingHub > 0 && (selectedMapSize * selectedMapSize) / totalZonesIncludingHub < 1024)
-                warnings.Add(new ValidationMessage($"Оценочный размер зоны слишком мал. Игра может зависнуть при загрузке карты. Увеличьте размер карты или уменьшите число зон.", warnBrush));
+                warnings.Add(new ValidationMessage(L.Get("S.CB.V.ZoneTooSmall"), warnBrush));
 
             if (selectedMapSize > KnownValues.MaxOfficialMapSize)
-                warnings.Add(new ValidationMessage("Экспериментальные размеры выше 240x240 не подтверждены официальными шаблонами; карты могут не загрузиться, зависнуть или вести себя непредсказуемо.", warnBrush));
+                warnings.Add(new ValidationMessage(L.Get("S.CB.V.ExpSize"), warnBrush));
 
             if (totalZones > 10)
             {
                 int playerCastles = (int)SldPlayerCastles.Value;
                 int neutralCastles = (int)SldNeutralCastles.Value;
                 if (playerCastles > 1 || neutralCastles > 1)
-                    warnings.Add(new ValidationMessage("Более 1 замка на зону при более чем 10 зонах может привести к зависанию игры при генерации карты. Уменьшите число замков.", warnBrush));
+                    warnings.Add(new ValidationMessage(L.Get("S.CB.V.ManyCastles"), warnBrush));
             }
 
             int minNeutralBetweenPlayers = (int)SldMinNeutralBetweenPlayers.Value;
@@ -624,7 +713,7 @@ namespace Olden_Era___Template_Editor
                 };
 
                 if (!TemplateGenerator.CanHonorNeutralSeparation(separationSettings, neutral))
-                        warnings.Add(new ValidationMessage("Минимальное нейтральное разделение нельзя гарантировать при текущей топологии, числе нейтр. зон или настройке порталов; эта опция будет проигнорирована.", warnBrush));
+                        warnings.Add(new ValidationMessage(L.Get("S.CB.V.MinSepIgnored"), warnBrush));
             }
 
             bool cityHoldActive = ChkCityHold.IsChecked == true;
@@ -632,7 +721,7 @@ namespace Olden_Era___Template_Editor
             {
                 if (selectedTopology != MapTopology.HubAndSpoke && neutral == 0)
                 {
-                    SetValidationError("Для «Удержания города» нужна хотя бы одна нейтральная зона. Добавьте нейтральную зону или выберите топологию «Хаб».");
+                    SetValidationError(L.Get("S.CB.V.CityHoldNeedNeutral"));
                     BtnPreview.IsEnabled = false;
                     return false;
                 }
@@ -640,7 +729,7 @@ namespace Olden_Era___Template_Editor
 
             if (ChkNoDirectPlayerConn.IsChecked == true && neutral == 0)
             {
-                SetValidationError("\"Соединять только через нейтральные зоны\" требует хотя бы одну нейтральную зону. Добавьте нейтральную зону или отключите эту опцию.");
+                SetValidationError(L.Get("S.CB.V.NeutralOnlyNeed"));
                 BtnPreview.IsEnabled = false;
                 return false;
             }
@@ -650,7 +739,7 @@ namespace Olden_Era___Template_Editor
                 : "win_condition_1";
             if (selectedVictoryCondition == "win_condition_6" && players != 2)
             {
-                SetValidationError("Режим турнира поддерживает ровно 2 игроков.");
+                SetValidationError(L.Get("S.CB.V.Tournament2"));
                 BtnPreview.IsEnabled = false;
                 return false;
             }
@@ -659,22 +748,22 @@ namespace Olden_Era___Template_Editor
             {
                 // Each neutral zone tier must be divisible by 2 so both players get an identical cluster.
                 var oddTiers = new System.Collections.Generic.List<string>();
-                if ((int)SldNeutralLowNoCastle.Value    % 2 != 0) oddTiers.Add("Слабая (без замка)");
-                if ((int)SldNeutralLowCastle.Value      % 2 != 0) oddTiers.Add("Слабая (с замком)");
-                if ((int)SldNeutralMediumNoCastle.Value % 2 != 0) oddTiers.Add("Средняя (без замка)");
-                if ((int)SldNeutralMediumCastle.Value   % 2 != 0) oddTiers.Add("Средняя (с замком)");
-                if ((int)SldNeutralHighNoCastle.Value   % 2 != 0) oddTiers.Add("Сильная (без замка)");
-                if ((int)SldNeutralHighCastle.Value     % 2 != 0) oddTiers.Add("Сильная (с замком)");
+                if ((int)SldNeutralLowNoCastle.Value    % 2 != 0) oddTiers.Add(L.Get("S.CB.Tier.WeakNo"));
+                if ((int)SldNeutralLowCastle.Value      % 2 != 0) oddTiers.Add(L.Get("S.CB.Tier.WeakYes"));
+                if ((int)SldNeutralMediumNoCastle.Value % 2 != 0) oddTiers.Add(L.Get("S.CB.Tier.MedNo"));
+                if ((int)SldNeutralMediumCastle.Value   % 2 != 0) oddTiers.Add(L.Get("S.CB.Tier.MedYes"));
+                if ((int)SldNeutralHighNoCastle.Value   % 2 != 0) oddTiers.Add(L.Get("S.CB.Tier.StrongNo"));
+                if ((int)SldNeutralHighCastle.Value     % 2 != 0) oddTiers.Add(L.Get("S.CB.Tier.StrongYes"));
                 if (oddTiers.Count > 0)
                 {
-                    SetValidationError($"Режим турнира требует, чтобы число зон каждого типа делилось на 2 для честной раскладки. Нечётное: {string.Join(", ", oddTiers)}.");
+                    SetValidationError(L.Get("S.CB.V.TournamentEven", string.Join(", ", oddTiers)));
                     BtnPreview.IsEnabled = false;
                     return false;
                 }
             }
 
             if ((int)SldBorderGuardStrength.Value > 100)
-                warnings.Add(new ValidationMessage("Сила охраны границ/порталов выше 100% может затруднить лёгким и средним ИИ-противникам прохождение — охрана станет слишком сильной.", warnBrush));
+                warnings.Add(new ValidationMessage(L.Get("S.CB.V.GuardHigh"), warnBrush));
 
             SetValidationMessages(warnings);
 
@@ -699,7 +788,7 @@ namespace Olden_Era___Template_Editor
 
         private static string FormatMapSize(int size) =>
             KnownValues.IsExperimentalMapSize(size)
-                ? $"{size}x{size} ({KnownValues.MapSizeLabel(size)}) (Experimental)"
+                ? $"{size}x{size} ({KnownValues.MapSizeLabel(size)}) {L.Get("S.MapExp")}"
                 : $"{size}x{size} ({KnownValues.MapSizeLabel(size)})";
 
         private static double GuardRandomizationPercent(double guardRandomization)
@@ -744,7 +833,7 @@ namespace Olden_Era___Template_Editor
             if (!IsInitialized) return;
             int idx = CmbTopology.SelectedIndex;
             if (idx >= 0 && idx < TopologyOptions.Length)
-                TxtTopologyDesc.Text = TopologyOptions[idx].Description;
+                TxtTopologyDesc.Text = L.Get(TopologyOptions[idx].Description);
 
             // Isolate option is only meaningful for Random and Chain topologies.
             var topo = idx >= 0 && idx < TopologyOptions.Length ? TopologyOptions[idx].Topology : MapTopology.Default;
@@ -807,9 +896,28 @@ namespace Olden_Era___Template_Editor
             return new BanEntry { Id = id, DisplayName = KnownValues.SidToDisplayName(id), Category = "Spell" };
         }
 
+        /// <summary>
+        /// Builds a BanEntry from a hero ID. Prefers the live game catalog (real localized name +
+        /// faction), then the built-in verified list, then a pattern-derived fallback.
+        /// </summary>
+        private static BanEntry HeroEntryFromId(string id)
+        {
+            if (Services.GameData.GameCatalogService.Instance.TryResolveHero(id, out var liveName, out var liveFaction, out var iconSid))
+                return new BanEntry
+                {
+                    Id = id, DisplayName = liveName, Category = liveFaction,
+                    Icon = Services.GameData.IconResolver.Resolve(iconSid),
+                };
+            var known = System.Array.Find(KnownValues.BannableHeroes, h => h.Id == id);
+            if (known != null)
+                return new BanEntry { Id = id, DisplayName = known.DisplayName, Category = known.Category };
+            var (displayName, faction) = KnownValues.DescribeHeroSid(id);
+            return new BanEntry { Id = id, DisplayName = displayName, Category = faction };
+        }
+
         /// <summary>Reloads an ObservableCollection from a newline-separated string of IDs.</summary>
         private static void LoadBanList(System.Collections.ObjectModel.ObservableCollection<BanEntry> col,
-                                        string raw, bool isMagics)
+                                        string raw, System.Func<string, BanEntry> factory)
         {
             col.Clear();
             if (string.IsNullOrWhiteSpace(raw)) return;
@@ -817,7 +925,7 @@ namespace Olden_Era___Template_Editor
             {
                 var trimmed = id.Trim();
                 if (trimmed.Length == 0) continue;
-                col.Add(isMagics ? MagicEntryFromId(trimmed) : ItemEntryFromId(trimmed));
+                col.Add(factory(trimmed));
             }
         }
 
@@ -825,7 +933,7 @@ namespace Olden_Era___Template_Editor
         {
             var entries = KnownValues.BannableItems
                 .Select(b => new BanEntry { Id = b.Id, DisplayName = b.DisplayName, Category = b.Category });
-            var picker = new ItemPickerWindow(entries, _bannedItems.Select(b => b.Id), "Бан предметов") { Owner = this };
+            var picker = new ItemPickerWindow(entries, _bannedItems.Select(b => b.Id), L.Get("S.CB.BanItems")) { Owner = this };
             if (picker.ShowDialog() == true)
             {
                 foreach (var id in picker.SelectedIds)
@@ -863,6 +971,100 @@ namespace Olden_Era___Template_Editor
                 var entry = _bannedMagics.FirstOrDefault(b => b.Id == id);
                 if (entry != null) { _bannedMagics.Remove(entry); MarkDirty(); }
             }
+        }
+
+        private async void BtnAddBannedHero_Click(object sender, RoutedEventArgs e)
+        {
+            // Full roster with real localized names from the installed game ONLY if the user
+            // opted into game assets; otherwise the built-in verified subset (out-of-the-box).
+            var catalog = Services.GameData.AppSettings.Current.UseGameAssets
+                ? await Services.GameData.GameCatalogService.Instance.GetCatalogAsync()
+                : new Services.GameData.GameCatalog();
+            IEnumerable<BanEntry> entries = catalog.Heroes.Count > 0
+                ? catalog.Heroes.Select(h => new BanEntry
+                  {
+                      Id = h.Sid, DisplayName = h.Name, Category = h.Faction,
+                      Icon = Services.GameData.IconResolver.Resolve(h.IconSid),
+                  })
+                : KnownValues.BannableHeroes.Select(h => new BanEntry { Id = h.Id, DisplayName = h.DisplayName, Category = h.Category });
+
+            var picker = new ItemPickerWindow(entries, _bannedHeroes.Select(b => b.Id), L.Get("S.CB.BanHeroes")) { Owner = this };
+            if (picker.ShowDialog() == true)
+            {
+                foreach (var id in picker.SelectedIds)
+                    if (!_bannedHeroes.Any(e => e.Id == id))
+                        _bannedHeroes.Add(HeroEntryFromId(id));
+                MarkDirty();
+            }
+        }
+
+        private void RemoveBannedHero_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement { Tag: string id })
+            {
+                var entry = _bannedHeroes.FirstOrDefault(b => b.Id == id);
+                if (entry != null) { _bannedHeroes.Remove(entry); MarkDirty(); }
+            }
+        }
+
+        /// <summary>Opt-in toggle for reading installed-game assets (full hero roster + icons).</summary>
+        private async void ChkUseGameAssets_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!IsInitialized || _suppressAssetToggle) return;
+
+            if (ChkUseGameAssets.IsChecked == true)
+            {
+                var ok = MessageBox.Show(this,
+                    L.Get("S.GA.DisclaimerMsg"),
+                    L.Get("S.GA.DisclaimerTitle"),
+                    MessageBoxButton.OKCancel, MessageBoxImage.Information);
+
+                if (ok != MessageBoxResult.OK)
+                {
+                    _suppressAssetToggle = true;
+                    ChkUseGameAssets.IsChecked = false;
+                    _suppressAssetToggle = false;
+                    return;
+                }
+
+                Services.GameData.AppSettings.Current.UseGameAssets = true;
+                Services.GameData.AppSettings.Current.Save();
+
+                await PrimeGameCatalogAsync();
+                var catalog = await Services.GameData.GameCatalogService.Instance.GetCatalogAsync();
+                if (catalog.Heroes.Count == 0)
+                    MessageBox.Show(this,
+                        L.Get("S.GA.NotFoundMsg"),
+                        L.Get("S.GA.NotFoundTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                else
+                    MessageBox.Show(this,
+                        L.Get("S.GA.ConnectedMsg", catalog.Heroes.Count),
+                        L.Get("S.GA.ConnectedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                Services.GameData.AppSettings.Current.UseGameAssets = false;
+                Services.GameData.AppSettings.Current.Save();
+            }
+        }
+
+        /// <summary>Loads the game-data catalog off-thread; once ready, upgrades any loaded hero-ban rows to real names.</summary>
+        private async Task PrimeGameCatalogAsync()
+        {
+            try
+            {
+                var catalog = await Services.GameData.GameCatalogService.Instance.GetCatalogAsync();
+                if (catalog.Heroes.Count > 0 && _bannedHeroes.Count > 0)
+                    RefreshBannedHeroNames();
+            }
+            catch { /* catalog is best-effort */ }
+        }
+
+        /// <summary>Re-resolves every loaded hero-ban row through the (now warm) catalog.</summary>
+        private void RefreshBannedHeroNames()
+        {
+            for (int i = 0; i < _bannedHeroes.Count; i++)
+                _bannedHeroes[i] = HeroEntryFromId(_bannedHeroes[i].Id);
         }
 
         // ── Bonus list handlers ───────────────────────────────────────────────────
@@ -932,30 +1134,50 @@ namespace Olden_Era___Template_Editor
             Validate();
         }
 
-        private const string PresetPlaceholder = "— Выберите пресет —";
-        private bool _applyingPreset = false;
-
-        /// <summary>Loads a built-in quick-start preset into the whole UI, then resets the picker.</summary>
-        private void CmbPreset_Changed(object sender, SelectionChangedEventArgs e)
+        /// <summary>Builds the grouped preset menu (one submenu per mode group) attached to the Пресет button.</summary>
+        private void BuildPresetMenu()
         {
-            if (!IsInitialized || _applyingPreset) return;
-            int idx = CmbPreset.SelectedIndex - 1; // index 0 is the placeholder
-            if (idx < 0 || idx >= Presets.All.Length) return;
+            bool en = L.CurrentLanguage == Services.Localization.AppLanguage.En;
+            var menu = new ContextMenu();
+            foreach (var group in Presets.All.GroupBy(p => p.GroupKey))
+            {
+                var groupItem = new MenuItem { Header = L.Get(group.Key) };
+                foreach (var preset in group)
+                {
+                    var item = new MenuItem { Header = preset.ShortNameLocalized(en), Tag = preset, ToolTip = preset.DescriptionLocalized(en) };
+                    item.Click += PresetMenuItem_Click;
+                    groupItem.Items.Add(item);
+                }
+                menu.Items.Add(groupItem);
+            }
+            BtnPreset.ContextMenu = menu;
+        }
 
-            _applyingPreset = true;
-            try
+        private void BtnPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (BtnPreset.ContextMenu is { } m)
             {
-                ApplySettings(Presets.All[idx].Settings);
-                _currentSettingsPath = null;
-                _isDirty = true;
-                UpdateTitle();
-                Validate();
+                m.PlacementTarget = BtnPreset;
+                m.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                m.IsOpen = true;
             }
-            finally
-            {
-                CmbPreset.SelectedIndex = 0; // behave like a one-shot "load" action
-                _applyingPreset = false;
-            }
+        }
+
+        private void PresetMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is MenuItem { Tag: Presets.Preset preset })
+                ApplyPreset(preset);
+        }
+
+        /// <summary>Loads a built-in quick-start preset into the whole UI.</summary>
+        private void ApplyPreset(Presets.Preset preset)
+        {
+            if (!IsInitialized) return;
+            ApplySettings(preset.Settings);
+            _currentSettingsPath = null;
+            _isDirty = true;
+            UpdateTitle();
+            Validate();
         }
 
         private void SldMaxPortals_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -980,6 +1202,9 @@ namespace Olden_Era___Template_Editor
             SldHeroMin.IsEnabled = !single;
             SldHeroMax.IsEnabled = !single;
             SldHeroIncrement.IsEnabled = !single;
+            TxtHeroMin.IsEnabled = !single;
+            TxtHeroMax.IsEnabled = !single;
+            TxtHeroIncrement.IsEnabled = !single;
             if (single)
             {
                 TxtHeroMin.Text = "1";
@@ -1571,6 +1796,7 @@ namespace Olden_Era___Template_Editor
             TournamentSaveArmy = ChkTournamentSaveArmy.IsChecked == true,
             BannedItems        = string.Join("\n", _bannedItems.Select(e => e.Id)),
             BannedMagics       = string.Join("\n", _bannedMagics.Select(e => e.Id)),
+            BannedHeroes       = string.Join("\n", _bannedHeroes.Select(e => e.Id)),
             ValueOverridesText = TxtValueOverrides.Text,
             BonusesJson        = string.Join("\n", _bonuses.Select(b => b.ToString())),
             // New format: save UI rows verbatim so Count and row identity are preserved.
@@ -1671,8 +1897,9 @@ namespace Olden_Era___Template_Editor
             SldTournamentInterval.Value = Math.Clamp(s.TournamentInterval, 1, 30);
             SldTournamentPointsToWin.Value = Math.Clamp(s.TournamentPointsToWin, 1, 10);
             ChkTournamentSaveArmy.IsChecked = s.TournamentSaveArmy;
-            LoadBanList(_bannedItems,  s.BannedItems,  isMagics: false);
-            LoadBanList(_bannedMagics, s.BannedMagics, isMagics: true);
+            LoadBanList(_bannedItems,  s.BannedItems,   ItemEntryFromId);
+            LoadBanList(_bannedMagics, s.BannedMagics,  MagicEntryFromId);
+            LoadBanList(_bannedHeroes, s.BannedHeroes,  HeroEntryFromId);
             LoadBonusList(s.BonusesJson);
             TxtValueOverrides.Text = s.ValueOverridesText;
             ApplyZoneContentRows(_playerZoneMandatoryContent,  s.PlayerZoneContentRows,    InitializeDefaultPlayerZoneContents);
@@ -1699,7 +1926,7 @@ namespace Olden_Era___Template_Editor
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Не удалось сохранить настройки:\n{ex.Message}", "Ошибка сохранения",
+                MessageBox.Show(L.Get("S.D.SaveSettingsErr", ex.Message), L.Get("S.D.SaveErrTitle"),
                                 MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
@@ -1707,7 +1934,7 @@ namespace Olden_Era___Template_Editor
 
         private void BtnNew_Click(object sender, RoutedEventArgs e)
         {
-            var result = MessageBox.Show("Сбросить все настройки по умолчанию?", "Новые настройки",
+            var result = MessageBox.Show(L.Get("S.D.ResetConfirm"), L.Get("S.D.ResetTitle"),
                                          MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes) return;
             ApplySettings(new SettingsFile());
@@ -1720,15 +1947,15 @@ namespace Olden_Era___Template_Editor
         {
             var dlg = new OpenFileDialog
             {
-                Title  = "Открыть файл настроек",
-                Filter = "Настройки шаблона (*.oetgs)|*.oetgs|Все файлы (*.*)|*.*",
+                Title  = L.Get("S.D.OpenTitle"),
+                Filter = L.Get("S.D.SettingsFilter"),
             };
             if (dlg.ShowDialog() != true) return;
             try
             {
                 var json = File.ReadAllText(dlg.FileName);
                 var s = JsonSerializer.Deserialize<SettingsFile>(json, JsonOptions);
-                if (s is null) throw new InvalidDataException("Файл пуст или повреждён.");
+                if (s is null) throw new InvalidDataException(L.Get("S.D.FileEmpty"));
                 ApplySettings(s);
                 _currentSettingsPath = dlg.FileName;
                 _isDirty = false;
@@ -1736,7 +1963,7 @@ namespace Olden_Era___Template_Editor
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Не удалось открыть настройки:\n{ex.Message}", "Ошибка открытия",
+                MessageBox.Show(L.Get("S.D.OpenErr", ex.Message), L.Get("S.D.OpenErrTitle"),
                                 MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -1753,9 +1980,9 @@ namespace Olden_Era___Template_Editor
         {
             var dlg = new SaveFileDialog
             {
-                Title      = "Сохранить настройки как",
-                Filter     = "Настройки шаблона (*.oetgs)|*.oetgs|Все файлы (*.*)|*.*",
-                FileName   = TxtTemplateName.Text.Trim().Length > 0 ? TxtTemplateName.Text.Trim() : "Мои настройки",
+                Title      = L.Get("S.D.SaveAsTitle"),
+                Filter     = L.Get("S.D.SettingsFilter"),
+                FileName   = TxtTemplateName.Text.Trim().Length > 0 ? TxtTemplateName.Text.Trim() : L.Get("S.D.MySettings"),
                 DefaultExt = ".oetgs",
             };
             if (dlg.ShowDialog() == true)
@@ -1783,6 +2010,80 @@ namespace Olden_Era___Template_Editor
             Validate(); // refresh warnings now that template is up to date
         }
 
+        private void BtnOpenEditor_Click(object sender, RoutedEventArgs e)
+        {
+            // Open the just-generated template if there is one; otherwise an empty editor
+            // where the user can load a .rmg.json directly.
+            var editor = new TemplateEditorWindow(_generatedTemplate, _generatedTopology) { Owner = this };
+            editor.Show();
+        }
+
+        private void BtnLang_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button { Tag: string tag }) return;
+            var lang = tag == "en"
+                ? Services.Localization.AppLanguage.En
+                : Services.Localization.AppLanguage.Ru;
+            Services.Localization.LocalizationManager.Instance.SetLanguage(lang);
+            Services.GameData.AppSettings.Current.Language = tag;
+            Services.GameData.AppSettings.Current.Save();
+            UpdateLanguageButtons();
+        }
+
+        /// <summary>Re-applies localized text everywhere that is driven by code (combos, preset menu, hero names).</summary>
+        private void OnLanguageChanged(object? sender, System.EventArgs e)
+        {
+            RefreshLocalizedLists();
+            _refreshingLists = true;
+            try { RefreshContentMenuLanguage(); } finally { _refreshingLists = false; }
+            foreach (var grp in new[] { _playerZoneMandatoryContent, _lowNeutralMandatoryContent,
+                                        _mediumNeutralMandatoryContent, _highNeutralMandatoryContent, _hubZoneMandatoryContent })
+                foreach (var item in grp.AllItems) item.RefreshDisplayName();
+            BuildPresetMenu();          // submenu group names + preset display names
+            RefreshBannedHeroNames();   // ban rows re-resolve names
+            UpdateLanguageButtons();
+            if (TxtWipWarning != null) TxtWipWarning.Text = L.Get("S.CB.Wip");
+            if (IsInitialized) { Validate(); UpdateTitle(); }  // refresh validation hints in the new language
+        }
+
+        /// <summary>Rebuilds option-combo item sources in the current language, preserving each selection.</summary>
+        private void RefreshLocalizedLists()
+        {
+            _refreshingLists = true;
+            try
+            {
+                void Rebind(System.Windows.Controls.ComboBox cb, System.Collections.Generic.List<string> items)
+                {
+                    int sel = cb.SelectedIndex;
+                    cb.ItemsSource = items;
+                    cb.SelectedIndex = sel >= 0 && sel < items.Count ? sel : (items.Count > 0 ? 0 : -1);
+                }
+
+                Rebind(CmbVictory, [.. KnownValues.VictoryConditionLabels.Select((_, i) => L.Get($"S.Victory.{i}"))]);
+                Rebind(CmbTopology, [.. TopologyOptions.Select(t => L.Get(t.Label))]);
+                Rebind(CmbTerrain, [.. TerrainOptions.Select(t => L.Get(t.Label))]);
+                Rebind(CmbMonsterAggression, [.. AggressionOptions.Select(a => L.Get(a.Label))]);
+                Rebind(CmbWaterLevel, [.. WaterOptions.Select(w => L.Get(w.Label))]);
+
+                RefreshMapSizeOptions();   // re-format sizes (localized "(experimental)" suffix)
+
+                int topoIdx = CmbTopology.SelectedIndex;
+                if (topoIdx >= 0 && topoIdx < TopologyOptions.Length && TxtTopologyDesc != null)
+                    TxtTopologyDesc.Text = L.Get(TopologyOptions[topoIdx].Description);
+            }
+            finally { _refreshingLists = false; }
+        }
+
+        private void UpdateLanguageButtons()
+        {
+            if (BtnLangRu is null || BtnLangEn is null) return;
+            bool en = Services.Localization.LocalizationManager.Instance.CurrentLanguage == Services.Localization.AppLanguage.En;
+            BtnLangRu.FontWeight = en ? FontWeights.Normal : FontWeights.Bold;
+            BtnLangEn.FontWeight = en ? FontWeights.Bold   : FontWeights.Normal;
+            BtnLangRu.Opacity    = en ? 0.55 : 1.0;
+            BtnLangEn.Opacity    = en ? 1.0  : 0.55;
+        }
+
         private void BtnSaveGenerated_Click(object sender, RoutedEventArgs e)
         {
             if (_generatedTemplate is null) return;
@@ -1793,9 +2094,9 @@ namespace Olden_Era___Template_Editor
 
             var dlg = new SaveFileDialog
             {
-                Title = "Сохранить шаблон",
-                Filter = "Шаблон RMG (*.rmg.json)|*.rmg.json",
-                FileName = $"{(currentTemplateName.Length > 0 ? currentTemplateName : "Свой шаблон")}.rmg.json",
+                Title = L.Get("S.D.SaveTplTitle"),
+                Filter = L.Get("S.D.TplFilter"),
+                FileName = $"{(currentTemplateName.Length > 0 ? currentTemplateName : L.Get("S.M.014"))}.rmg.json",
                 DefaultExt = ".rmg.json"
             };
 
@@ -1807,11 +2108,11 @@ namespace Olden_Era___Template_Editor
             if (!IsInsideGameTemplatesFolder(dlg.FileName, gameTemplatesPath))
             {
                 string expectedDesc = gameTemplatesPath != null
-                    ? $"Ожидается:\n{gameTemplatesPath}\n\n"
-                    : $"Ожидаемая структура папок:\n...\\HeroesOldenEra_Data\\StreamingAssets\\map_templates\n\n";
+                    ? L.Get("S.D.ExpectedPath", gameTemplatesPath)
+                    : L.Get("S.D.ExpectedStruct");
                 var wrongFolderResult = MessageBox.Show(
-                    $"Файл сохраняется вне ожидаемой папки шаблонов.\n\n{expectedDesc}Выбрано:\n{Path.GetDirectoryName(dlg.FileName)}\n\nШаблоны, сохранённые в другом месте, не появятся в игре. Всё равно сохранить здесь?",
-                    "Неверная папка",
+                    L.Get("S.D.WrongFolderMsg", expectedDesc, Path.GetDirectoryName(dlg.FileName) ?? ""),
+                    L.Get("S.D.WrongFolderTitle"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning);
                 if (wrongFolderResult != MessageBoxResult.Yes) return;
@@ -1821,8 +2122,8 @@ namespace Olden_Era___Template_Editor
             if (!chosenBaseName.Equals(currentTemplateName, StringComparison.Ordinal))
             {
                 var mismatchResult = MessageBox.Show(
-                    $"Файл будет сохранён как \"{Path.GetFileName(dlg.FileName)}\", но в игре шаблон будет называться \"{currentTemplateName}\".\n\n«Да» — сохранить как есть, «Нет» — вернуться и переименовать шаблон.",
-                    "Несовпадение имени шаблона",
+                    L.Get("S.D.NameMismatchMsg", Path.GetFileName(dlg.FileName), currentTemplateName),
+                    L.Get("S.D.NameMismatchTitle"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning);
                 if (mismatchResult != MessageBoxResult.Yes) return;
@@ -1845,18 +2146,18 @@ namespace Olden_Era___Template_Editor
                 }
             }
 
-            string savedMsg = $"Шаблон успешно сохранён:\n\n{dlg.FileName}";
+            string savedMsg = L.Get("S.D.SavedMsg", dlg.FileName);
             if (ChkSavePreviewImage.IsChecked == true)
             {
                 if (previewError == null)
-                    savedMsg += $"\n\nПревью PNG сохранено:\n\n{previewPath}";
+                    savedMsg += L.Get("S.D.SavedPreview", previewPath);
                 else
-                    savedMsg += $"\n\nШаблон сохранён, но превью PNG записать не удалось:\n{previewError}";
+                    savedMsg += L.Get("S.D.SavedPreviewErr", previewError);
             }
             if (gameTemplatesPath == null)
-                savedMsg += "\n\n\n💡 Подсказка: шаблоны должны лежать в:\n<папка установки Olden Era>\\HeroesOldenEra_Data\\StreamingAssets\\map_templates";
+                savedMsg += L.Get("S.D.SavedHint");
 
-            MessageBox.Show(savedMsg, "Сохранено", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(savedMsg, L.Get("S.D.SavedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private GeneratorSettings BuildSettings() => new()
@@ -1948,6 +2249,7 @@ namespace Olden_Era___Template_Editor
             },
             BannedItems        = string.Join("\n", _bannedItems.Select(e => e.Id)),
             BannedMagics       = string.Join("\n", _bannedMagics.Select(e => e.Id)),
+            BannedHeroes       = string.Join("\n", _bannedHeroes.Select(e => e.Id)),
             ValueOverridesText = TxtValueOverrides.Text,
             Bonuses            = [.. _bonuses],
         };

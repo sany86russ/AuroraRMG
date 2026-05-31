@@ -66,13 +66,13 @@ namespace Olden_Era___Template_Editor
             {
                 (LblResourceAmount.Text, TxtResourceAmount.Text) = type switch
                 {
-                    BonusPresetType.StartingGold     => ("Кол-во золота",     "10000"),
-                    BonusPresetType.StartingGems     => ("Кол-во самоцветов",     "15"),
-                    BonusPresetType.StartingCrystals => ("Кол-во кристаллов", "15"),
-                    BonusPresetType.StartingMercury  => ("Кол-во ртути",  "15"),
-                    BonusPresetType.StartingWood     => ("Кол-во древесины",     "20"),
-                    BonusPresetType.StartingOre      => ("Кол-во руды",      "20"),
-                    _                                => ("Количество",          "10000"),
+                    BonusPresetType.StartingGold     => (Services.Localization.LocalizationManager.T("S.Bonus.AmtGold"),     "10000"),
+                    BonusPresetType.StartingGems     => (Services.Localization.LocalizationManager.T("S.Bonus.AmtGems"),     "15"),
+                    BonusPresetType.StartingCrystals => (Services.Localization.LocalizationManager.T("S.Bonus.AmtCrystals"), "15"),
+                    BonusPresetType.StartingMercury  => (Services.Localization.LocalizationManager.T("S.Bonus.AmtMercury"),  "15"),
+                    BonusPresetType.StartingWood     => (Services.Localization.LocalizationManager.T("S.Bonus.AmtWood"),     "20"),
+                    BonusPresetType.StartingOre      => (Services.Localization.LocalizationManager.T("S.Bonus.AmtOre"),      "20"),
+                    _                                => (Services.Localization.LocalizationManager.T("S.Bonus.021"),         "10000"),
                 };
             }
         }
@@ -107,7 +107,7 @@ namespace Olden_Era___Template_Editor
         {
             var entries = KnownValues.BannableItems
                 .Select(b => new BanEntry { Id = b.Id, DisplayName = b.DisplayName, Category = b.Category });
-            var picker = new ItemPickerWindow(entries, _existingItemIds, "Выбор стартового предмета") { Owner = this };
+            var picker = new ItemPickerWindow(entries, _existingItemIds, Services.Localization.LocalizationManager.T("S.Bonus.ChooseItem")) { Owner = this };
             if (picker.ShowDialog() != true) return;
 
             if (picker.SelectedIds.Count > 1)
@@ -143,7 +143,7 @@ namespace Olden_Era___Template_Editor
                     param = TxtSpell.Text.Trim();
                     if (string.IsNullOrEmpty(param))
                     {
-                        MessageBox.Show("Сначала выберите заклинание.", "Проверка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show(Services.Localization.LocalizationManager.T("S.Bonus.SelectSpellFirst"), Services.Localization.LocalizationManager.T("S.Bonus.Validation"), MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
                     param2 = ChkMakeFree.IsChecked == true ? "1" : "0";
@@ -163,7 +163,7 @@ namespace Olden_Era___Template_Editor
                     param = TxtItem.Text.Trim();
                     if (string.IsNullOrEmpty(param))
                     {
-                        MessageBox.Show("Введите или выберите ID артефакта.", "Проверка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show(Services.Localization.LocalizationManager.T("S.Bonus.EnterArtifactId"), Services.Localization.LocalizationManager.T("S.Bonus.Validation"), MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
                     break;
@@ -184,7 +184,7 @@ namespace Olden_Era___Template_Editor
 
             if (_existingKeys.Contains(candidate.ToString()))
             {
-                MessageBox.Show("Этот бонус уже добавлен.", "Дубликат", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(Services.Localization.LocalizationManager.T("S.Bonus.AlreadyAdded"), Services.Localization.LocalizationManager.T("S.Bonus.Duplicate"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 

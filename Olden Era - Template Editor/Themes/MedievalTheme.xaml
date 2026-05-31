@@ -715,4 +715,77 @@
         </Setter>
     </Style>
 
+    <!-- ── Aurora-styled menus (ContextMenu + MenuItem) ───────────────────────── -->
+    <Style TargetType="ContextMenu">
+        <Setter Property="Background"  Value="{StaticResource BrushInput}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorder}"/>
+        <Setter Property="Foreground"  Value="{StaticResource BrushText}"/>
+        <Setter Property="FontSize"    Value="13"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="1" CornerRadius="7" Padding="4"
+                            SnapsToDevicePixels="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.55" Color="#000000"/>
+                        </Border.Effect>
+                        <ItemsPresenter/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{StaticResource BrushText}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding"    Value="11,6"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Grid>
+                        <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="4"/>
+                        <Grid Margin="{TemplateBinding Padding}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter Grid.Column="0" ContentSource="Header"
+                                              VerticalAlignment="Center" RecognizesAccessKey="True"/>
+                            <TextBlock x:Name="Arrow" Grid.Column="1" Text="›" FontSize="15"
+                                       Margin="14,0,0,0" VerticalAlignment="Center"
+                                       Foreground="{StaticResource BrushTextDim}" Visibility="Collapsed"/>
+                        </Grid>
+                        <Popup x:Name="SubPopup" Placement="Right" HorizontalOffset="3"
+                               IsOpen="{TemplateBinding IsSubmenuOpen}" AllowsTransparency="True"
+                               Focusable="False" PopupAnimation="Fade">
+                            <Border Background="{StaticResource BrushInput}"
+                                    BorderBrush="{StaticResource BrushBorder}"
+                                    BorderThickness="1" CornerRadius="7" Padding="4">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.55" Color="#000000"/>
+                                </Border.Effect>
+                                <ItemsPresenter/>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="HasItems" Value="True">
+                            <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bg" Property="Background" Value="{StaticResource BrushHover}"/>
+                            <Setter Property="Foreground" Value="{StaticResource BrushGold}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource BrushTextDim}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

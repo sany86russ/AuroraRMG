@@ -11,7 +11,138 @@ namespace Olden_Era___Template_Editor.Models
     /// </summary>
     public static class Presets
     {
-        public sealed record Preset(string Name, string Description, SettingsFile Settings);
+        public sealed record Preset(string Name, string Description, SettingsFile Settings)
+        {
+            /// <summary>Mode group, derived from the name prefix — used to organise the preset menu.</summary>
+            public string Group =>
+                  Name.StartsWith("1v1 Классика",   System.StringComparison.Ordinal) ? "1v1 — Классика"
+                : Name.StartsWith("1v1 Один герой", System.StringComparison.Ordinal) ? "1v1 — Один герой"
+                : Name.StartsWith("ПвЕ",            System.StringComparison.Ordinal) ? "ПвЕ — 1 против ИИ"
+                : "FFA / мультиплеер";
+
+            /// <summary>Name with the group prefix stripped, for compact display inside its submenu.</summary>
+            public string ShortName
+            {
+                get
+                {
+                    int dash = Name.IndexOf('—');
+                    return dash >= 0 ? Name[(dash + 1)..].Trim() : Name;
+                }
+            }
+
+            /// <summary>Localization key for the group submenu header.</summary>
+            public string GroupKey => Group switch
+            {
+                "1v1 — Классика"     => "S.PG.Classic",
+                "1v1 — Один герой"   => "S.PG.SingleHero",
+                "ПвЕ — 1 против ИИ"  => "S.PG.PvE",
+                _                     => "S.PG.FFA",
+            };
+
+            /// <summary>Submenu display name in the requested language (EN map → else the RU short name).</summary>
+            public string ShortNameLocalized(bool english) =>
+                english && EnShort.TryGetValue(Name, out var en) ? en : ShortName;
+
+            /// <summary>Tooltip description in the requested language (EN map → else the RU description).</summary>
+            public string DescriptionLocalized(bool english) =>
+                english && EnDesc.TryGetValue(Name, out var en) ? en : Description;
+        }
+
+        /// <summary>English tooltip descriptions, keyed by the (stable) Russian preset name.</summary>
+        public static readonly Dictionary<string, string> EnDesc = new()
+        {
+            ["1v1 Классика — Дуэль (быстрая)"]          = "Small map, ring, minimal neutrals — a fast 2-player game.",
+            ["1v1 Классика — Стандарт"]                 = "Medium balanced map with neutral zones of varying quality.",
+            ["1v1 Классика — Богатые земли"]            = "More resources and structures, random terrain, aggressive neutrals.",
+            ["1v1 Классика — Удержание города"]         = "Win by holding the central neutral town (City Hold).",
+            ["1v1 Классика — Турнир"]                   = "1v1 tournament mode: isolated mirrored clusters, a series of battles.",
+            ["1v1 Классика — Острова (вода)"]           = "Zones separated by water, random terrain — focus on scouting and portals.",
+            ["1v1 Один герой — Блиц"]                   = "One hero per player, small map — very fast games.",
+            ["1v1 Один герой — Дуэль"]                  = "One hero, medium map, balanced neutrals.",
+            ["1v1 Один герой — Эпопея"]                 = "One hero, large map, many neutrals and aggressive monsters.",
+            ["1v1 Классика — Хаб"]                      = "All zones around a shared central hub; players don't border directly.",
+            ["1v1 Классика — Цепь"]                     = "Linear map: zones stretched in a chain from one player to the other.",
+            ["1v1 Классика — Изоляция"]                 = "Players connected only through neutral zones — they meet only via the center.",
+            ["1v1 Классика — Снежная"]                  = "Snowy terrain across the whole map.",
+            ["1v1 Классика — Лавовая"]                  = "Scorched lava lands with aggressive monsters.",
+            ["1v1 Классика — Пустыня"]                  = "Sandy open spaces, few obstacles.",
+            ["1v1 Классика — Хардкор"]                  = "Strong guards, aggressive monsters, rugged terrain.",
+            ["1v1 Классика — Мирная (эконом)"]          = "Passive monsters, weak guards, a fast economic start.",
+            ["1v1 Классика — Два замка"]                = "Players start with two towns of their faction in their zone.",
+            ["1v1 Один герой — Хаб"]                    = "One hero per player, central hub.",
+            ["1v1 Один герой — Снежный блиц"]           = "One hero, small snowy map — very fast.",
+            ["FFA 3 игрока — Классика"]                 = "Three each for themselves on a balanced map.",
+            ["FFA 4 игрока — Классика"]                 = "Four on a medium-large balanced map.",
+            ["FFA 4 игрока — Хаб"]                      = "Four around a shared central hub.",
+            ["FFA 6 игроков — Кольцо"]                  = "Six players around a ring.",
+            ["FFA 8 игроков — Большая"]                 = "Eight players on a large balanced map.",
+            ["Король горы (4 игрока)"]                  = "Win by holding the central hub town. Four players.",
+            ["Бойня — быстрая FFA (4)"]                 = "Small map, everything close, abundant resources — constant skirmishes.",
+            ["ПвЕ — 1 против 2"]                        = "One player vs two computers. Balanced 3-side map.",
+            ["ПвЕ — 1 против 3"]                        = "One player vs three computers. Balanced 4-side map.",
+            ["ПвЕ — 1 против 4"]                        = "One player vs four computers. Five on a balanced map.",
+            ["ПвЕ — 1 против 5"]                        = "One player vs five computers. Six on a large map.",
+            ["ПвЕ — 1 против 6"]                        = "One player vs six computers. Seven on a large map.",
+            ["ПвЕ — 1 против 7"]                        = "One player vs seven computers. Eight sides on the largest map.",
+            ["1v1 Один герой — Турнир"]                 = "One hero, 1v1 tournament mode: a series of mirrored battles.",
+            ["1v1 Один герой — Удержание города"]       = "One hero, win by holding the central neutral town.",
+            ["1v1 Один герой — Острова"]                = "One hero, zones separated by water, with portals.",
+            ["1v1 Один герой — Цепь"]                   = "One hero, linear chain map.",
+            ["1v1 Классика — Сокровищница хаба"]        = "A rich, well-guarded central hub — a race for the center.",
+            ["1v1 Классика — Порталы"]                  = "Random layout, players isolated, many portals between zones.",
+            ["1v1 Классика — Мега-богатая (песочница)"] = "Maximum resources and structures, passive monsters, two starting towns.",
+            ["1v1 Классика — Аскеза (выживание)"]       = "Few resources and structures, strong neutrals — a fight for every mine.",
+            ["1v1 Классика — Глубокая вода"]            = "Wide water borders and portals — a naval map.",
+            ["FFA 8 игроков — Хаб"]                     = "Eight players around one big central hub.",
+        };
+
+        /// <summary>English submenu names, keyed by the (stable) Russian preset name.</summary>
+        public static readonly Dictionary<string, string> EnShort = new()
+        {
+            ["1v1 Классика — Дуэль (быстрая)"]          = "Duel (fast)",
+            ["1v1 Классика — Стандарт"]                 = "Standard",
+            ["1v1 Классика — Богатые земли"]            = "Rich lands",
+            ["1v1 Классика — Удержание города"]         = "City hold",
+            ["1v1 Классика — Турнир"]                   = "Tournament",
+            ["1v1 Классика — Острова (вода)"]           = "Islands (water)",
+            ["1v1 Один герой — Блиц"]                   = "Blitz",
+            ["1v1 Один герой — Дуэль"]                  = "Duel",
+            ["1v1 Один герой — Эпопея"]                 = "Epic",
+            ["1v1 Классика — Хаб"]                      = "Hub",
+            ["1v1 Классика — Цепь"]                     = "Chain",
+            ["1v1 Классика — Изоляция"]                 = "Isolation",
+            ["1v1 Классика — Снежная"]                  = "Snowy",
+            ["1v1 Классика — Лавовая"]                  = "Lava",
+            ["1v1 Классика — Пустыня"]                  = "Desert",
+            ["1v1 Классика — Хардкор"]                  = "Hardcore",
+            ["1v1 Классика — Мирная (эконом)"]          = "Peaceful (economy)",
+            ["1v1 Классика — Два замка"]                = "Two towns",
+            ["1v1 Один герой — Хаб"]                    = "Hub",
+            ["1v1 Один герой — Снежный блиц"]           = "Snow blitz",
+            ["FFA 3 игрока — Классика"]                 = "3 players — Classic",
+            ["FFA 4 игрока — Классика"]                 = "4 players — Classic",
+            ["FFA 4 игрока — Хаб"]                      = "4 players — Hub",
+            ["FFA 6 игроков — Кольцо"]                  = "6 players — Ring",
+            ["FFA 8 игроков — Большая"]                 = "8 players — Large",
+            ["Король горы (4 игрока)"]                  = "King of the Hill (4 players)",
+            ["Бойня — быстрая FFA (4)"]                 = "Massacre — fast FFA (4)",
+            ["ПвЕ — 1 против 2"]                        = "1 vs 2",
+            ["ПвЕ — 1 против 3"]                        = "1 vs 3",
+            ["ПвЕ — 1 против 4"]                        = "1 vs 4",
+            ["ПвЕ — 1 против 5"]                        = "1 vs 5",
+            ["ПвЕ — 1 против 6"]                        = "1 vs 6",
+            ["ПвЕ — 1 против 7"]                        = "1 vs 7",
+            ["1v1 Один герой — Турнир"]                 = "Tournament",
+            ["1v1 Один герой — Удержание города"]       = "City hold",
+            ["1v1 Один герой — Острова"]                = "Islands",
+            ["1v1 Один герой — Цепь"]                   = "Chain",
+            ["1v1 Классика — Сокровищница хаба"]        = "Hub treasury",
+            ["1v1 Классика — Порталы"]                  = "Portals",
+            ["1v1 Классика — Мега-богатая (песочница)"] = "Mega-rich (sandbox)",
+            ["1v1 Классика — Аскеза (выживание)"]       = "Asceticism (survival)",
+            ["1v1 Классика — Глубокая вода"]            = "Deep water",
+            ["FFA 8 игроков — Хаб"]                     = "8 players — Hub",
+        };
 
         /// <summary>All built-in presets, in display order.</summary>
         public static readonly Preset[] All =
@@ -318,6 +449,67 @@ namespace Olden_Era___Template_Editor.Models
                     PlayerZoneCastles = 1, MonsterAggression = MonsterAggression.Passive,
                     ResourceDensityPercent = 160, StructureDensityPercent = 140,
                     HeroCountMin = 5, HeroCountMax = 10, HeroCountIncrement = 2,
+                }),
+
+            // ── PvE: one player vs N computers (1×N) ──
+            new("ПвЕ — 1 против 2",
+                "Один игрок против двух компьютеров. Сбалансированная карта на троих.",
+                new SettingsFile
+                {
+                    TemplateName = "ПвЕ 1 против 2", PlayerCount = 3, MapSize = 160,
+                    Topology = MapTopology.Balanced, AdvancedMode = true,
+                    NeutralLowCastleCount = 3, NeutralMediumCastleCount = 3, PlayerZoneCastles = 1,
+                    HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
+                }),
+
+            new("ПвЕ — 1 против 3",
+                "Один игрок против трёх компьютеров. Сбалансированная карта на четверых.",
+                new SettingsFile
+                {
+                    TemplateName = "ПвЕ 1 против 3", PlayerCount = 4, MapSize = 176,
+                    Topology = MapTopology.Balanced, AdvancedMode = true,
+                    NeutralLowCastleCount = 4, NeutralMediumCastleCount = 4, NeutralHighNoCastleCount = 2,
+                    PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
+                }),
+
+            new("ПвЕ — 1 против 4",
+                "Один игрок против четырёх компьютеров. Пятеро на сбалансированной карте.",
+                new SettingsFile
+                {
+                    TemplateName = "ПвЕ 1 против 4", PlayerCount = 5, MapSize = 184,
+                    Topology = MapTopology.Balanced, AdvancedMode = true,
+                    NeutralLowCastleCount = 5, NeutralMediumCastleCount = 5, NeutralHighNoCastleCount = 2,
+                    PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
+                }),
+
+            new("ПвЕ — 1 против 5",
+                "Один игрок против пяти компьютеров. Шестеро на большой карте.",
+                new SettingsFile
+                {
+                    TemplateName = "ПвЕ 1 против 5", PlayerCount = 6, MapSize = 192,
+                    Topology = MapTopology.Balanced, AdvancedMode = true,
+                    NeutralLowCastleCount = 6, NeutralMediumCastleCount = 6, NeutralHighNoCastleCount = 3,
+                    PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
+                }),
+
+            new("ПвЕ — 1 против 6",
+                "Один игрок против шести компьютеров. Семеро на большой карте.",
+                new SettingsFile
+                {
+                    TemplateName = "ПвЕ 1 против 6", PlayerCount = 7, MapSize = 200,
+                    Topology = MapTopology.Balanced, AdvancedMode = true,
+                    NeutralLowCastleCount = 7, NeutralMediumCastleCount = 6, NeutralHighNoCastleCount = 3,
+                    PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
+                }),
+
+            new("ПвЕ — 1 против 7",
+                "Один игрок против семи компьютеров. Восемь сторон на самой большой карте.",
+                new SettingsFile
+                {
+                    TemplateName = "ПвЕ 1 против 7", PlayerCount = 8, MapSize = 208,
+                    Topology = MapTopology.Balanced, AdvancedMode = true,
+                    NeutralLowCastleCount = 8, NeutralMediumCastleCount = 6, NeutralHighNoCastleCount = 4,
+                    PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
                 }),
 
             // ── More Single-Hero 1v1 variations ──

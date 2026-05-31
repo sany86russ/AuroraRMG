@@ -42,8 +42,7 @@ namespace Olden_Era___Template_Editor
         {
             string newLabel = FormatVersion(info.Version);
             string curLabel = FormatVersion(UpdateService.CurrentVersion);
-            TxtUpdateBanner.Text =
-                $"Доступна новая версия AuroraRMG {newLabel}  ·  установлена {curLabel}.";
+            TxtUpdateBanner.Text = L.Get("S.Upd.Available", newLabel, curLabel);
             BtnUpdateNotes.Visibility = string.IsNullOrWhiteSpace(info.ReleaseNotes)
                 ? Visibility.Collapsed
                 : Visibility.Visible;
@@ -73,7 +72,7 @@ namespace Olden_Era___Template_Editor
             }
             catch
             {
-                MessageBox.Show(this, url, "Страница релиза",
+                MessageBox.Show(this, url, L.Get("S.Upd.RelPage"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }

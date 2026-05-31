@@ -1543,4 +1543,89 @@ public class TemplateGeneratorTests
 
         return best.TryGetValue(to, out int shortest) ? shortest : int.MaxValue;
     }
+
+    // ── Hero bans (globalBans.heroes) ─────────────────────────────────────────
+
+    [Fact]
+    public void Generate_EmitsBannedHeroesIntoGlobalBans()
+    {
+        var settings = new GeneratorSettings
+        {
+            TemplateName = "Hero Ban Test",
+            GameMode     = "Classic",
+            MapSize      = 160,
+            Topology     = MapTopology.Default,
+            BannedItems  = "pole_star_artifact",
+            BannedMagics = "neutral_magic_town_portal",
+            BannedHeroes = "demon_hero_3\nnature_hero_17\nhuman_hero_8",
+        };
+
+        RmgTemplate template = TemplateGenerator.Generate(settings);
+
+        Assert.NotNull(template.GlobalBans);
+        Assert.NotNull(template.GlobalBans!.Heroes);
+        Assert.Equal(
+            new[] { "demon_hero_3", "nature_hero_17", "human_hero_8" },
+            template.GlobalBans.Heroes!.ToArray());
+
+        // The schema key must be exactly "heroes" — the engine reads globalBans.heroes.
+        string json = JsonSerializer.Serialize(template);
+        Assert.Contains("\"heroes\"", json);
+    }
+
+    [Fact]
+    public void Generate_WithNoHeroBans_OmitsHeroesList()
+    {
+        var settings = new GeneratorSettings
+        {
+            TemplateName = "No Hero Ban",
+            GameMode     = "Classic",
+            MapSize      = 160,
+            Topology     = MapTopology.Default,
+            BannedItems  = "pole_star_artifact",
+        };
+
+        RmgTemplate template = TemplateGenerator.Generate(settings);
+
+        Assert.NotNull(template.GlobalBans);
+        Assert.Null(template.GlobalBans!.Heroes);
+    }
+
+    [Fact]
+    public void Generate_HighCustomHeroCount_IsPreserved()
+    {
+        // The hero-count UI now accepts free numeric entry beyond the old cap of 12.
+        var settings = new GeneratorSettings
+        {
+            TemplateName = "Twenty Heroes",
+            GameMode     = "Classic",
+            MapSize      = 160,
+            Topology     = MapTopology.Default,
+            HeroSettings = new HeroSettings
+            {
+                HeroCountMin       = 20,
+                HeroCountMax       = 20,
+                HeroCountIncrement = 0,
+            },
+        };
+
+        RmgTemplate template = TemplateGenerator.Generate(settings);
+
+        Assert.NotNull(template.GameRules);
+        Assert.Equal(20, template.GameRules!.HeroCountMax);
+        Assert.Equal(20, template.GameRules.HeroCountMin); // min - increment (0) = 20
+    }
+
+    [Fact]
+    public void BannableHeroes_AllFollowFactionHeroPattern()
+    {
+        Assert.NotEmpty(KnownValues.BannableHeroes);
+        foreach (var hero in KnownValues.BannableHeroes)
+        {
+            var (_, faction) = KnownValues.DescribeHeroSid(hero.Id);
+            Assert.Equal(hero.Category, faction);
+            Assert.Contains(hero.Category, KnownValues.HeroFactions);
+            Assert.Matches(@"^[a-z]+_hero_\d+$", hero.Id);
+        }
+    }
 }
