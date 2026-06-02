@@ -184,6 +184,7 @@ namespace Olden_Era___Template_Editor
                 _ = PrimeGameCatalogAsync(); // warm names/icons only when the user has opted in
 
             UpdateLanguageButtons();
+            InitSimpleMode();   // populate simple-mode combos/seed + apply the saved Simple/Advanced mode
 
             InitializeZoneContentPresets();
             InitializeDefaultPlayerZoneContents();
@@ -2176,6 +2177,14 @@ namespace Olden_Era___Template_Editor
                 Rebind(CmbMonsterAggression, [.. AggressionOptions.Select(a => L.Get(a.Label))]);
                 Rebind(CmbWaterLevel, [.. WaterOptions.Select(w => L.Get(w.Label))]);
 
+                // Simple Mode / Quick Generate option combos
+                Rebind(CmbSimpleType,   [.. SimpleTypeKeys.Select(k => L.Get(k))]);
+                Rebind(CmbSimpleScale,  [.. SimpleScaleKeys.Select(k => L.Get(k))]);
+                Rebind(CmbSimpleLength, [.. SimpleLengthKeys.Select(k => L.Get(k))]);
+                Rebind(CmbSimpleChaos,  [.. SimpleChaosKeys.Select(k => L.Get(k))]);
+                // Same victory-condition set the Advanced tab exposes (the real in-game modes).
+                Rebind(CmbSimpleVictory, [.. KnownValues.VictoryConditionLabels.Select((_, i) => L.Get($"S.Victory.{i}"))]);
+
                 RefreshMapSizeOptions();   // re-format sizes (localized "(experimental)" suffix)
 
                 int topoIdx = CmbTopology.SelectedIndex;
@@ -2193,6 +2202,284 @@ namespace Olden_Era___Template_Editor
             BtnLangEn.FontWeight = en ? FontWeights.Bold   : FontWeights.Normal;
             BtnLangRu.Opacity    = en ? 0.55 : 1.0;
             BtnLangEn.Opacity    = en ? 1.0  : 0.55;
+        }
+
+        // ── Simple Mode / Quick Generate ──────────────────────────────────────────
+
+        private static readonly string[] SimpleTypeKeys   = ["S.Simple.Type.Duel", "S.Simple.Type.FFA", "S.Simple.Type.Pve", "S.Simple.Type.Team"];
+        private static readonly string[] SimpleScaleKeys  = ["S.Simple.Scale.Small", "S.Simple.Scale.Medium", "S.Simple.Scale.Large"];
+        private static readonly string[] SimpleLengthKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];
+        private static readonly string[] SimpleChaosKeys  = ["S.Simple.Chaos.Tame", "S.Simple.Chaos.Normal", "S.Simple.Chaos.Wild"];
+
+        private GeneratorSettings? _lastQuickSettings;
+
+        /// <summary>Sets sensible defaults for the simple-mode combos + seed and applies the saved mode.</summary>
+        private void InitSimpleMode()
+        {
+            ApplySimpleState(Services.GameData.AppSettings.Current.Simple); // restore last-used selections
+            TxtSimpleSeed.Text = ((uint)NewSeed()).ToString("X8");           // always a fresh seed per launch
+
+            bool advanced = string.Equals(Services.GameData.AppSettings.Current.Mode, "advanced", StringComparison.OrdinalIgnoreCase);
+            SetMode(advanced, persist: false);
+        }
+
+        private void ApplySimpleState(Services.GameData.SimpleModeState st)
+        {
+            void SetCombo(System.Windows.Controls.ComboBox cb, int idx)
+            { if (cb.Items.Count > 0) cb.SelectedIndex = Math.Clamp(idx, 0, cb.Items.Count - 1); }
+
+            SldSimplePlayers.Value = Math.Clamp(st.Players, (int)SldSimplePlayers.Minimum, (int)SldSimplePlayers.Maximum);
+            SetCombo(CmbSimpleType, st.Type);
+            SetCombo(CmbSimpleScale, st.Scale);
+            SetCombo(CmbSimpleLength, st.Length);
+            SetCombo(CmbSimpleChaos, st.Chaos);
+            SetCombo(CmbSimpleVictory, st.Victory);
+            ChkSimpleWater.IsChecked = st.Water;
+            ChkSimplePortals.IsChecked = st.Portals;
+            ChkSimpleStrong.IsChecked = st.StrongNeutrals;
+        }
+
+        private void SaveSimpleState()
+        {
+            var st = Services.GameData.AppSettings.Current.Simple;
+            st.Players        = (int)SldSimplePlayers.Value;
+            st.Type           = CmbSimpleType.SelectedIndex;
+            st.Scale          = CmbSimpleScale.SelectedIndex;
+            st.Length         = CmbSimpleLength.SelectedIndex;
+            st.Chaos          = CmbSimpleChaos.SelectedIndex;
+            st.Victory        = CmbSimpleVictory.SelectedIndex;
+            st.Water          = ChkSimpleWater.IsChecked == true;
+            st.Portals        = ChkSimplePortals.IsChecked == true;
+            st.StrongNeutrals = ChkSimpleStrong.IsChecked == true;
+            Services.GameData.AppSettings.Current.Save();
+        }
+
+        private void SetMode(bool advanced, bool persist = true)
+        {
+            if (AdvancedView == null || SimpleView == null) return;
+            AdvancedView.Visibility = advanced ? Visibility.Visible : Visibility.Collapsed;
+            SimpleView.Visibility   = advanced ? Visibility.Collapsed : Visibility.Visible;
+            UpdateModeButtons(advanced);
+            if (persist)
+            {
+                Services.GameData.AppSettings.Current.Mode = advanced ? "advanced" : "simple";
+                Services.GameData.AppSettings.Current.Save();
+            }
+        }
+
+        private void UpdateModeButtons(bool advanced)
+        {
+            if (BtnModeSimple == null || BtnModeAdvanced == null) return;
+            BtnModeSimple.FontWeight   = advanced ? FontWeights.Normal : FontWeights.Bold;
+            BtnModeAdvanced.FontWeight = advanced ? FontWeights.Bold   : FontWeights.Normal;
+            BtnModeSimple.Opacity      = advanced ? 0.55 : 1.0;
+            BtnModeAdvanced.Opacity    = advanced ? 1.0  : 0.55;
+        }
+
+        private void BtnMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { Tag: string tag })
+                SetMode(tag == "advanced");
+        }
+
+        private static int NewSeed() => new Random().Next(int.MinValue, int.MaxValue);
+
+        private static int ParseSeed(string? text)
+        {
+            text = (text ?? "").Trim();
+            if (uint.TryParse(text, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out uint hex))
+                return unchecked((int)hex);
+            if (int.TryParse(text, out int dec)) return dec;
+            return NewSeed();
+        }
+
+        private void BtnSimpleRoll_Click(object sender, RoutedEventArgs e)
+            => TxtSimpleSeed.Text = ((uint)NewSeed()).ToString("X8");
+
+        private QuickGenerateOptions BuildQuickOptions() => new()
+        {
+            PlayerCount    = (int)SldSimplePlayers.Value,
+            GameType       = (QuickGameType)Math.Clamp(CmbSimpleType.SelectedIndex, 0, 3),
+            Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 2),
+            Length         = (QuickGameLength)Math.Clamp(CmbSimpleLength.SelectedIndex, 0, 2),
+            Chaos          = (QuickChaos)Math.Clamp(CmbSimpleChaos.SelectedIndex, 0, 2),
+            Water          = ChkSimpleWater.IsChecked == true,
+            Portals        = ChkSimplePortals.IsChecked == true,
+            StrongNeutrals = ChkSimpleStrong.IsChecked == true,
+            VictoryCondition = CmbSimpleVictory.SelectedIndex >= 0 && CmbSimpleVictory.SelectedIndex < KnownValues.VictoryConditionIds.Length
+                ? KnownValues.VictoryConditionIds[CmbSimpleVictory.SelectedIndex]
+                : "win_condition_1",
+            Seed           = ParseSeed(TxtSimpleSeed.Text),
+        };
+
+        private void BtnSimpleGenerate_Click(object sender, RoutedEventArgs e)
+        {
+            var opts = BuildQuickOptions();
+            TxtSimpleSeed.Text = ((uint)opts.Seed).ToString("X8"); // normalise display
+            var settings = Olden_Era___Template_Editor.Services.Generation.RandomTemplateBuilder.Build(opts);
+
+            _generatedTemplate = TemplateGenerator.Generate(settings);
+            _generatedTopology = settings.Topology;
+            _templateOutdated  = false;
+            _lastQuickSettings = settings;
+            TxtTemplateName.Text = settings.TemplateName; // so the Save dialog uses the generated name
+
+            ImgSimplePreview.Source = TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology);
+            TxtSimpleNoPreview.Visibility = Visibility.Collapsed;
+            TxtSimpleSummary.Text = BuildSimpleSummary(settings, opts);
+            BtnSimpleSaveToGame.IsEnabled = true;
+            BtnSimpleSave.IsEnabled = true;
+            BtnSimpleOpenAdvanced.IsEnabled = true;
+            BtnSaveGenerated.Visibility = Visibility.Visible; // keep the advanced save path in sync too
+            SaveSimpleState();                                 // remember these selections for next launch
+        }
+
+        private static readonly string[] SimpleLenLabelKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];
+
+        private string BuildSimpleSummary(GeneratorSettings s, QuickGenerateOptions opts)
+        {
+            var topo = TopologyOptions.FirstOrDefault(t => t.Topology == s.Topology);
+            string topoLabel = topo.Label != null ? L.Get(topo.Label) : s.Topology.ToString();
+            string lengthLabel = L.Get(SimpleLenLabelKeys[EstimateLengthIndex(s.MapSize, opts.Length)]);
+
+            string summary = L.Get("S.Simple.Sum.Length", lengthLabel)
+                           + "\n" + L.Get("S.Simple.Sum.Line", s.PlayerCount, s.MapSize, topoLabel);
+
+            var extras = new System.Collections.Generic.List<string>();
+            if (s.WaterLevel != WaterLevel.None) extras.Add(L.Get("S.Simple.Water"));
+            if (s.RandomPortals) extras.Add(L.Get("S.Simple.Portals"));
+            if (s.MonsterAggression == MonsterAggression.Aggressive) extras.Add(L.Get("S.Simple.StrongNeutrals"));
+            if (extras.Count > 0) summary += "\n" + L.Get("S.Simple.SumExtras", string.Join(", ", extras));
+            return summary;
+        }
+
+        /// <summary>Maps map size + desired length to a 0/1/2 (short/medium/long) bucket for the summary.</summary>
+        private static int EstimateLengthIndex(int mapSize, QuickGameLength length)
+        {
+            int sizeBucket = mapSize <= 96 ? 0 : (mapSize <= 160 ? 1 : 2);
+            double score = sizeBucket + length switch
+            {
+                QuickGameLength.Short => -0.5,
+                QuickGameLength.Long => 0.5,
+                _ => 0.0,
+            };
+            return score < 0.5 ? 0 : (score < 1.5 ? 1 : 2);
+        }
+
+        private void BtnSimpleSave_Click(object sender, RoutedEventArgs e) => BtnSaveGenerated_Click(sender, e);
+
+        private void BtnSimpleOpenAdvanced_Click(object sender, RoutedEventArgs e)
+        {
+            if (_lastQuickSettings != null) SyncAdvancedFromSettings(_lastQuickSettings);
+            SetMode(advanced: true);
+        }
+
+        /// <summary>Pushes the principal fields of a quick-generated settings object into the advanced
+        /// controls so the user can tweak the random map by hand. Best-effort, not every field.</summary>
+        private void SyncAdvancedFromSettings(GeneratorSettings s)
+        {
+            _suppressTopologySync = true;
+            try
+            {
+                TxtTemplateName.Text = s.TemplateName;
+                SldPlayers.Value = s.PlayerCount;
+                RefreshMapSizeOptions(s.MapSize);
+
+                int topoIdx = Array.FindIndex(TopologyOptions, t => t.Topology == s.Topology);
+                if (topoIdx >= 0) { CmbTopology.SelectedIndex = topoIdx; CmbMapView.SelectedIndex = topoIdx; }
+
+                int vicIdx = Array.IndexOf(KnownValues.VictoryConditionIds, s.GameEndConditions.VictoryCondition);
+                if (vicIdx >= 0) CmbVictory.SelectedIndex = vicIdx;
+
+                int terrIdx = Array.FindIndex(TerrainOptions, t => t.Theme == s.Terrain);
+                if (terrIdx >= 0) CmbTerrain.SelectedIndex = terrIdx;
+                int watIdx = Array.FindIndex(WaterOptions, w => w.Level == s.WaterLevel);
+                if (watIdx >= 0) CmbWaterLevel.SelectedIndex = watIdx;
+                int aggIdx = Array.FindIndex(AggressionOptions, ag => ag.Level == s.MonsterAggression);
+                if (aggIdx >= 0) CmbMonsterAggression.SelectedIndex = aggIdx;
+
+                SldResourceDensity.Value     = s.ZoneCfg.ResourceDensityPercent;
+                SldStructureDensity.Value    = s.ZoneCfg.StructureDensityPercent;
+                SldNeutralStackStrength.Value = s.ZoneCfg.NeutralStackStrengthPercent;
+                SldBorderGuardStrength.Value = s.ZoneCfg.BorderGuardStrengthPercent;
+                SldDiplomacy.Value           = s.NeutralDiplomacyModifier * 100.0;
+                SldTerrainRoughness.Value    = s.TerrainRoughnessPercent;
+                SldLakeAmount.Value          = s.LakeAmountPercent;
+
+                var a = s.ZoneCfg.Advanced;
+                SldNeutral.Value = a.NeutralLowNoCastleCount + a.NeutralLowCastleCount
+                                 + a.NeutralMediumNoCastleCount + a.NeutralMediumCastleCount
+                                 + a.NeutralHighNoCastleCount + a.NeutralHighCastleCount;
+
+                ChkRandomPortals.IsChecked    = s.RandomPortals;
+                SldMaxPortals.Value           = s.MaxPortalConnections;
+                ChkEncounterHoles.IsChecked   = s.EncounterHoles;
+                ChkNoDirectPlayerConn.IsChecked = s.NoDirectPlayerConnections;
+            }
+            finally { _suppressTopologySync = false; }
+
+            if (_generatedTemplate != null)
+            {
+                ImgPreview.Source = TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology);
+                lblNoPreview.Content = "?";
+                BtnSaveGenerated.Visibility = Visibility.Visible;
+                BtnSaveGenerated.IsEnabled = true;
+            }
+        }
+
+        private async void BtnSimpleCopySeed_Click(object sender, RoutedEventArgs e)
+        {
+            try { Clipboard.SetText(TxtSimpleSeed.Text.Trim()); }
+            catch { return; } // clipboard can be transiently locked — ignore
+            if (sender is Button btn)
+            {
+                object? prev = btn.Content;
+                btn.Content = "✓";
+                await System.Threading.Tasks.Task.Delay(900);
+                btn.Content = prev;
+            }
+        }
+
+        /// <summary>One-click save straight into the game's map_templates folder (no dialog).</summary>
+        private void BtnSimpleSaveToGame_Click(object sender, RoutedEventArgs e)
+        {
+            if (_generatedTemplate is null) return;
+
+            string? gameDir = FindOldenEraTemplatesPath();
+            if (string.IsNullOrEmpty(gameDir) || !Directory.Exists(gameDir))
+            {
+                MessageBox.Show(L.Get("S.Simple.NoGameFolder"), L.Get("S.D.SavedTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                BtnSimpleSave_Click(sender, e); // fall back to the manual save dialog
+                return;
+            }
+
+            // Ask the player what to call the map (this is the name the game shows in its picker).
+            string suggested = TxtTemplateName.Text.Trim();
+            if (suggested.Length == 0) suggested = "AuroraQuick";
+            var prompt = new NamePromptWindow(suggested) { Owner = this };
+            if (prompt.ShowDialog() != true) return;
+            string chosen = prompt.MapName;
+
+            _generatedTemplate.Name = chosen;  // in-game template name
+            TxtTemplateName.Text = chosen;     // keep the rest of the UI in sync
+
+            string fileName = chosen;
+            foreach (char c in Path.GetInvalidFileNameChars()) fileName = fileName.Replace(c, '_');
+            string path = Path.Combine(gameDir, fileName + ".rmg.json");
+
+            try
+            {
+                File.WriteAllText(path, JsonSerializer.Serialize(_generatedTemplate, JsonOptions));
+                try { TemplatePreviewPngWriter.Save(_generatedTemplate, TemplatePreviewPngWriter.GetSidecarPath(path), _generatedTopology); }
+                catch { /* preview sidecar is best-effort */ }
+                MessageBox.Show(L.Get("S.Simple.SavedToGame", path), L.Get("S.D.SavedTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, L.Get("S.D.SavedTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void BtnSaveGenerated_Click(object sender, RoutedEventArgs e)

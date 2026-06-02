@@ -27,6 +27,21 @@ namespace Olden_Era___Template_Editor
             (3, "ui-bonuses-bans"),
         ];
 
+        /// <summary>Renders the current window content to <paramref name="dir"/>/<paramref name="file"/>.png.</summary>
+        private void CaptureRoot(FrameworkElement root, string dir, string file)
+        {
+            int w = (int)Math.Ceiling(root.ActualWidth);
+            int h = (int)Math.Ceiling(root.ActualHeight);
+            if (w <= 0 || h <= 0) return;
+
+            var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(root);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(rtb));
+            using var fs = new FileStream(Path.Combine(dir, file + ".png"), FileMode.Create, FileAccess.Write);
+            encoder.Save(fs);
+        }
+
         /// <summary>
         /// Headless ReadyMaps regeneration (<c>--gen-readymaps &lt;dir&gt;</c>): writes every built-in
         /// preset to "[Gen] &lt;TemplateName&gt;.rmg.json" via the shared export options (literal UTF-8,
@@ -68,6 +83,21 @@ namespace Olden_Era___Template_Editor
                 root.UpdateLayout();
                 await Task.Delay(400);
 
+                // ── Simple Mode (the default landing view) ──
+                SetMode(advanced: false, persist: false);
+                try { BtnSimpleGenerate_Click(this, new RoutedEventArgs()); } catch { /* preview is best-effort */ }
+                await Dispatcher.Yield(DispatcherPriority.Background);
+                root.UpdateLayout();
+                await Task.Delay(550);
+                await Dispatcher.Yield(DispatcherPriority.Background);
+                CaptureRoot(root, dir, "ui-simple");
+
+                // ── Advanced Mode tabs ──
+                SetMode(advanced: true, persist: false);
+                await Dispatcher.Yield(DispatcherPriority.Background);
+                root.UpdateLayout();
+                await Task.Delay(300);
+
                 foreach (var (index, file) in ShootTabs)
                 {
                     if (index >= MainTabs.Items.Count) continue;
@@ -79,18 +109,7 @@ namespace Olden_Era___Template_Editor
                     await Task.Delay(450);
                     await Dispatcher.Yield(DispatcherPriority.Background);
 
-                    int w = (int)Math.Ceiling(root.ActualWidth);
-                    int h = (int)Math.Ceiling(root.ActualHeight);
-                    if (w <= 0 || h <= 0) continue;
-
-                    var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
-                    rtb.Render(root);
-
-                    var encoder = new PngBitmapEncoder();
-                    encoder.Frames.Add(BitmapFrame.Create(rtb));
-                    string path = Path.Combine(dir, file + ".png");
-                    using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write))
-                        encoder.Save(fs);
+                    CaptureRoot(root, dir, file);
                 }
             }
             catch

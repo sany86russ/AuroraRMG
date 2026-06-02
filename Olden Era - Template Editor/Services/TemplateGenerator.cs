@@ -29,8 +29,20 @@ namespace Olden_Era___Template_Editor.Services
             "Q", "R", "S", "T", "U", "V", "W", "X",
             "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"
         ];
+        /// <summary>
+        /// Per-generation RNG for all placement randomisation. Seeded from
+        /// <see cref="GeneratorSettings.Seed"/> at the start of <see cref="Generate"/> so a given seed
+        /// reproduces the same map; falls back to a time-based RNG when no seed is set (manual mode).
+        /// <c>[ThreadStatic]</c> keeps parallel test runs isolated — a single <see cref="Generate"/>
+        /// call runs entirely on one thread.
+        /// </summary>
+        [System.ThreadStatic] private static Random? _rng;
+        private static Random Rng => _rng ??= new Random();
+
         public static RmgTemplate Generate(GeneratorSettings settings)
         {
+            _rng = settings.Seed.HasValue ? new Random(settings.Seed.Value) : new Random();
+
             var playerLetters = ZoneLetters.Take(settings.PlayerCount).ToList();
             var neutralZones = BuildNeutralZonePlan(settings);
 
@@ -868,7 +880,7 @@ namespace Olden_Era___Template_Editor.Services
         private static Variant BuildVariant(GeneratorSettings settings, List<string> playerLetters, List<NeutralZonePlan> neutralZones, GenerationTuning tuning, string? holdCityNeutralLetter = null, bool hubIsHoldCity = false)
         {
             // Always shuffle player letters so players are not always at the same geometric positions.
-            playerLetters = [.. playerLetters.OrderBy(_ => Random.Shared.Next())];
+            playerLetters = [.. playerLetters.OrderBy(_ => Rng.Next())];
 
             bool isTournament = settings.TournamentRules.Enabled || settings.GameEndConditions.VictoryCondition == "win_condition_6";
             if (isTournament && playerLetters.Count == 2)
@@ -919,7 +931,7 @@ namespace Olden_Era___Template_Editor.Services
 
             // Randomize the chain order, but use the same permutation for both players
             // so each cluster has an identical slot structure (mirrored layout).
-            var rng = new Random();
+            var rng = Rng;
 
             // Order each player's neutrals ascending by quality so the chain reads:
             // player → low → medium → high  (mirrors the ordering used in non-tournament layouts).
@@ -1566,7 +1578,7 @@ namespace Olden_Era___Template_Editor.Services
 
         private static Variant BuildVariantRandom(GeneratorSettings settings, List<string> playerLetters, List<NeutralZonePlan> neutralZones, GenerationTuning tuning, string? holdCityNeutralLetter = null)
         {
-            var rng = new Random();
+            var rng = Rng;
             var neutralByLetter = neutralZones.ToDictionary(zone => zone.Letter);
             var neutralLetters = neutralZones.Select(zone => zone.Letter).ToList();
             // Shuffle zones so player/neutral order is fully random.
@@ -2998,7 +3010,7 @@ namespace Olden_Era___Template_Editor.Services
 
             // Build a derangement where zone[i] -> zone[dest[i]] and dest[i] is never an
             // immediate neighbour (i-1, i, i+1 mod count).
-            var rng = new Random();
+            var rng = Rng;
             int[] dest = BuildNonAdjacentDerangement(count, rng);
 
             // Shuffle which zones get portals so limiting the count picks random zones,

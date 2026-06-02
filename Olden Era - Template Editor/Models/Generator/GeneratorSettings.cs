@@ -73,6 +73,13 @@ namespace Olden_Era___Template_Editor.Models
         public bool SingleHeroMode { get; set; } = false;
         public int PlayerCount { get; set; } = 2;
         public int MapSize { get; set; } = 160;
+        /// <summary>
+        /// Optional deterministic seed. When set, <see cref="Services.TemplateGenerator.Generate"/>
+        /// seeds its internal placement RNG so the same settings reproduce the same map (the basis of
+        /// Simple Mode's shareable seeds). Null = time-based RNG, i.e. the legacy non-deterministic
+        /// behaviour used by the manual/advanced path.
+        /// </summary>
+        public int? Seed { get; set; }
         public HeroSettings HeroSettings { get; set; } = new HeroSettings();
         
         public bool NoDirectPlayerConnections { get; set; } = false;

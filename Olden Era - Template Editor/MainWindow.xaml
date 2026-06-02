@@ -100,6 +100,12 @@
                         <Button Content="💾" Width="38" Margin="0,0,4,0" Click="BtnSave_Click"   Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.003}"/>
                         <Button Content="💾…" Width="44" Margin="0,0,8,0" Click="BtnSaveAs_Click" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.004}"/>
                         <Border Width="1" Background="{StaticResource BrushBorder}" Margin="0,4,8,4" VerticalAlignment="Stretch"/>
+                        <!-- Simple / Advanced mode toggle -->
+                        <Button x:Name="BtnModeSimple" Content="{DynamicResource S.Mode.Simple}" Tag="simple"
+                                Margin="0,0,2,0" Click="BtnMode_Click" Style="{StaticResource ToolbarButton}"/>
+                        <Button x:Name="BtnModeAdvanced" Content="{DynamicResource S.Mode.Advanced}" Tag="advanced"
+                                Margin="0,0,8,0" Click="BtnMode_Click" Style="{StaticResource ToolbarButton}"/>
+                        <Border Width="1" Background="{StaticResource BrushBorder}" Margin="0,4,8,4" VerticalAlignment="Stretch"/>
                         <Button x:Name="BtnLangRu" Content="RU" Width="34" Margin="0,0,2,0" Click="BtnLang_Click" Tag="ru" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.006}"/>
                         <Button x:Name="BtnLangEn" Content="EN" Width="34" Click="BtnLang_Click" Tag="en" Style="{StaticResource ToolbarButton}" ToolTip="English language"/>
                     </StackPanel>
@@ -169,8 +175,14 @@
                     </Border>
                 </StackPanel>
 
-        <!-- ════════ MAIN CONTENT — left nav rail + content + preview ═════════ -->
-        <Grid Grid.Row="2">
+        <!-- ════════ MAIN CONTENT — mode toggle + (Simple | Advanced) views ════ -->
+        <DockPanel Grid.Row="2" LastChildFill="True">
+
+            <!-- View host: exactly one of AdvancedView / SimpleView is visible.
+                 The Simple/Advanced toggle lives in the top command bar (next to RU/EN). -->
+            <Grid>
+
+            <Grid x:Name="AdvancedView">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="14"/>
@@ -3056,6 +3068,191 @@ ValueChanged="Slider_ValueChanged"/>
             </Grid>
 
         </Grid>
+        <!-- ↑ end AdvancedView (the full editor) -->
+
+        <!-- ════════ SIMPLE MODE / QUICK GENERATE ════════════════════════════ -->
+        <Border x:Name="SimpleView" Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="14"/>
+                    <ColumnDefinition Width="320"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ── Options ─────────────────────────────────────────── -->
+                <Border Grid.Column="0" Style="{StaticResource SectionBorder}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel MaxWidth="520" HorizontalAlignment="Left">
+                        <TextBlock Text="{DynamicResource S.Simple.Title}" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Text="{DynamicResource S.Simple.Subtitle}" TextWrapping="Wrap"
+                                   Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,14"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Players -->
+                            <Label Grid.Row="0" Grid.Column="0" Content="{DynamicResource S.Simple.Players}" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="0" Grid.Column="1" x:Name="SldSimplePlayers"
+                                    Minimum="2" Maximum="8" Value="4" VerticalAlignment="Center"
+                                    TickFrequency="1" IsSnapToTickEnabled="True"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2" MinWidth="28" Margin="8,0,0,0"
+                                       VerticalAlignment="Center" Style="{StaticResource ValueText}"
+                                       Text="{Binding Value, ElementName=SldSimplePlayers, StringFormat={}{0:F0}}"/>
+
+                            <!-- Game type -->
+                            <Label Grid.Row="2" Grid.Column="0" Content="{DynamicResource S.Simple.GameType}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CmbSimpleType"/>
+
+                            <!-- Map size -->
+                            <Label Grid.Row="4" Grid.Column="0" Content="{DynamicResource S.Simple.Scale}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CmbSimpleScale"/>
+
+                            <!-- Game length -->
+                            <Label Grid.Row="6" Grid.Column="0" Content="{DynamicResource S.Simple.Length}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CmbSimpleLength"/>
+
+                            <!-- Chaos -->
+                            <Label Grid.Row="8" Grid.Column="0" Content="{DynamicResource S.Simple.Chaos}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CmbSimpleChaos"/>
+
+                            <!-- Victory condition (the real in-game modes) -->
+                            <Label Grid.Row="10" Grid.Column="0" Content="{DynamicResource S.Simple.Victory}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CmbSimpleVictory"/>
+                        </Grid>
+
+                        <!-- Extras -->
+                        <TextBlock Text="{DynamicResource S.Simple.Extras}" Margin="0,16,0,6"
+                                   Foreground="{StaticResource BrushTextDim}" FontSize="12"/>
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox x:Name="ChkSimpleWater" Content="{DynamicResource S.Simple.Water}" Margin="0,0,18,0"/>
+                            <CheckBox x:Name="ChkSimplePortals" Content="{DynamicResource S.Simple.Portals}" Margin="0,0,18,0"/>
+                            <CheckBox x:Name="ChkSimpleStrong" Content="{DynamicResource S.Simple.StrongNeutrals}"/>
+                        </StackPanel>
+
+                        <!-- Seed -->
+                        <Grid Margin="0,16,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Label Grid.Column="0" Content="{DynamicResource S.Simple.Seed}" VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="1" x:Name="TxtSimpleSeed" VerticalAlignment="Center"
+                                     FontFamily="Consolas" ToolTip="{DynamicResource S.Simple.SeedTip}"/>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="6,0,0,0">
+                                <Button x:Name="BtnSimpleRoll" Content="🎲" Width="38"
+                                        Click="BtnSimpleRoll_Click" Style="{StaticResource ToolbarButton}"
+                                        ToolTip="{DynamicResource S.Simple.Roll}"/>
+                                <Button x:Name="BtnSimpleCopySeed" Content="📋" Width="38" Margin="4,0,0,0"
+                                        Click="BtnSimpleCopySeed_Click" Style="{StaticResource ToolbarButton}"
+                                        ToolTip="{DynamicResource S.Simple.Copy}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Button x:Name="BtnSimpleGenerate" Margin="0,18,0,0" Height="44"
+                                Content="{DynamicResource S.Simple.Generate}"
+                                Style="{StaticResource GenerateButton}"
+                                Click="BtnSimpleGenerate_Click"/>
+
+                        <!-- Aurora help legend — what each option means -->
+                        <Border Margin="0,18,0,0" Padding="14,12" CornerRadius="10"
+                                Background="{StaticResource BrushPanelAlt}"
+                                BorderBrush="{StaticResource BrushGold}" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource S.Simple.HelpTitle}"
+                                           Foreground="{StaticResource BrushCyan}" FontWeight="SemiBold"
+                                           FontSize="13" Margin="0,0,0,8"/>
+                                <TextBlock Text="{DynamicResource S.Simple.Help.Players}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="{DynamicResource S.Simple.Help.Type}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="{DynamicResource S.Simple.Help.Scale}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="{DynamicResource S.Simple.Help.Length}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="{DynamicResource S.Simple.Help.Chaos}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="{DynamicResource S.Simple.Help.Victory}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="{DynamicResource S.Simple.Help.Extras}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,8"/>
+                                <!-- Seed — emphasised (the shareable fingerprint) -->
+                                <Border Padding="10,8" CornerRadius="8" Background="#16213A"
+                                        BorderBrush="{StaticResource BrushCyan}" BorderThickness="1">
+                                    <TextBlock Text="{DynamicResource S.Simple.Help.Seed}" TextWrapping="Wrap"
+                                               Foreground="{StaticResource BrushText}" FontSize="12"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- ── Preview / summary / actions ─────────────────────── -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>     <!-- preview -->
+                        <RowDefinition Height="8"/>
+                        <RowDefinition Height="Auto"/>  <!-- summary -->
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="Auto"/>  <!-- save to game (primary) -->
+                        <RowDefinition Height="6"/>
+                        <RowDefinition Height="Auto"/>  <!-- save as… -->
+                        <RowDefinition Height="6"/>
+                        <RowDefinition Height="Auto"/>  <!-- open advanced -->
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" BorderThickness="2" CornerRadius="4"
+                            BorderBrush="{StaticResource BrushBorder}" Background="#0E1117">
+                        <Grid>
+                            <TextBlock x:Name="TxtSimpleNoPreview"
+                                       Text="{DynamicResource S.Simple.NoPreview}"
+                                       Foreground="{StaticResource BrushTextDim}" FontSize="13"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       TextAlignment="Center" TextWrapping="Wrap"/>
+                            <Image x:Name="ImgSimplePreview" Stretch="Uniform"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   Margin="4"
+                                   VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Grid.Row="2">
+                        <TextBlock Text="{DynamicResource S.Simple.SummaryTitle}" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock x:Name="TxtSimpleSummary" TextWrapping="Wrap"
+                                   Foreground="{StaticResource BrushText}" FontSize="12"/>
+                    </StackPanel>
+
+                    <Button Grid.Row="4" x:Name="BtnSimpleSaveToGame"
+                            Content="{DynamicResource S.Simple.SaveToGame}"
+                            Style="{StaticResource GenerateButton}"
+                            IsEnabled="False" Click="BtnSimpleSaveToGame_Click"/>
+
+                    <Button Grid.Row="6" x:Name="BtnSimpleSave"
+                            Content="{DynamicResource S.Simple.SaveAs}"
+                            IsEnabled="False" Click="BtnSimpleSave_Click"/>
+
+                    <Button Grid.Row="8" x:Name="BtnSimpleOpenAdvanced"
+                            Content="{DynamicResource S.Simple.OpenAdvanced}"
+                            IsEnabled="False" Click="BtnSimpleOpenAdvanced_Click"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+            </Grid>  <!-- end view host -->
+        </DockPanel>
 
                     <!-- Hidden combos required by code-behind -->
         <ComboBox Grid.Row="0" x:Name="CmbGameMode" Visibility="Collapsed"/>

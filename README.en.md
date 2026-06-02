@@ -24,20 +24,30 @@
 
 ---
 
-## 🆕 What's new in 1.1.0
+## 🆕 What's new in 1.2.0
 
-- **Fixed a critical encoding bug.** Cyrillic template names are now written as real UTF-8 (no BOM) — previously the `.rmg.json` contained `\uXXXX` escape runs that broke the template in-game. Built-in presets also got Latin internal names for safety.
-- **New interface layout.** Sections moved to a single top row of colour-coded "tangible" tabs (**Map Rules · Zone Setup · Zone Content · Bonuses & Bans**), and the **🗺 Editor** button is set apart. Switch tabs with `Ctrl+Tab`. The **Heroes** and **Template** blocks were swapped and reworked.
-- **More victory conditions.** Added **"Final Battle"** (as in Blitz) and **"Capital Hold"** (as in Crossroads), with the correct in-game names.
-- **New fields:** "Ban hiring extra heroes" and "Highlight players on the minimap from day N".
-- **🎲 Random pick** of a ready-made template matching the current player count (click to cycle).
-- Finer slider steps for experience (**10%**) and diplomacy (**0.05**); "Topology" renamed to the clearer **"Map view"** and mirrored into the Template block.
+### ⚡ Simple Mode — "a map in a few clicks"
+
+The headline feature is a **Simple generation mode** for players who don't want to learn templates. Pick a few clear options — **number of players, game type, map size, game length, chaos level and victory condition** — and click **"Create map"**. Everything else is chosen at random within safe, sensible values, and you get a ready, playable map.
+
+![Simple Mode](docs/ui-simple-en.png)
+
+- A **Simple / Advanced** toggle in the top bar (next to the language). The full manual mode with every setting is still there.
+- **Map seed** — its fingerprint: the same seed always yields the same map. Share the seed to play an identical map with friends (🎲 = new random, 📋 = copy).
+- **Save straight into the game folder** with one button (it asks for a name) — the map shows up in a custom game right away.
+- All the real in-game **victory conditions**: classic, city hold, capital hold, final battle, tournament — each with its own rules.
+- A short **hint for every option** and an estimated game length, right in the window.
+- The app **remembers** your last selections.
+
+### 🛠 Also
+
+- **Fixed loading the game's own templates.** The editor failed to open some stock templates (e.g. `Expanse.rmg.json`) because the game writes certain fields sometimes as a string and sometimes as an array — all 120 now load.
 
 ---
 
 ## 📑 Contents
 
-- [What's new in 1.1.0](#-whats-new-in-110)
+- [What's new in 1.2.0](#-whats-new-in-120)
 - [What is this](#-what-is-this)
 - [Installation](#-installation)
 - [Build authenticity verification](#-build-authenticity-verification)

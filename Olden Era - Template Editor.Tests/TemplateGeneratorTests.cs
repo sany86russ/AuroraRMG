@@ -1,5 +1,6 @@
 using Olden_Era___Template_Editor.Models;
 using Olden_Era___Template_Editor.Services;
+using Olden_Era___Template_Editor.Services.Generation;
 using OldenEraTemplateEditor.Models;
 using System.Diagnostics;
 using System.Text.Json;
@@ -906,6 +907,360 @@ public class TemplateGeneratorTests
         Assert.NotNull(deserialized);
         Assert.Equal(generated.Name, deserialized.Name);
         Assert.Single(deserialized.Variants ?? []);
+    }
+
+    // ── Loading stock templates: sid-list fields may be a bare string OR an array ──
+    // The official templates (Expanse, Crossroads, Wastelands, …) write fields like
+    // contentCountLimits as a bare string in some zones and an array in others. The default
+    // deserializer only accepted arrays, so opening such a template failed with
+    // "The JSON value could not be converted to System.Collections.Generic.List`1[System.String]
+    //  Path: $.variants[0].zones[0].contentCountLimits". JsonExport.Options must tolerate both.
+
+    [Fact]
+    public void Load_ZoneSidListField_AcceptsBothBareStringAndArray()
+    {
+        // zones[0] uses the bare-string form (the exact shape that broke loading Expanse.rmg.json);
+        // zones[1] uses the array form. Other sid-list fields are exercised in both forms too.
+        const string json = """
+            {
+              "variants": [
+                {
+                  "zones": [
+                    {
+                      "name": "Spawn-A",
+                      "contentCountLimits": "content_limits_spawn",
+                      "guardedContentPool": "content_pool_start_guarded",
+                      "mandatoryContent": "mandatory_content_spawn"
+                    },
+                    {
+                      "name": "Spawn-B",
+                      "contentCountLimits": ["content_limits_spawn"],
+                      "guardedContentPool": ["content_pool_a", "content_pool_b"]
+                    }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        RmgTemplate? template = JsonSerializer.Deserialize<RmgTemplate>(json, JsonExport.Options);
+
+        Assert.NotNull(template);
+        List<Zone> zones = template.Variants![0].Zones!;
+
+        // Bare-string form is read as a single-element list.
+        Assert.Equal(new[] { "content_limits_spawn" }, zones[0].ContentCountLimits);
+        Assert.Equal(new[] { "content_pool_start_guarded" }, zones[0].GuardedContentPool);
+        Assert.Equal(new[] { "mandatory_content_spawn" }, zones[0].MandatoryContent);
+
+        // Array form is unchanged.
+        Assert.Equal(new[] { "content_limits_spawn" }, zones[1].ContentCountLimits);
+        Assert.Equal(new[] { "content_pool_a", "content_pool_b" }, zones[1].GuardedContentPool);
+    }
+
+    [Fact]
+    public void Save_ZoneSidListField_AlwaysWrittenAsArray()
+    {
+        // A bare-string field read in must round-trip back out as an array (the generator's
+        // canonical form), so re-saving a loaded stock template normalises it.
+        const string json = """
+            { "variants": [ { "zones": [ { "name": "Z", "contentCountLimits": "content_limits_spawn" } ] } ] }
+            """;
+
+        RmgTemplate template = JsonSerializer.Deserialize<RmgTemplate>(json, JsonExport.Options)!;
+        string written = JsonSerializer.Serialize(template, JsonExport.Options);
+
+        Assert.Contains("\"contentCountLimits\": [", written, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"contentCountLimits\": \"content_limits_spawn\"", written, StringComparison.Ordinal);
+
+        // And the normalised output reloads cleanly.
+        RmgTemplate? reloaded = JsonSerializer.Deserialize<RmgTemplate>(written, JsonExport.Options);
+        Assert.Equal(new[] { "content_limits_spawn" }, reloaded!.Variants![0].Zones![0].ContentCountLimits);
+    }
+
+    [Fact]
+    public void Load_StringList_AcceptsNumericElements()
+    {
+        // Some templates write rule args as bare numbers (e.g. Pyramid / Sand Clover: "args": [0]).
+        // The game treats them as string sids; we read them as their literal text.
+        List<string>? list = JsonSerializer.Deserialize<List<string>>("[0, \"x\", 12]", JsonExport.Options);
+
+        Assert.Equal(new[] { "0", "x", "12" }, list);
+    }
+
+    [Fact]
+    public void Load_ObjectList_AcceptsSingleBareObject()
+    {
+        // gameRules.bonuses in some templates (e.g. Wastelands) is a single bare object, not an array.
+        const string json = """
+            {
+              "gameRules": {
+                "bonuses": { "sid": "add_bonus_hero_item", "receiverFilter": "start_hero" }
+              }
+            }
+            """;
+
+        RmgTemplate? template = JsonSerializer.Deserialize<RmgTemplate>(json, JsonExport.Options);
+
+        List<Bonus> bonuses = template!.GameRules!.Bonuses!;
+        Assert.Single(bonuses);
+        Assert.Equal("add_bonus_hero_item", bonuses[0].Sid);
+
+        // Re-saving normalises the single object back into an array.
+        string written = JsonSerializer.Serialize(template, JsonExport.Options);
+        Assert.Contains("\"bonuses\": [", written, StringComparison.Ordinal);
+    }
+
+    // ── Simple Mode / Quick Generate (RandomTemplateBuilder) ──────────────────────
+    // Core promise: ANY combination of simple options + ANY seed must yield a template
+    // that is structurally valid (no dangling/duplicate/isolated zones) and serialises to
+    // game-compatible JSON. These sweeps are the safety net for the random corridors.
+
+    private static void AssertQuickTemplateValid(QuickGenerateOptions opts)
+    {
+        GeneratorSettings settings = RandomTemplateBuilder.Build(opts);
+        RmgTemplate template = TemplateGenerator.Generate(settings);
+
+        Variant variant = Assert.Single(template.Variants ?? []);
+        Assert.NotNull(variant.Zones);
+        Assert.True(variant.Zones!.Count >= settings.PlayerCount,
+            $"only {variant.Zones.Count} zones for {settings.PlayerCount} players");
+
+        List<string> issues = ZoneGraphValidator.Validate(variant.Zones!, variant.Connections ?? []);
+        Assert.True(issues.Count == 0,
+            $"seed {opts.Seed} {opts.GameType}/{opts.Scale}/{opts.Length}/{opts.Chaos} " +
+            $"players={settings.PlayerCount} topo={settings.Topology} size={settings.MapSize}: {string.Join("; ", issues)}");
+
+        // Must produce game-compatible JSON and reload cleanly.
+        string json = JsonSerializer.Serialize(template, JsonExport.Options);
+        Assert.NotNull(JsonSerializer.Deserialize<RmgTemplate>(json, JsonExport.Options));
+    }
+
+    [Fact]
+    public void QuickGenerate_EveryGameTypeScaleLengthChaosCombo_IsValid()
+    {
+        foreach (QuickGameType type in Enum.GetValues<QuickGameType>())
+        foreach (QuickMapScale scale in Enum.GetValues<QuickMapScale>())
+        foreach (QuickGameLength length in Enum.GetValues<QuickGameLength>())
+        foreach (QuickChaos chaos in Enum.GetValues<QuickChaos>())
+        {
+            AssertQuickTemplateValid(new QuickGenerateOptions
+            {
+                Seed = 12345, PlayerCount = 4,
+                GameType = type, Scale = scale, Length = length, Chaos = chaos,
+            });
+        }
+    }
+
+    [Fact]
+    public void QuickGenerate_RandomSeedsPlayerCountsAndToggles_AreValid()
+    {
+        for (int seed = 0; seed < 120; seed++)
+        {
+            var pick = new Random(seed);
+            AssertQuickTemplateValid(new QuickGenerateOptions
+            {
+                Seed = seed,
+                PlayerCount = pick.Next(2, 9),
+                GameType = (QuickGameType)pick.Next(0, 4),
+                Scale = (QuickMapScale)pick.Next(0, 3),
+                Length = (QuickGameLength)pick.Next(0, 3),
+                Chaos = (QuickChaos)pick.Next(0, 3),
+                Water = pick.NextDouble() < 0.5,
+                Portals = pick.NextDouble() < 0.4,
+                StrongNeutrals = pick.NextDouble() < 0.4,
+            });
+        }
+    }
+
+    [Fact]
+    public void QuickGenerate_SameOptionsAndSeed_AreDeterministic()
+    {
+        QuickGenerateOptions Make() => new()
+        {
+            Seed = 4242, PlayerCount = 4, GameType = QuickGameType.FreeForAll,
+            Scale = QuickMapScale.Medium, Length = QuickGameLength.Long, Chaos = QuickChaos.Wild,
+            Water = true, Portals = true, StrongNeutrals = true,
+        };
+
+        GeneratorSettings a = RandomTemplateBuilder.Build(Make());
+        GeneratorSettings b = RandomTemplateBuilder.Build(Make());
+
+        Assert.Equal(a.MapSize, b.MapSize);
+        Assert.Equal(a.Topology, b.Topology);
+        Assert.Equal(a.WaterLevel, b.WaterLevel);
+        Assert.Equal(a.MonsterAggression, b.MonsterAggression);
+        Assert.Equal(a.ZoneCfg.ResourceDensityPercent, b.ZoneCfg.ResourceDensityPercent);
+        Assert.Equal(a.ZoneCfg.NeutralStackStrengthPercent, b.ZoneCfg.NeutralStackStrengthPercent);
+        Assert.Equal(a.ZoneCfg.Advanced.NeutralLowNoCastleCount + a.ZoneCfg.Advanced.NeutralHighCastleCount,
+                     b.ZoneCfg.Advanced.NeutralLowNoCastleCount + b.ZoneCfg.Advanced.NeutralHighCastleCount);
+        Assert.Equal(a.TemplateName, b.TemplateName);
+    }
+
+    [Fact]
+    public void QuickGenerate_SameSeed_ReproducesIdenticalMap()
+    {
+        // The shareable-seed promise: same options + seed → byte-identical template.
+        var opts = new QuickGenerateOptions
+        {
+            Seed = 0x7F3A22, PlayerCount = 4, GameType = QuickGameType.FreeForAll,
+            Scale = QuickMapScale.Medium, Length = QuickGameLength.Long, Chaos = QuickChaos.Wild,
+            Water = true, Portals = true,
+        };
+
+        string first = JsonSerializer.Serialize(TemplateGenerator.Generate(RandomTemplateBuilder.Build(opts)), JsonExport.Options);
+        string second = JsonSerializer.Serialize(TemplateGenerator.Generate(RandomTemplateBuilder.Build(opts)), JsonExport.Options);
+
+        Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void Generate_DifferentSeedsGenerallyDiffer()
+    {
+        // Sanity that seeding doesn't collapse every map to the same output.
+        var a = new QuickGenerateOptions { Seed = 1, PlayerCount = 6, GameType = QuickGameType.FreeForAll, Chaos = QuickChaos.Wild };
+        var b = new QuickGenerateOptions { Seed = 2, PlayerCount = 6, GameType = QuickGameType.FreeForAll, Chaos = QuickChaos.Wild };
+
+        string ja = JsonSerializer.Serialize(TemplateGenerator.Generate(RandomTemplateBuilder.Build(a)), JsonExport.Options);
+        string jb = JsonSerializer.Serialize(TemplateGenerator.Generate(RandomTemplateBuilder.Build(b)), JsonExport.Options);
+
+        Assert.NotEqual(ja, jb);
+    }
+
+    [Fact]
+    public void QuickGenerate_DuelForcesTwoPlayers_AndNameIsAscii()
+    {
+        GeneratorSettings s = RandomTemplateBuilder.Build(new QuickGenerateOptions
+        {
+            Seed = 7, PlayerCount = 6, GameType = QuickGameType.Duel,
+        });
+
+        Assert.Equal(2, s.PlayerCount);
+        Assert.All(s.TemplateName, ch => Assert.True(ch < 128, $"non-ASCII char in name: {s.TemplateName}"));
+    }
+
+    // Helper: enumerate a broad, deterministic spread of quick options for the invariant sweeps.
+    private static IEnumerable<QuickGenerateOptions> QuickOptionMatrix()
+    {
+        foreach (QuickGameType type in Enum.GetValues<QuickGameType>())
+        foreach (QuickMapScale scale in Enum.GetValues<QuickMapScale>())
+        foreach (QuickGameLength length in Enum.GetValues<QuickGameLength>())
+        foreach (QuickChaos chaos in Enum.GetValues<QuickChaos>())
+        for (int seed = 0; seed < 4; seed++)
+        {
+            var pick = new Random(seed * 97 + (int)type * 13 + (int)scale * 5 + (int)length * 3 + (int)chaos);
+            for (int players = 2; players <= 8; players += 3)
+                yield return new QuickGenerateOptions
+                {
+                    Seed = seed * 100 + players, PlayerCount = players,
+                    GameType = type, Scale = scale, Length = length, Chaos = chaos,
+                    Water = pick.NextDouble() < 0.5, Portals = pick.NextDouble() < 0.4,
+                    StrongNeutrals = pick.NextDouble() < 0.4,
+                };
+        }
+    }
+
+    [Fact]
+    public void QuickGenerate_SettingsStayWithinAdvancedUiRanges()
+    {
+        // Simple Mode must never feed TemplateGenerator anything the Advanced UI couldn't also
+        // produce — so its output stays inside the already-proven (in-game-tested) envelope.
+        // Ranges below mirror the Advanced-tab sliders/combos.
+        foreach (QuickGenerateOptions opts in QuickOptionMatrix())
+        {
+            GeneratorSettings s = RandomTemplateBuilder.Build(opts);
+            var z = s.ZoneCfg;
+            string id = $"{opts.GameType}/{opts.Scale}/{opts.Length}/{opts.Chaos} p={s.PlayerCount}";
+
+            Assert.True(KnownValues.MapSizes.Contains(s.MapSize), $"{id}: map size {s.MapSize} not an official size");
+            Assert.InRange(s.PlayerCount, 2, 8);
+            Assert.InRange(z.ResourceDensityPercent, 20, 400);   // SldResourceDensity
+            Assert.InRange(z.StructureDensityPercent, 20, 200);  // SldStructureDensity
+            Assert.InRange(z.NeutralStackStrengthPercent, 25, 300); // SldNeutralStackStrength
+            Assert.InRange(z.BorderGuardStrengthPercent, 20, 400);
+            Assert.InRange(s.TerrainRoughnessPercent, 20, 400);
+            Assert.InRange(s.LakeAmountPercent, 20, 400);
+            Assert.InRange(s.NeutralDiplomacyModifier, -1.0, 0.5);
+            Assert.Contains(s.GameEndConditions.VictoryCondition, KnownValues.VictoryConditionIds);
+
+            var a = z.Advanced;
+            int neutrals = a.NeutralLowNoCastleCount + a.NeutralLowCastleCount
+                         + a.NeutralMediumNoCastleCount + a.NeutralMediumCastleCount
+                         + a.NeutralHighNoCastleCount + a.NeutralHighCastleCount;
+            int totalZones = s.PlayerCount + neutrals;
+            Assert.True(totalZones <= 32, $"{id}: {totalZones} zones exceeds the 32-zone cap");
+            // The Advanced UI warns when a zone gets < 1024 map area; the builder must respect that.
+            Assert.True((double)s.MapSize * s.MapSize / totalZones >= 1024.0,
+                $"{id}: overcrowded — {totalZones} zones on {s.MapSize}² (< 1024 area/zone)");
+        }
+    }
+
+    [Fact]
+    public void QuickGenerate_MapsSatisfyPlayabilityInvariants()
+    {
+        foreach (QuickGenerateOptions opts in QuickOptionMatrix())
+        {
+            GeneratorSettings s = RandomTemplateBuilder.Build(opts);
+            RmgTemplate tpl = TemplateGenerator.Generate(s);
+            string id = $"{opts.GameType}/{opts.Scale}/{opts.Length}/{opts.Chaos} p={s.PlayerCount} seed={opts.Seed}";
+
+            Variant variant = Assert.Single(tpl.Variants ?? []);
+            Assert.NotNull(variant.Zones);
+
+            // Graph integrity.
+            List<string> issues = ZoneGraphValidator.Validate(variant.Zones!, variant.Connections ?? []);
+            Assert.True(issues.Count == 0, $"{id}: {string.Join("; ", issues)}");
+
+            // Exactly one spawn per player, all distinct.
+            var spawns = variant.Zones!
+                .SelectMany(zo => zo.MainObjects ?? [])
+                .Where(o => o.Type == "Spawn")
+                .Select(o => o.Spawn)
+                .ToList();
+            Assert.Equal(s.PlayerCount, spawns.Count);
+            Assert.Equal(spawns.Count, spawns.Distinct().Count());
+
+            // Content is actually budgeted (zones won't be empty) and count-limits exist.
+            Assert.NotNull(tpl.ContentCountLimits);
+            Assert.NotEmpty(tpl.ContentCountLimits!);
+            Assert.Contains(variant.Zones!, zo => (zo.GuardedContentValue ?? 0) > 0 || (zo.ResourcesValue ?? 0) > 0);
+        }
+    }
+
+    [Fact]
+    public void QuickGenerate_EveryVictoryConditionProducesValidMap()
+    {
+        // Every real in-game mode (the same set the Advanced tab exposes) must generate a valid map,
+        // carry the right win condition, and honour its constraints (tournament → 2 players;
+        // city hold → a castle neutral to hold).
+        foreach (string victory in KnownValues.VictoryConditionIds)
+        foreach (QuickGameType type in Enum.GetValues<QuickGameType>())
+        for (int seed = 0; seed < 3; seed++)
+        {
+            var opts = new QuickGenerateOptions
+            {
+                Seed = seed, PlayerCount = 4, GameType = type,
+                Scale = QuickMapScale.Medium, Length = QuickGameLength.Medium, Chaos = QuickChaos.Normal,
+                VictoryCondition = victory,
+            };
+            GeneratorSettings s = RandomTemplateBuilder.Build(opts);
+            string id = $"{victory}/{type} seed={seed}";
+
+            Assert.Equal(victory, s.GameEndConditions.VictoryCondition);
+            if (victory == "win_condition_6") Assert.Equal(2, s.PlayerCount); // tournament = two 1v1 clusters
+            if (victory == "win_condition_5")
+            {
+                var a = s.ZoneCfg.Advanced;
+                Assert.True(a.NeutralLowCastleCount + a.NeutralMediumCastleCount + a.NeutralHighCastleCount > 0,
+                    $"{id}: city hold needs a castle neutral to hold");
+            }
+
+            RmgTemplate tpl = TemplateGenerator.Generate(s);
+            Variant v = Assert.Single(tpl.Variants ?? []);
+            List<string> issues = ZoneGraphValidator.Validate(v.Zones!, v.Connections ?? []);
+            Assert.True(issues.Count == 0, $"{id}: {string.Join("; ", issues)}");
+            Assert.Equal(victory, tpl.DisplayWinCondition);
+        }
     }
 
     [Fact]
