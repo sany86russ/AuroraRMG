@@ -24,6 +24,13 @@
     <SolidColorBrush x:Key="BrushWarnText"   Color="#F2B85C"/>
     <SolidColorBrush x:Key="BrushWarnBorder" Color="#4A3A2A"/>
 
+    <!-- Soft per-tab accent colours (colour-coded top navigation) -->
+    <SolidColorBrush x:Key="BrushTabRules"   Color="#5B7BD0"/>  <!-- soft dark blue -->
+    <SolidColorBrush x:Key="BrushTabZones"   Color="#4FA877"/>  <!-- deep green -->
+    <SolidColorBrush x:Key="BrushTabContent" Color="#C99A4E"/>  <!-- warm amber -->
+    <SolidColorBrush x:Key="BrushTabBans"    Color="#C56B8C"/>  <!-- muted rose -->
+    <SolidColorBrush x:Key="BrushTabEditor"  Color="#22D3EE"/>  <!-- cyan (editor, set apart) -->
+
     <LinearGradientBrush x:Key="AccentGradient" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#8B7CFF" Offset="0.0"/>
         <GradientStop Color="#6F7BFF" Offset="0.5"/>
@@ -414,6 +421,87 @@
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── Top nav tab (horizontal, colour-coded "tangible" buttons) ────── -->
+    <Style x:Key="TopTab" TargetType="TabItem">
+        <Setter Property="Foreground" Value="{StaticResource BrushTextDim}"/>
+        <Setter Property="Background" Value="{StaticResource BrushInput}"/>
+        <Setter Property="Padding" Value="15,9"/>
+        <Setter Property="Margin" Value="0,0,8,0"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{StaticResource BrushBorder}"
+                            BorderThickness="1"
+                            CornerRadius="9"
+                            Padding="{TemplateBinding Padding}">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="Dot" Width="9" Height="9" CornerRadius="5"
+                                    VerticalAlignment="Center" Margin="0,0,9,0"
+                                    Background="{TemplateBinding Tag}" Opacity="0.7"/>
+                            <ContentPresenter ContentSource="Header" VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BrushHover}"/>
+                            <Setter Property="Foreground" Value="{StaticResource BrushText}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource BrushText}"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BrushPanel}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush"
+                                    Value="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}"/>
+                            <Setter TargetName="Bd" Property="BorderThickness" Value="1.4"/>
+                            <Setter TargetName="Dot" Property="Opacity" Value="1"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── Editor button that sits in the tab row, visually set apart ────── -->
+    <Style x:Key="TopEditorButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{StaticResource BrushText}"/>
+        <Setter Property="Background" Value="{StaticResource BrushInput}"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            BorderBrush="{StaticResource BrushTabEditor}" BorderThickness="1.2"
+                            CornerRadius="9" Padding="{TemplateBinding Padding}">
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="9" Height="9" CornerRadius="5" VerticalAlignment="Center"
+                                    Margin="0,0,9,0" Background="{StaticResource BrushTabEditor}"/>
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#15384A"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#1C4E63"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

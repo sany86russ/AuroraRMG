@@ -24,6 +24,10 @@ namespace Olden_Era___Template_Editor.Models
         public bool LostStartHero { get; set; } = false;
         public bool CityHold { get; set; } = false;
         public int CityHoldDays { get; set; } = 6;
+        /// <summary>Highlight enemy players on the minimap (engine <c>heroLighting</c>). Default on.</summary>
+        public bool HeroLighting { get; set; } = true;
+        /// <summary>First in-game day the minimap highlight starts (engine <c>heroLightingDay</c>).</summary>
+        public int HeroLightingDay { get; set; } = 1;
     }
 
     public class HeroSettings
@@ -31,6 +35,8 @@ namespace Olden_Era___Template_Editor.Models
         public int HeroCountMin { get; set; } = 4;
         public int HeroCountMax { get; set; } = 8;
         public int HeroCountIncrement { get; set; } = 1;
+        /// <summary>Ban hiring additional heroes (engine <c>heroHireBan</c>). Forced on in single-hero mode.</summary>
+        public bool HeroHireBan { get; set; } = false;
     }
 
     public class AdvancedSettings

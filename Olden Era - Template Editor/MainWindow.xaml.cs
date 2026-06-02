@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using OldenEraTemplateEditor.Services.ContentManagement;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows;
@@ -19,11 +20,8 @@ namespace Olden_Era___Template_Editor
         private const int SimpleModeMaxZones = 32;
         private const int AdvancedModeMaxZones = 32;
 
-        private static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            WriteIndented = true,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-        };
+        // Literal UTF-8 (no \uXXXX), UTF-8 no-BOM via File.WriteAllText. See Services.JsonExport.
+        private static readonly JsonSerializerOptions JsonOptions = Services.JsonExport.Options;
 
         // Currently open settings file path (null = unsaved / untitled)
         private string? _currentSettingsPath = null;
@@ -131,6 +129,17 @@ namespace Olden_Era___Template_Editor
                 ContentRendered += async (_, _) => await ShootEditorAsync(editorShotDir);
             }
 
+            // --gen-readymaps <dir>: headless regen of the built-in presets to .rmg.json, then exit.
+            int genIdx = Array.FindIndex(cmdLine, a => a.Equals("--gen-readymaps", StringComparison.OrdinalIgnoreCase));
+            if (genIdx >= 0 && genIdx + 1 < cmdLine.Length)
+            {
+                ShowActivated = false;
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = -5000; Top = 100;
+                string genDir = cmdLine[genIdx + 1];
+                ContentRendered += (_, _) => GenerateReadyMaps(genDir);
+            }
+
             // Clamp startup size to the available work area so the window never
             // overflows the screen at high-DPI scaling (e.g. 125 %, 150 %, 200 %).
             var area = SystemParameters.WorkArea;
@@ -151,6 +160,7 @@ namespace Olden_Era___Template_Editor
             RefreshLocalizedLists();      // fills the option combos in the current language
             CmbVictory.SelectedIndex = 0; // Classic (win_condition_1)
             CmbTopology.SelectedIndex = 0;
+            CmbMapView.SelectedIndex = 0;
             CmbTerrain.SelectedIndex = 0; // Faction-based
             CmbMonsterAggression.SelectedIndex = 1; // Normal
             CmbWaterLevel.SelectedIndex = 0; // None
@@ -218,6 +228,22 @@ namespace Olden_Era___Template_Editor
             TxtTemplateName.TextChanged += (_, _) => { MarkDirtyNameOnly(); Validate(); };
             UpdateTitle();
             TxtWindowTitle.Text = Title;
+
+            // Ctrl+Tab / Ctrl+Shift+Tab cycle the top navigation tabs (works regardless of focus).
+            PreviewKeyDown += OnGlobalPreviewKeyDown;
+        }
+
+        private void OnGlobalPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key != System.Windows.Input.Key.Tab) return;
+            var mods = System.Windows.Input.Keyboard.Modifiers;
+            if ((mods & System.Windows.Input.ModifierKeys.Control) != System.Windows.Input.ModifierKeys.Control) return;
+            int n = MainTabs.Items.Count;
+            if (n == 0) return;
+            bool back = (mods & System.Windows.Input.ModifierKeys.Shift) == System.Windows.Input.ModifierKeys.Shift;
+            int idx = MainTabs.SelectedIndex < 0 ? 0 : MainTabs.SelectedIndex;
+            MainTabs.SelectedIndex = back ? (idx - 1 + n) % n : (idx + 1) % n;
+            e.Handled = true;
         }
         private void InitializeDefaultPlayerZoneContents()
         {
@@ -845,9 +871,62 @@ namespace Olden_Era___Template_Editor
             PnlHubZoneSize.Visibility = topo == MapTopology.HubAndSpoke ? Visibility.Visible : Visibility.Collapsed;
             PnlHubCastles.Visibility  = topo == MapTopology.HubAndSpoke ? Visibility.Visible : Visibility.Collapsed;
 
+            SyncMapViewFromTopology(idx);
             MarkDirty();
             Validate();
         }
+
+        private bool _suppressTopologySync;
+
+        /// <summary>"Вид карты" in the Template block mirrors the topology combo on the Zones tab.</summary>
+        private void CmbMapView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!IsInitialized || _suppressTopologySync) return;
+            int idx = CmbMapView.SelectedIndex;
+            if (idx >= 0 && idx < CmbTopology.Items.Count && idx != CmbTopology.SelectedIndex)
+            {
+                _suppressTopologySync = true;
+                CmbTopology.SelectedIndex = idx;   // drives CmbTopology_SelectionChanged (desc, panels, dirty)
+                _suppressTopologySync = false;
+            }
+        }
+
+        /// <summary>Keeps the "Вид карты" combo in sync when the topology changes on the Zones tab.</summary>
+        private void SyncMapViewFromTopology(int idx)
+        {
+            if (_suppressTopologySync || CmbMapView == null) return;
+            if (idx >= 0 && idx < CmbMapView.Items.Count && CmbMapView.SelectedIndex != idx)
+            {
+                _suppressTopologySync = true;
+                CmbMapView.SelectedIndex = idx;
+                _suppressTopologySync = false;
+            }
+        }
+
+        /// <summary>"Нежелательные герои" jumps to the Bonuses &amp; Bans tab (hero-ban list).</summary>
+        private void BtnUnwantedHeroes_Click(object sender, RoutedEventArgs e)
+        {
+            MainTabs.SelectedItem = TabBonusesBans;
+        }
+
+        private void HeroLighting_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!IsInitialized) return;
+            if (TxtHeroLightingDay != null)
+                TxtHeroLightingDay.IsEnabled = ChkHeroLighting.IsChecked == true;
+            MarkDirty();
+        }
+
+        private void HeroLightingDay_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (!IsInitialized) return;
+            TxtHeroLightingDay.Text = HeroLightingDayValue().ToString();
+            MarkDirty();
+        }
+
+        /// <summary>Parses the heroLightingDay box, clamped to 1..30 (default 1).</summary>
+        private int HeroLightingDayValue() =>
+            int.TryParse(TxtHeroLightingDay?.Text, out int d) ? Math.Clamp(d, 1, 30) : 1;
 
         private void BansOverrides_TextChanged(object sender, TextChangedEventArgs e)
         {
@@ -1178,6 +1257,30 @@ namespace Olden_Era___Template_Editor
             _isDirty = true;
             UpdateTitle();
             Validate();
+        }
+
+        private readonly Random _presetRng = new();
+        private string? _lastRandomPreset;
+
+        /// <summary>
+        /// "🎲" — picks a random built-in preset whose player count matches the slider and applies it
+        /// (size, name, heroes, view, etc. come from the preset). Repeated clicks cycle the matching pool
+        /// without immediately repeating the last pick. A plain slider drag never triggers this.
+        /// </summary>
+        private void BtnRandomPreset_Click(object sender, RoutedEventArgs e)
+        {
+            if (!IsInitialized) return;
+            int players = (int)SldPlayers.Value;
+            var matches = Presets.All.Where(p => p.Settings.PlayerCount == players).ToList();
+            if (matches.Count == 0) matches = [.. Presets.All];
+            if (matches.Count == 0) return;
+            var pool = matches.Count > 1 && _lastRandomPreset != null
+                ? matches.Where(p => p.Name != _lastRandomPreset).ToList()
+                : matches;
+            if (pool.Count == 0) pool = matches;
+            var pick = pool[_presetRng.Next(pool.Count)];
+            _lastRandomPreset = pick.Name;
+            ApplyPreset(pick);
         }
 
         private void SldMaxPortals_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1786,6 +1889,9 @@ namespace Olden_Era___Template_Editor
             LostStartHero         = ChkLostStartHero.IsChecked == true,
             CityHold              = ChkCityHold.IsChecked == true,
             CityHoldDays = (int)SldCityHoldDays.Value,
+            HeroHireBan          = ChkHeroHireBan.IsChecked == true,
+            HeroLighting         = ChkHeroLighting.IsChecked == true,
+            HeroLightingDay      = HeroLightingDayValue(),
             GladiatorArena               = ChkGladiatorArena.IsChecked == true,
             GladiatorArenaDaysDelayStart = (int)SldGladiatorDelay.Value,
             GladiatorArenaCountDay       = (int)SldGladiatorCountDay.Value,
@@ -1858,6 +1964,7 @@ namespace Olden_Era___Template_Editor
             SldHeroMax.Value        = s.HeroCountMax;
             SldHeroIncrement.Value  = s.HeroCountIncrement;
             ChkSingleHeroMode.IsChecked = s.SingleHeroMode;
+            ChkHeroHireBan.IsChecked = s.HeroHireBan;
             int topoIdx = Array.FindIndex(TopologyOptions, t => t.Topology == s.Topology);
             if (topoIdx >= 0) CmbTopology.SelectedIndex = topoIdx;
             int terrainIdx = Array.FindIndex(TerrainOptions, t => t.Theme == s.Terrain);
@@ -1882,13 +1989,16 @@ namespace Olden_Era___Template_Editor
             SldBorderGuardStrength.Value      = s.BorderGuardStrengthPercent;
             int victoryIdx = Array.IndexOf(KnownValues.VictoryConditionIds, s.VictoryCondition);
             CmbVictory.SelectedIndex = victoryIdx >= 0 ? victoryIdx : 0;
-            SldFactionLawsExp.Value = Math.Clamp(s.FactionLawsExpPercent, 25, 200);
-            SldAstrologyExp.Value = Math.Clamp(s.AstrologyExpPercent, 25, 200);
+            SldFactionLawsExp.Value = Math.Clamp(s.FactionLawsExpPercent, 20, 200);
+            SldAstrologyExp.Value = Math.Clamp(s.AstrologyExpPercent, 20, 200);
             ChkLostStartCity.IsChecked = s.LostStartCity;
             SldLostStartCityDay.Value = Math.Clamp(s.LostStartCityDay, 1, 30);
             ChkLostStartHero.IsChecked = s.LostStartHero || s.SingleHeroMode;
             ChkCityHold.IsChecked = s.CityHold;
             SldCityHoldDays.Value = Math.Clamp(s.CityHoldDays, 1, 30);
+            ChkHeroLighting.IsChecked = s.HeroLighting;
+            TxtHeroLightingDay.Text = Math.Clamp(s.HeroLightingDay, 1, 30).ToString();
+            TxtHeroLightingDay.IsEnabled = s.HeroLighting;
             ChkGladiatorArena.IsChecked = s.GladiatorArena;
             SldGladiatorDelay.Value = Math.Clamp(s.GladiatorArenaDaysDelayStart, 1, 60);
             SldGladiatorCountDay.Value = Math.Clamp(s.GladiatorArenaCountDay, 1, 30);
@@ -2061,6 +2171,7 @@ namespace Olden_Era___Template_Editor
 
                 Rebind(CmbVictory, [.. KnownValues.VictoryConditionLabels.Select((_, i) => L.Get($"S.Victory.{i}"))]);
                 Rebind(CmbTopology, [.. TopologyOptions.Select(t => L.Get(t.Label))]);
+                Rebind(CmbMapView, [.. TopologyOptions.Select(t => L.Get(t.Label))]);
                 Rebind(CmbTerrain, [.. TerrainOptions.Select(t => L.Get(t.Label))]);
                 Rebind(CmbMonsterAggression, [.. AggressionOptions.Select(a => L.Get(a.Label))]);
                 Rebind(CmbWaterLevel, [.. WaterOptions.Select(w => L.Get(w.Label))]);
@@ -2170,7 +2281,8 @@ namespace Olden_Era___Template_Editor
             {
                 HeroCountMin = (int)SldHeroMin.Value,
                 HeroCountMax = (int)SldHeroMax.Value,
-                HeroCountIncrement = (int)SldHeroIncrement.Value
+                HeroCountIncrement = (int)SldHeroIncrement.Value,
+                HeroHireBan = ChkHeroHireBan.IsChecked == true
             },
             MapSize = SelectedMapSize(),
             GameEndConditions = new GameEndConditions
@@ -2183,6 +2295,8 @@ namespace Olden_Era___Template_Editor
                 LostStartHero = ChkLostStartHero.IsChecked == true,
                 CityHold = ChkCityHold.IsChecked == true,
                 CityHoldDays = (int)SldCityHoldDays.Value,
+                HeroLighting = ChkHeroLighting.IsChecked == true,
+                HeroLightingDay = HeroLightingDayValue(),
             },
             ZoneCfg = new ZoneConfiguration
             {

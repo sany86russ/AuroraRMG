@@ -52,23 +52,24 @@ namespace OldenEraTemplateEditor.Models
         /// </summary>
         public static readonly string[] VictoryConditionLabels =
         [
-            "Стандартная",
-            "Потеря стартового города",
-            //"Gladiator Arena",
-            "Удержание города",
-            "Турнир",
+            "Стандартные условия", // win_condition_1 — Классическое
+            "Удержание города",    // win_condition_5 — City Hold (нейтральный город)
+            "Правила турнира",     // win_condition_6 — Турнир
+            "Решающая битва",      // win_condition_4 — Final Battle (как в Blitz)
+            "Удержание столицы",   // win_condition_3 — Capital Hold (как в Crossroads)
         ];
 
         /// <summary>
         /// displayWinCondition JSON values, aligned with <see cref="VictoryConditionLabels"/>.
+        /// Actual display text comes from the localized S.Victory.{i} keys.
         /// </summary>
         public static readonly string[] VictoryConditionIds =
         [
             "win_condition_1",
-            "win_condition_3",
-            //"win_condition_4",
             "win_condition_5",
             "win_condition_6",
+            "win_condition_4",
+            "win_condition_3",
         ];
 
         // ── Game rules ───────────────────────────────────────────────────────────

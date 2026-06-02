@@ -1,7 +1,7 @@
 {
   "name": "FFA 4",
   "gameMode": "Classic",
-  "description": "Generated with Olden Era Template Generator v0.7: Balanced layout, 10 neutral zones, 1 castle per player zone, mixed neutral zone tiers.",
+  "description": "Generated with Olden Era Template Generator v1.1: Balanced layout, 10 neutral zones, 1 castle per player zone, mixed neutral zone tiers.",
   "displayWinCondition": "win_condition_1",
   "sizeX": 176,
   "sizeZ": 176,
@@ -30,7 +30,7 @@
   "variants": [
     {
       "orientation": {
-        "zeroAngleZone": "Spawn-B",
+        "zeroAngleZone": "Spawn-D",
         "baseAngleMin": 45,
         "baseAngleMax": 45,
         "randomAngleAmplitude": 360,
@@ -56,7 +56,7 @@
       },
       "zones": [
         {
-          "name": "Spawn-B",
+          "name": "Spawn-D",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -94,7 +94,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_B"
+            "mandatory_content_side_D"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -180,7 +180,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-B-H"
+                  "Rnd-D-H"
                 ]
               }
             }
@@ -756,7 +756,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-F-D"
+                  "Rnd-F-C"
                 ]
               }
             },
@@ -1054,7 +1054,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-G-C"
+                  "Rnd-G-B"
                 ]
               }
             },
@@ -1075,7 +1075,7 @@
           ]
         },
         {
-          "name": "Spawn-D",
+          "name": "Spawn-C",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -1113,7 +1113,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_D"
+            "mandatory_content_side_C"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -1199,7 +1199,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-F-D"
+                  "Rnd-F-C"
                 ]
               }
             }
@@ -1556,7 +1556,7 @@
           ]
         },
         {
-          "name": "Spawn-C",
+          "name": "Spawn-B",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -1594,7 +1594,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_C"
+            "mandatory_content_side_B"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -1680,7 +1680,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-G-C"
+                  "Rnd-G-B"
                 ]
               }
             }
@@ -1841,7 +1841,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-B-H"
+                  "Rnd-D-H"
                 ]
               }
             },
@@ -2310,28 +2310,28 @@
           "guardMatchGroup": "rnd_guard_I_K"
         },
         {
-          "name": "Rnd-G-C",
+          "name": "Rnd-G-B",
           "from": "Neutral-G",
-          "to": "Spawn-C",
+          "to": "Spawn-B",
           "connectionType": "Direct",
           "guardZone": "Neutral-G",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
           "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_G_C"
+          "guardMatchGroup": "rnd_guard_G_B"
         },
         {
-          "name": "Rnd-B-H",
-          "from": "Spawn-B",
+          "name": "Rnd-D-H",
+          "from": "Spawn-D",
           "to": "Neutral-H",
           "connectionType": "Direct",
-          "guardZone": "Spawn-B",
+          "guardZone": "Spawn-D",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
           "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_B_H"
+          "guardMatchGroup": "rnd_guard_D_H"
         },
         {
           "name": "Rnd-E-A",
@@ -2346,16 +2346,16 @@
           "guardMatchGroup": "rnd_guard_E_A"
         },
         {
-          "name": "Rnd-F-D",
+          "name": "Rnd-F-C",
           "from": "Neutral-F",
-          "to": "Spawn-D",
+          "to": "Spawn-C",
           "connectionType": "Direct",
           "guardZone": "Neutral-F",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
           "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_F_D"
+          "guardMatchGroup": "rnd_guard_F_C"
         },
         {
           "name": "Rnd-G-K",

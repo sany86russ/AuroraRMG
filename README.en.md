@@ -24,8 +24,20 @@
 
 ---
 
+## 🆕 What's new in 1.1.0
+
+- **Fixed a critical encoding bug.** Cyrillic template names are now written as real UTF-8 (no BOM) — previously the `.rmg.json` contained `\uXXXX` escape runs that broke the template in-game. Built-in presets also got Latin internal names for safety.
+- **New interface layout.** Sections moved to a single top row of colour-coded "tangible" tabs (**Map Rules · Zone Setup · Zone Content · Bonuses & Bans**), and the **🗺 Editor** button is set apart. Switch tabs with `Ctrl+Tab`. The **Heroes** and **Template** blocks were swapped and reworked.
+- **More victory conditions.** Added **"Final Battle"** (as in Blitz) and **"Capital Hold"** (as in Crossroads), with the correct in-game names.
+- **New fields:** "Ban hiring extra heroes" and "Highlight players on the minimap from day N".
+- **🎲 Random pick** of a ready-made template matching the current player count (click to cycle).
+- Finer slider steps for experience (**10%**) and diplomacy (**0.05**); "Topology" renamed to the clearer **"Map view"** and mirrored into the Template block.
+
+---
+
 ## 📑 Contents
 
+- [What's new in 1.1.0](#-whats-new-in-110)
 - [What is this](#-what-is-this)
 - [Installation](#-installation)
 - [Build authenticity verification](#-build-authenticity-verification)

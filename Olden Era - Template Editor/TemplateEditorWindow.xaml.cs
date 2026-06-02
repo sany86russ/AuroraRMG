@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -42,11 +43,8 @@ namespace Olden_Era___Template_Editor
         private static readonly Color SelectColor = Color.FromRgb(179, 169, 255); // accent violet
         private static readonly Color GridLine     = Color.FromRgb( 30,  36,  51);
 
-        private static readonly JsonSerializerOptions JsonOptions = new()
-        {
-            WriteIndented = true,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-        };
+        // Literal UTF-8 (no \uXXXX), UTF-8 no-BOM. See Services.JsonExport.
+        private static readonly JsonSerializerOptions JsonOptions = Olden_Era___Template_Editor.Services.JsonExport.Options;
 
         private RmgTemplate _template;
         private MapTopology _topology;

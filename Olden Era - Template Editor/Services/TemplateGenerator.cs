@@ -348,7 +348,7 @@ namespace Olden_Era___Template_Editor.Services
             HeroCountMin = settings.SingleHeroMode ? 1 : settings.HeroSettings.HeroCountMin - settings.HeroSettings.HeroCountIncrement,
             HeroCountMax = settings.SingleHeroMode ? 1 : settings.HeroSettings.HeroCountMax,
             HeroCountIncrement = settings.SingleHeroMode ? 1 : settings.HeroSettings.HeroCountIncrement,
-            HeroHireBan = settings.SingleHeroMode,
+            HeroHireBan = settings.SingleHeroMode || settings.HeroSettings.HeroHireBan,
             EncounterHoles = settings.EncounterHoles,
             FactionLawsExpModifier = PercentToModifier(settings.FactionLawsExpPercent),
             AstrologyExpModifier = PercentToModifier(settings.AstrologyExpPercent),
@@ -357,7 +357,7 @@ namespace Olden_Era___Template_Editor.Services
         };
 
         private static double PercentToModifier(int percent) =>
-            Math.Round(Math.Clamp(percent, 25, 200) / 100.0, 2, MidpointRounding.AwayFromZero);
+            Math.Round(Math.Clamp(percent, 20, 200) / 100.0, 2, MidpointRounding.AwayFromZero);
 
         private static List<Bonus>? BuildBonuses(List<OldenEraTemplateEditor.Models.BonusEntry> entries)
         {
@@ -428,8 +428,10 @@ namespace Olden_Era___Template_Editor.Services
                 Desertion = true,
                 DesertionDay = 3,
                 DesertionValue = 3000,
-                HeroLighting = true,
-                HeroLightingDay = 1,
+                HeroLighting = settings.GameEndConditions.HeroLighting,
+                HeroLightingDay = settings.GameEndConditions.HeroLighting
+                    ? Math.Clamp(settings.GameEndConditions.HeroLightingDay, 1, 30)
+                    : 1,
                 LostStartCity = useLostStartCity,
                 LostStartCityDay = Math.Clamp(settings.GameEndConditions.LostStartCityDay, 1, 30),
                 LostStartHero = settings.GameEndConditions.LostStartHero || useGladiator,

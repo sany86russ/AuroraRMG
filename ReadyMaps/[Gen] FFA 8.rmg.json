@@ -1,7 +1,7 @@
 {
   "name": "FFA 8",
   "gameMode": "Classic",
-  "description": "Generated with Olden Era Template Generator v0.7: Balanced layout, 8 neutral zones, 1 castle per player zone, mixed neutral zone tiers.",
+  "description": "Generated with Olden Era Template Generator v1.1: Balanced layout, 8 neutral zones, 1 castle per player zone, mixed neutral zone tiers.",
   "displayWinCondition": "win_condition_1",
   "sizeX": 208,
   "sizeZ": 208,
@@ -30,7 +30,7 @@
   "variants": [
     {
       "orientation": {
-        "zeroAngleZone": "Spawn-B",
+        "zeroAngleZone": "Spawn-F",
         "baseAngleMin": 45,
         "baseAngleMax": 45,
         "randomAngleAmplitude": 360,
@@ -56,7 +56,7 @@
       },
       "zones": [
         {
-          "name": "Spawn-B",
+          "name": "Spawn-F",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -94,7 +94,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_B"
+            "mandatory_content_side_F"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -180,7 +180,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-B-L"
+                  "Rnd-F-L"
                 ]
               }
             }
@@ -310,7 +310,7 @@
           ]
         },
         {
-          "name": "Spawn-A",
+          "name": "Spawn-G",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -348,7 +348,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_A"
+            "mandatory_content_side_G"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -434,7 +434,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-A-I"
+                  "Rnd-G-I"
                 ]
               }
             }
@@ -1072,7 +1072,7 @@
           ]
         },
         {
-          "name": "Spawn-F",
+          "name": "Spawn-H",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -1110,7 +1110,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_F"
+            "mandatory_content_side_H"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -1196,7 +1196,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-F-J"
+                  "Rnd-H-J"
                 ]
               }
             }
@@ -1357,7 +1357,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-A-I"
+                  "Rnd-G-I"
                 ]
               }
             },
@@ -1420,7 +1420,7 @@
           ]
         },
         {
-          "name": "Spawn-G",
+          "name": "Spawn-B",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -1458,7 +1458,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_G"
+            "mandatory_content_side_B"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -1544,7 +1544,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-G-J"
+                  "Rnd-B-J"
                 ]
               }
             }
@@ -1705,7 +1705,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-G-J"
+                  "Rnd-B-J"
                 ]
               }
             },
@@ -1719,7 +1719,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-F-J"
+                  "Rnd-H-J"
                 ]
               }
             },
@@ -1754,7 +1754,7 @@
           ]
         },
         {
-          "name": "Spawn-H",
+          "name": "Spawn-D",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -1792,7 +1792,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_H"
+            "mandatory_content_side_D"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -1878,7 +1878,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-H-K"
+                  "Rnd-D-K"
                 ]
               }
             }
@@ -2039,7 +2039,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-H-K"
+                  "Rnd-D-K"
                 ]
               }
             },
@@ -2053,7 +2053,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-K-D"
+                  "Rnd-K-A"
                 ]
               }
             },
@@ -2088,7 +2088,7 @@
           ]
         },
         {
-          "name": "Spawn-D",
+          "name": "Spawn-A",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -2126,7 +2126,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_D"
+            "mandatory_content_side_A"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -2212,7 +2212,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-K-D"
+                  "Rnd-K-A"
                 ]
               }
             }
@@ -2373,7 +2373,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-B-L"
+                  "Rnd-F-L"
                 ]
               }
             },
@@ -2506,64 +2506,64 @@
           "guardMatchGroup": "rnd_guard_J_K"
         },
         {
-          "name": "Rnd-G-J",
-          "from": "Spawn-G",
-          "to": "Neutral-J",
-          "connectionType": "Direct",
-          "guardZone": "Spawn-G",
-          "guardEscape": false,
-          "simTurnSquad": true,
-          "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_G_J"
-        },
-        {
-          "name": "Rnd-H-K",
-          "from": "Spawn-H",
-          "to": "Neutral-K",
-          "connectionType": "Direct",
-          "guardZone": "Spawn-H",
-          "guardEscape": false,
-          "simTurnSquad": true,
-          "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_H_K"
-        },
-        {
-          "name": "Rnd-K-D",
-          "from": "Neutral-K",
-          "to": "Spawn-D",
-          "connectionType": "Direct",
-          "guardZone": "Neutral-K",
-          "guardEscape": false,
-          "simTurnSquad": true,
-          "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_K_D"
-        },
-        {
-          "name": "Rnd-B-L",
+          "name": "Rnd-B-J",
           "from": "Spawn-B",
-          "to": "Neutral-L",
+          "to": "Neutral-J",
           "connectionType": "Direct",
           "guardZone": "Spawn-B",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
           "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_B_L"
+          "guardMatchGroup": "rnd_guard_B_J"
         },
         {
-          "name": "Rnd-A-I",
-          "from": "Spawn-A",
-          "to": "Neutral-I",
+          "name": "Rnd-D-K",
+          "from": "Spawn-D",
+          "to": "Neutral-K",
           "connectionType": "Direct",
-          "guardZone": "Spawn-A",
+          "guardZone": "Spawn-D",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
           "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_A_I"
+          "guardMatchGroup": "rnd_guard_D_K"
+        },
+        {
+          "name": "Rnd-K-A",
+          "from": "Neutral-K",
+          "to": "Spawn-A",
+          "connectionType": "Direct",
+          "guardZone": "Neutral-K",
+          "guardEscape": false,
+          "simTurnSquad": true,
+          "guardValue": 15000,
+          "guardWeeklyIncrement": 0.15,
+          "guardMatchGroup": "rnd_guard_K_A"
+        },
+        {
+          "name": "Rnd-F-L",
+          "from": "Spawn-F",
+          "to": "Neutral-L",
+          "connectionType": "Direct",
+          "guardZone": "Spawn-F",
+          "guardEscape": false,
+          "simTurnSquad": true,
+          "guardValue": 15000,
+          "guardWeeklyIncrement": 0.15,
+          "guardMatchGroup": "rnd_guard_F_L"
+        },
+        {
+          "name": "Rnd-G-I",
+          "from": "Spawn-G",
+          "to": "Neutral-I",
+          "connectionType": "Direct",
+          "guardZone": "Spawn-G",
+          "guardEscape": false,
+          "simTurnSquad": true,
+          "guardValue": 15000,
+          "guardWeeklyIncrement": 0.15,
+          "guardMatchGroup": "rnd_guard_G_I"
         },
         {
           "name": "Rnd-C-I",
@@ -2590,16 +2590,16 @@
           "guardMatchGroup": "rnd_guard_E_I"
         },
         {
-          "name": "Rnd-F-J",
-          "from": "Spawn-F",
+          "name": "Rnd-H-J",
+          "from": "Spawn-H",
           "to": "Neutral-J",
           "connectionType": "Direct",
-          "guardZone": "Spawn-F",
+          "guardZone": "Spawn-H",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
           "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_F_J"
+          "guardMatchGroup": "rnd_guard_H_J"
         },
         {
           "name": "Rnd-O-K",

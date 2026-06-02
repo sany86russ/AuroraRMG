@@ -1,7 +1,7 @@
 {
   "name": "FFA 3",
   "gameMode": "Classic",
-  "description": "Generated with Olden Era Template Generator v0.7: Balanced layout, 6 neutral zones, 1 castle per player zone, mixed neutral zone tiers.",
+  "description": "Generated with Olden Era Template Generator v1.1: Balanced layout, 6 neutral zones, 1 castle per player zone, mixed neutral zone tiers.",
   "displayWinCondition": "win_condition_1",
   "sizeX": 160,
   "sizeZ": 160,
@@ -30,7 +30,7 @@
   "variants": [
     {
       "orientation": {
-        "zeroAngleZone": "Spawn-C",
+        "zeroAngleZone": "Spawn-A",
         "baseAngleMin": 45,
         "baseAngleMax": 45,
         "randomAngleAmplitude": 360,
@@ -56,7 +56,7 @@
       },
       "zones": [
         {
-          "name": "Spawn-C",
+          "name": "Spawn-A",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -94,7 +94,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_C"
+            "mandatory_content_side_A"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -180,7 +180,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-C-F"
+                  "Rnd-A-F"
                 ]
               }
             }
@@ -341,7 +341,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-D-A"
+                  "Rnd-D-C"
                 ]
               }
             },
@@ -523,7 +523,7 @@
           ]
         },
         {
-          "name": "Spawn-A",
+          "name": "Spawn-C",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
@@ -561,7 +561,7 @@
             "content_pool_general_resources_start_zone_poor"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_A"
+            "mandatory_content_side_C"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -647,7 +647,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-D-A"
+                  "Rnd-D-C"
                 ]
               }
             }
@@ -1275,7 +1275,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Rnd-C-F"
+                  "Rnd-A-F"
                 ]
               }
             },
@@ -1543,28 +1543,28 @@
           "guardMatchGroup": "rnd_guard_E_B"
         },
         {
-          "name": "Rnd-C-F",
-          "from": "Spawn-C",
+          "name": "Rnd-A-F",
+          "from": "Spawn-A",
           "to": "Neutral-F",
           "connectionType": "Direct",
-          "guardZone": "Spawn-C",
+          "guardZone": "Spawn-A",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
           "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_C_F"
+          "guardMatchGroup": "rnd_guard_A_F"
         },
         {
-          "name": "Rnd-D-A",
+          "name": "Rnd-D-C",
           "from": "Neutral-D",
-          "to": "Spawn-A",
+          "to": "Spawn-C",
           "connectionType": "Direct",
           "guardZone": "Neutral-D",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
           "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "rnd_guard_D_A"
+          "guardMatchGroup": "rnd_guard_D_C"
         },
         {
           "name": "Rnd-G-E",

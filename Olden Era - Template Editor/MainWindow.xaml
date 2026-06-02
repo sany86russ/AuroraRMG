@@ -99,7 +99,6 @@
                         <Button Content="📂" Width="38" Margin="0,0,4,0" Click="BtnOpen_Click"   Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.002}"/>
                         <Button Content="💾" Width="38" Margin="0,0,4,0" Click="BtnSave_Click"   Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.003}"/>
                         <Button Content="💾…" Width="44" Margin="0,0,8,0" Click="BtnSaveAs_Click" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.004}"/>
-                        <Button x:Name="BtnEditor" Content="{DynamicResource S.Btn.Editor}" Margin="0,0,8,0" Padding="8,0" Click="BtnOpenEditor_Click" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.005}"/>
                         <Border Width="1" Background="{StaticResource BrushBorder}" Margin="0,4,8,4" VerticalAlignment="Stretch"/>
                         <Button x:Name="BtnLangRu" Content="RU" Width="34" Margin="0,0,2,0" Click="BtnLang_Click" Tag="ru" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.006}"/>
                         <Button x:Name="BtnLangEn" Content="EN" Width="34" Click="BtnLang_Click" Tag="en" Style="{StaticResource ToolbarButton}" ToolTip="English language"/>
@@ -178,17 +177,18 @@
                 <ColumnDefinition Width="290"/>
             </Grid.ColumnDefinitions>
 
+            <Grid Grid.Column="0">
             <TabControl x:Name="MainTabs"
-                        Grid.Column="0"
-                        TabStripPlacement="Left"
-                        ItemContainerStyle="{StaticResource SidebarTab}"
+                        TabStripPlacement="Top"
+                        ItemContainerStyle="{StaticResource TopTab}"
+                        KeyboardNavigation.TabNavigation="Cycle"
                         VerticalContentAlignment="Stretch">
-                <TabItem Header="{DynamicResource S.Tab.Rules}">
+                <TabItem Header="{DynamicResource S.Tab.Rules}" Tag="{StaticResource BrushTabRules}">
                 <Grid Margin="0,8,0,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="0.9*"/>
                     <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1.1*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>  <!-- 1st row -->
@@ -198,69 +198,8 @@
                     <RowDefinition Height="*"/>     <!-- 3rd row -->
                 </Grid.RowDefinitions>
 
-                <!-- TEMPLATE -->
+                <!-- HEROES (left) -->
                 <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource SectionBorder}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel>
-                        <TextBlock Text="{DynamicResource S.Hdr.Template}" Style="{StaticResource SectionHeader}"/>
-                        <DockPanel Margin="0,0,0,8">
-                            <Label Content="{DynamicResource S.Lbl.Preset}" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                            <Button x:Name="BtnPreset" Margin="8,0,0,0" Click="BtnPreset_Click"
-                                    Content="{DynamicResource S.Btn.PresetPick}"
-                                    HorizontalContentAlignment="Left"
-                                    Style="{StaticResource ToolbarButton}"
-                                    ToolTip="{DynamicResource S.M.013}"/>
-                        </DockPanel>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="155"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="8"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="8"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="8"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Label Grid.Row="0" Grid.Column="0" Content="{DynamicResource S.Lbl.TemplateName}"/>
-                            <TextBox Grid.Row="0" Grid.Column="1" x:Name="TxtTemplateName" Text="{DynamicResource S.M.014}"/>
-                            <Label Grid.Row="2" Grid.Column="0" Content="{DynamicResource S.Lbl.MapSize}"/>
-                            <ComboBox x:Name="CmbMapSize" Grid.Row="2" Grid.Column="1" SelectionChanged="CmbMapSize_SelectionChanged"/>
-                            <StackPanel Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2">
-                                <CheckBox x:Name="ChkExperimentalMapSizes"
-                                          Content="{DynamicResource S.Chk.ExpMaps}"
-                                          Margin="0,6,0,0"
-                                          Visibility="Visible"
-                                          Checked="ChkExperimentalMapSizes_Changed"
-                                          Unchecked="ChkExperimentalMapSizes_Changed"/>
-                                <TextBlock x:Name="TxtExperimentalMapSizeWarning"
-                                           Foreground="{StaticResource BrushTextDim}"
-                                           FontSize="11"
-                                           TextWrapping="Wrap"
-                                           Margin="0,4,0,0"
-                                           Visibility="Collapsed"
-                                           Text="{DynamicResource S.M.015}"/>
-                            </StackPanel>
-                            <DockPanel Grid.Row="6" Grid.Column="0">
-                                <Label Content="{DynamicResource S.Lbl.Players}" DockPanel.Dock="Left"/>
-                                <TextBlock x:Name="TxtPlayers" Text="2" DockPanel.Dock="Right"
-                                           HorizontalAlignment="Right" VerticalAlignment="Center"
-                                           Margin="0,0,4,0" Style="{StaticResource ValueText}"/>
-                            </DockPanel>
-                            <Slider Grid.Row="6" Grid.Column="1" x:Name="SldPlayers"
-                                    Minimum="2" Maximum="8" Value="2"
-                                    TickFrequency="1" IsSnapToTickEnabled="True"
-                                    ValueChanged="Slider_ValueChanged"/>
-                        </Grid>
-                    </StackPanel>
-                    </ScrollViewer>
-                </Border>
-
-                <!-- HEROES -->
-                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource SectionBorder}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel>
                         <TextBlock Text="{DynamicResource S.Hdr.Heroes}" Style="{StaticResource SectionHeader}"/>
@@ -278,6 +217,7 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
+                            <!-- Начальный лимит героев -->
                             <Label Grid.Row="0" Grid.Column="0" Content="{DynamicResource S.Lbl.HeroMin}"
                                    Padding="5,2" VerticalAlignment="Center"/>
                             <Slider Grid.Row="0" Grid.Column="1" x:Name="SldHeroMin"
@@ -295,30 +235,14 @@
                                         Tag="+SldHeroMin" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.018}"/>
                             </StackPanel>
 
-                            <Label Grid.Row="2" Grid.Column="0" Content="{DynamicResource S.Lbl.HeroMax}"
+                            <!-- Прирост лимита за замок (между начальным и максимумом) -->
+                            <Label Grid.Row="2" Grid.Column="0" Content="{DynamicResource S.Lbl.HeroIncrement}"
                                    Padding="5,2" VerticalAlignment="Center"/>
-                            <Slider Grid.Row="2" Grid.Column="1" x:Name="SldHeroMax"
-                                    Minimum="1" Maximum="12" Value="8" VerticalAlignment="Center"
-                                    Margin="0,0,6,0" TickFrequency="1" IsSnapToTickEnabled="True"
-                                    ValueChanged="Slider_ValueChanged"/>
-                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Content="−" Width="22" Style="{StaticResource ToolbarButton}"
-                                        Tag="-SldHeroMax" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.016}"/>
-                                <TextBox x:Name="TxtHeroMax" Text="8" Width="34" MaxLength="3"
-                                         TextAlignment="Center" VerticalContentAlignment="Center" Margin="2,0"
-                                         ToolTip="{DynamicResource S.M.017}"
-                                         LostFocus="HeroBox_LostFocus" KeyDown="HeroBox_KeyDown"/>
-                                <Button Content="+" Width="22" Style="{StaticResource ToolbarButton}"
-                                        Tag="+SldHeroMax" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.018}"/>
-                            </StackPanel>
-
-                            <Label Grid.Row="4" Grid.Column="0" Content="{DynamicResource S.Lbl.HeroIncrement}"
-                                   Padding="5,2" VerticalAlignment="Center"/>
-                            <Slider Grid.Row="4" Grid.Column="1" x:Name="SldHeroIncrement"
+                            <Slider Grid.Row="2" Grid.Column="1" x:Name="SldHeroIncrement"
                                     Minimum="0" Maximum="20" Value="1" VerticalAlignment="Center"
                                     Margin="0,0,6,0" TickFrequency="1" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
-                            <StackPanel Grid.Row="4" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button Content="−" Width="22" Style="{StaticResource ToolbarButton}"
                                         Tag="-SldHeroIncrement" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.016}"/>
                                 <TextBox x:Name="TxtHeroIncrement" Text="1" Width="34" MaxLength="3"
@@ -328,14 +252,118 @@
                                 <Button Content="+" Width="22" Style="{StaticResource ToolbarButton}"
                                         Tag="+SldHeroIncrement" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.018}"/>
                             </StackPanel>
+
+                            <!-- Максимальный лимит героев (внизу) -->
+                            <Label Grid.Row="4" Grid.Column="0" Content="{DynamicResource S.Lbl.HeroMax}"
+                                   Padding="5,2" VerticalAlignment="Center"/>
+                            <Slider Grid.Row="4" Grid.Column="1" x:Name="SldHeroMax"
+                                    Minimum="1" Maximum="12" Value="8" VerticalAlignment="Center"
+                                    Margin="0,0,6,0" TickFrequency="1" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_ValueChanged"/>
+                            <StackPanel Grid.Row="4" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button Content="−" Width="22" Style="{StaticResource ToolbarButton}"
+                                        Tag="-SldHeroMax" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.016}"/>
+                                <TextBox x:Name="TxtHeroMax" Text="8" Width="34" MaxLength="3"
+                                         TextAlignment="Center" VerticalContentAlignment="Center" Margin="2,0"
+                                         ToolTip="{DynamicResource S.M.017}"
+                                         LostFocus="HeroBox_LostFocus" KeyDown="HeroBox_KeyDown"/>
+                                <Button Content="+" Width="22" Style="{StaticResource ToolbarButton}"
+                                        Tag="+SldHeroMax" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.018}"/>
+                            </StackPanel>
                         </Grid>
-                        <TextBlock Text="{DynamicResource S.Hint.Heroes}"
-                                   Foreground="#8A93A8" FontSize="11" TextWrapping="Wrap"
-                                   Margin="5,6,5,0"/>
-                        <CheckBox x:Name="ChkSingleHeroMode" Content="{DynamicResource S.Chk.SingleHero}"
-                                  Margin="5,8,5,2" VerticalContentAlignment="Center"
-                                  Checked="ChkSingleHeroMode_Changed"
-                                  Unchecked="ChkSingleHeroMode_Changed"/>
+
+                        <!-- Запрет найма героев (heroHireBan) -->
+                        <CheckBox x:Name="ChkHeroHireBan" Content="{DynamicResource S.Chk.HeroHireBan}"
+                                  Margin="5,12,5,2" VerticalContentAlignment="Center"
+                                  ToolTip="{DynamicResource S.Tip.HeroHireBan}"
+                                  Checked="ChkOption_Changed" Unchecked="ChkOption_Changed"/>
+                        <!-- Поражение при потере стартового героя (перенесено из Правил) -->
+                        <CheckBox x:Name="ChkLostStartHero" Content="{DynamicResource S.M.024}"
+                                  Margin="5,4,5,2" VerticalContentAlignment="Center"
+                                  Checked="WinConditionOption_Changed" Unchecked="WinConditionOption_Changed"/>
+                        <!-- Переход к списку банов героев -->
+                        <Button x:Name="BtnUnwantedHeroes" Content="{DynamicResource S.Btn.UnwantedHeroes}"
+                                Margin="5,10,5,2" HorizontalAlignment="Left" Padding="12,5"
+                                Style="{StaticResource ToolbarButton}" Click="BtnUnwantedHeroes_Click"
+                                ToolTip="{DynamicResource S.Tip.UnwantedHeroes}"/>
+                    </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- TEMPLATE (right, wider) -->
+                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource SectionBorder}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource S.Hdr.Template}" Style="{StaticResource SectionHeader}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="155"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Игроки (наверху) -->
+                            <DockPanel Grid.Row="0" Grid.Column="0">
+                                <Label Content="{DynamicResource S.Lbl.Players}" DockPanel.Dock="Left"/>
+                                <TextBlock x:Name="TxtPlayers" Text="2" DockPanel.Dock="Right"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           Margin="0,0,4,0" Style="{StaticResource ValueText}"/>
+                            </DockPanel>
+                            <Slider Grid.Row="0" Grid.Column="1" x:Name="SldPlayers"
+                                    Minimum="2" Maximum="8" Value="2"
+                                    TickFrequency="1" IsSnapToTickEnabled="True"
+                                    ValueChanged="Slider_ValueChanged"/>
+
+                            <!-- Вид карты (дублирует топологию из вкладки "Настройка зон") -->
+                            <Label Grid.Row="2" Grid.Column="0" Content="{DynamicResource S.Lbl.MapView}"/>
+                            <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CmbMapView"
+                                      SelectionChanged="CmbMapView_SelectionChanged"/>
+
+                            <!-- Размер карты -->
+                            <Label Grid.Row="4" Grid.Column="0" Content="{DynamicResource S.Lbl.MapSize}"/>
+                            <ComboBox x:Name="CmbMapSize" Grid.Row="4" Grid.Column="1" SelectionChanged="CmbMapSize_SelectionChanged"/>
+                            <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2">
+                                <CheckBox x:Name="ChkExperimentalMapSizes"
+                                          Content="{DynamicResource S.Chk.ExpMaps}"
+                                          Margin="0,2,0,0"
+                                          Checked="ChkExperimentalMapSizes_Changed"
+                                          Unchecked="ChkExperimentalMapSizes_Changed"/>
+                                <TextBlock x:Name="TxtExperimentalMapSizeWarning"
+                                           Foreground="{StaticResource BrushTextDim}"
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"
+                                           Visibility="Collapsed" Text="{DynamicResource S.M.015}"/>
+                            </StackPanel>
+
+                            <!-- Пресет (+ кнопка случайного подбора под число игроков) -->
+                            <Label Grid.Row="8" Grid.Column="0" Content="{DynamicResource S.Lbl.Preset}" VerticalAlignment="Center"/>
+                            <DockPanel Grid.Row="8" Grid.Column="1">
+                                <Button x:Name="BtnRandomPreset" DockPanel.Dock="Right" Content="🎲"
+                                        Width="34" Margin="6,0,0,0" Click="BtnRandomPreset_Click"
+                                        Style="{StaticResource ToolbarButton}"
+                                        ToolTip="{DynamicResource S.Tip.Random}"/>
+                                <Button x:Name="BtnPreset" Click="BtnPreset_Click"
+                                        Content="{DynamicResource S.Btn.PresetPick}"
+                                        HorizontalContentAlignment="Left"
+                                        Style="{StaticResource ToolbarButton}"
+                                        ToolTip="{DynamicResource S.M.013}"/>
+                            </DockPanel>
+
+                            <!-- Название шаблона (в самом конце) -->
+                            <Label Grid.Row="10" Grid.Column="0" Content="{DynamicResource S.Lbl.TemplateName}"/>
+                            <TextBox Grid.Row="10" Grid.Column="1" x:Name="TxtTemplateName" Text="{DynamicResource S.M.014}"/>
+                        </Grid>
                     </StackPanel>
                     </ScrollViewer>
                 </Border>
@@ -346,43 +374,64 @@
                         <TextBlock DockPanel.Dock="Top" Text="{DynamicResource S.Hdr.GameRules}" Style="{StaticResource SectionHeader}"/>
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel>
+                            <!-- Условия победы (наверху) + режим одного героя + опыт/дипломатия -->
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="205"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>   <!-- условие победы -->
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>   <!-- режим одного героя -->
+                                    <RowDefinition Height="12"/>
+                                    <RowDefinition Height="Auto"/>   <!-- законы -->
                                     <RowDefinition Height="10"/>
-                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>   <!-- астрология -->
                                     <RowDefinition Height="10"/>
-                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>   <!-- дипломатия -->
                                 </Grid.RowDefinitions>
 
-                                <Label Grid.Row="4" Grid.Column="0" Content="{DynamicResource S.M.019}"/>
-                                <ComboBox Grid.Row="4" Grid.Column="1" x:Name="CmbVictory"
+                                <Label Grid.Row="0" Grid.Column="0" Content="{DynamicResource S.M.019}" VerticalAlignment="Center"/>
+                                <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CmbVictory"
                                           SelectionChanged="CmbVictory_SelectionChanged"/>
 
-                                <DockPanel Grid.Row="0" Grid.Column="0">
+                                <CheckBox Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                          x:Name="ChkSingleHeroMode" Content="{DynamicResource S.Chk.SingleHero}"
+                                          VerticalContentAlignment="Center"
+                                          Checked="ChkSingleHeroMode_Changed" Unchecked="ChkSingleHeroMode_Changed"/>
+
+                                <DockPanel Grid.Row="4" Grid.Column="0">
                                     <Label Content="{DynamicResource S.M.020}" DockPanel.Dock="Left"/>
                                     <TextBlock x:Name="TxtFactionLawsExp" Text="100%" DockPanel.Dock="Right"
                                                HorizontalAlignment="Right" VerticalAlignment="Center"
                                                Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                                 </DockPanel>
-                                <Slider Grid.Row="0" Grid.Column="1" x:Name="SldFactionLawsExp"
-                                        Minimum="25" Maximum="200" Value="100"
-                                        TickFrequency="25" IsSnapToTickEnabled="True"
+                                <Slider Grid.Row="4" Grid.Column="1" x:Name="SldFactionLawsExp"
+                                        Minimum="20" Maximum="200" Value="100"
+                                        TickFrequency="10" SmallChange="10" IsSnapToTickEnabled="True"
                                         ValueChanged="Slider_ValueChanged"/>
 
-                                        <DockPanel Grid.Row="2" Grid.Column="0">
+                                <DockPanel Grid.Row="6" Grid.Column="0">
                                     <Label Content="{DynamicResource S.M.021}" DockPanel.Dock="Left"/>
                                     <TextBlock x:Name="TxtAstrologyExp" Text="100%" DockPanel.Dock="Right"
                                                HorizontalAlignment="Right" VerticalAlignment="Center"
                                                Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                                 </DockPanel>
-                                <Slider Grid.Row="2" Grid.Column="1" x:Name="SldAstrologyExp"
-                                        Minimum="25" Maximum="200" Value="100"
-                                        TickFrequency="25" IsSnapToTickEnabled="True"
+                                <Slider Grid.Row="6" Grid.Column="1" x:Name="SldAstrologyExp"
+                                        Minimum="20" Maximum="200" Value="100"
+                                        TickFrequency="10" SmallChange="10" IsSnapToTickEnabled="True"
+                                        ValueChanged="Slider_ValueChanged"/>
+
+                                <DockPanel Grid.Row="8" Grid.Column="0">
+                                    <Label Content="{DynamicResource S.M.038}" DockPanel.Dock="Left"/>
+                                    <TextBlock x:Name="TxtDiplomacy" Text="-0.50" DockPanel.Dock="Right"
+                                               HorizontalAlignment="Right" VerticalAlignment="Center"
+                                               Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
+                                </DockPanel>
+                                <Slider Grid.Row="8" Grid.Column="1" x:Name="SldDiplomacy"
+                                        Minimum="-100" Maximum="100" Value="-50"
+                                        TickFrequency="5" SmallChange="5" IsSnapToTickEnabled="True"
                                         ValueChanged="Slider_ValueChanged"/>
                             </Grid>
 
@@ -407,11 +456,6 @@
                                             TickFrequency="1" IsSnapToTickEnabled="True"
                                             ValueChanged="Slider_ValueChanged"/>
                                 </Grid>
-
-                                <CheckBox x:Name="ChkLostStartHero"
-                                          Content="{DynamicResource S.M.024}"
-                                          Checked="WinConditionOption_Changed"
-                                          Unchecked="WinConditionOption_Changed"/>
 
                                 <CheckBox x:Name="ChkCityHold"
                                           Content="{DynamicResource S.M.025}"
@@ -475,6 +519,7 @@
                                 <CheckBox x:Name="ChkTournament"
                                           Content="{DynamicResource S.M.030}"
                                           Margin="0,6,0,0"
+                                          Visibility="Collapsed"
                                           Checked="WinConditionOption_Changed"
                                           Unchecked="WinConditionOption_Changed"/>
                                 <Grid x:Name="PnlTournamentDetails" Margin="18,3,0,0">
@@ -530,6 +575,18 @@
                                               Unchecked="ChkOption_Changed"/>
                                                 </Grid>
 
+                                <!-- Подсветка игроков на миникарте (heroLighting / heroLightingDay) -->
+                                <StackPanel Orientation="Horizontal" Margin="0,12,0,2">
+                                    <CheckBox x:Name="ChkHeroLighting" Content="{DynamicResource S.M.HeroLighting}"
+                                              IsChecked="True" VerticalContentAlignment="Center"
+                                              Checked="HeroLighting_Changed" Unchecked="HeroLighting_Changed"/>
+                                    <TextBlock Text="{DynamicResource S.M.HeroLightingFrom}" VerticalAlignment="Center"
+                                               Margin="10,0,4,0" Foreground="{StaticResource BrushTextDim}"/>
+                                    <TextBox x:Name="TxtHeroLightingDay" Text="1" Width="40" MaxLength="2"
+                                             TextAlignment="Center" VerticalContentAlignment="Center"
+                                             LostFocus="HeroLightingDay_LostFocus"/>
+                                </StackPanel>
+
                                 <TextBlock Text="{DynamicResource S.Hdr.Environment}" Margin="0,16,0,6"
                                            FontWeight="Bold" Opacity="0.85"/>
                                 <Grid>
@@ -564,34 +621,23 @@
                                               SelectionChanged="EnvironmentOption_Changed"/>
 
                                     <DockPanel Grid.Row="6" Grid.Column="0">
-                                        <Label Content="{DynamicResource S.M.038}" DockPanel.Dock="Left"/>
-                                        <TextBlock x:Name="TxtDiplomacy" Text="-0.50" DockPanel.Dock="Right"
-                                                   HorizontalAlignment="Right" VerticalAlignment="Center"
-                                                   Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
-                                    </DockPanel>
-                                    <Slider Grid.Row="6" Grid.Column="1" x:Name="SldDiplomacy"
-                                            Minimum="-100" Maximum="100" Value="-50"
-                                            TickFrequency="10" IsSnapToTickEnabled="True"
-                                            ValueChanged="Slider_ValueChanged"/>
-
-                                    <DockPanel Grid.Row="8" Grid.Column="0">
                                         <Label Content="{DynamicResource S.M.039}" DockPanel.Dock="Left"/>
                                         <TextBlock x:Name="TxtTerrainRoughness" Text="100%" DockPanel.Dock="Right"
                                                    HorizontalAlignment="Right" VerticalAlignment="Center"
                                                    Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                                     </DockPanel>
-                                    <Slider Grid.Row="8" Grid.Column="1" x:Name="SldTerrainRoughness"
+                                    <Slider Grid.Row="6" Grid.Column="1" x:Name="SldTerrainRoughness"
                                             Minimum="0" Maximum="200" Value="100"
                                             TickFrequency="10" IsSnapToTickEnabled="True"
                                             ValueChanged="Slider_ValueChanged"/>
 
-                                    <DockPanel Grid.Row="10" Grid.Column="0">
+                                    <DockPanel Grid.Row="8" Grid.Column="0">
                                         <Label Content="{DynamicResource S.M.040}" DockPanel.Dock="Left"/>
                                         <TextBlock x:Name="TxtLakeAmount" Text="100%" DockPanel.Dock="Right"
                                                    HorizontalAlignment="Right" VerticalAlignment="Center"
                                                    Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                                     </DockPanel>
-                                    <Slider Grid.Row="10" Grid.Column="1" x:Name="SldLakeAmount"
+                                    <Slider Grid.Row="8" Grid.Column="1" x:Name="SldLakeAmount"
                                             Minimum="0" Maximum="200" Value="100"
                                             TickFrequency="10" IsSnapToTickEnabled="True"
                                             ValueChanged="Slider_ValueChanged"/>
@@ -610,7 +656,7 @@
                     </Grid>
                 </TabItem>           
 
-            <TabItem Header="{DynamicResource S.Tab.MapZones}">
+            <TabItem Header="{DynamicResource S.Tab.MapZones}" Tag="{StaticResource BrushTabZones}">
             <Grid Margin="0,8,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>     <!-- Layout -->
@@ -1026,320 +1072,7 @@ ValueChanged="Slider_ValueChanged"/>
         </TabItem>
 
                         <!-- ── BONUSES & BANS TAB ───────────────────────────────────────── -->
-                        <TabItem Header="{DynamicResource S.Tab.BonusesBans}">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                <DockPanel Margin="0,8,0,0">
-                                    <Border DockPanel.Dock="Top" Style="{StaticResource SectionBorder}">
-                                        <StackPanel>
-                                            <TextBlock Text="{DynamicResource S.M.078}"
-                           Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
-                                            <TextBlock Text="{DynamicResource S.M.079}"
-                           Foreground="#8A93A8" FontSize="11"
-                           Margin="0,0,0,6" TextWrapping="Wrap"/>
-                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,0">
-                                                <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBonus"
-                                Content="+" Width="28"
-                                Click="BtnAddBonus_Click"
-                                Background="#0B0E14"
-                                BorderBrush="#3A4258" BorderThickness="0,0,1,0"
-                                Foreground="#B3A9FF" FontSize="16"
-                                VerticalAlignment="Stretch"
-                                Cursor="Hand"/>
-                                                    <ListBox x:Name="LbBonuses"
-                                 MinHeight="32"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                                        <ListBox.ItemContainerStyle>
-                                                            <Style TargetType="ListBoxItem">
-                                                                <Setter Property="Padding"    Value="0"/>
-                                                                <Setter Property="Margin"     Value="0"/>
-                                                                <Setter Property="Background" Value="Transparent"/>
-                                                                <Setter Property="Template">
-                                                                    <Setter.Value>
-                                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                                            <ContentPresenter/>
-                                                                        </ControlTemplate>
-                                                                    </Setter.Value>
-                                                                </Setter>
-                                                            </Style>
-                                                        </ListBox.ItemContainerStyle>
-                                                        <ListBox.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <DockPanel Margin="4,2">
-                                                                    <Button DockPanel.Dock="Right"
-                                        Content="×" Width="20" Height="18"
-                                        FontSize="13" Padding="0"
-                                        Tag="{Binding}"
-                                        Click="RemoveBonus_Click"
-                                        ToolTip="{DynamicResource S.M.080}"
-                                        Background="#1C2230"
-                                        BorderBrush="#2A3142"
-                                        Foreground="#E7EBF3"/>
-                                                                    <Ellipse Width="8" Height="8"
-                                         Fill="{Binding DotBrush}"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,6,0"/>
-                                                                    <TextBlock Text="{Binding DisplayName}"
-                                           Foreground="#E7EBF3" FontSize="12"
-                                           VerticalAlignment="Center"
-                                           Margin="0,0,8,0"/>
-                                                                    <TextBlock Text="{Binding ReceiverLabel}"
-                                           Foreground="#8A93A8" FontSize="11"
-                                           VerticalAlignment="Center"
-                                           FontStyle="Italic"
-                                           Visibility="{Binding ShowReceiverLabel, Converter={StaticResource BoolToVis}}"/>
-                                                                </DockPanel>
-                                                            </DataTemplate>
-                                                        </ListBox.ItemTemplate>
-                                                    </ListBox>
-                                                </DockPanel>
-                                            </Border>
-
-                                            <Separator Margin="0,12,0,8"/>
-                                            <TextBlock Text="{DynamicResource S.M.081}" Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
-
-                                            <!-- Optional: connect installed-game assets (full roster + icons) -->
-                                            <CheckBox x:Name="ChkUseGameAssets"
-                                                      Content="{DynamicResource S.M.082}"
-                                                      Margin="0,0,0,2" VerticalContentAlignment="Center"
-                                                      Checked="ChkUseGameAssets_Changed" Unchecked="ChkUseGameAssets_Changed"/>
-                                            <TextBlock Text="{DynamicResource S.M.083}"
-                                                       Foreground="#8A93A8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10"/>
-
-                                            <!-- Banned Items -->
-                                            <TextBlock Text="{DynamicResource S.M.084}"
-                           Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
-                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,10">
-                                                <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBannedItem"
-                                Content="+" Width="28"
-                                Click="BtnAddBannedItem_Click"
-                                Background="#0B0E14"
-                                BorderBrush="#3A4258" BorderThickness="0,0,1,0"
-                                Foreground="#B3A9FF" FontSize="16"
-                                VerticalAlignment="Stretch"
-                                Cursor="Hand"/>
-                                                    <ListBox x:Name="LbBannedItems"
-                                 MinHeight="32" MaxHeight="130"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                                        <ListBox.ItemContainerStyle>
-                                                            <Style TargetType="ListBoxItem">
-                                                                <Setter Property="Padding"    Value="0"/>
-                                                                <Setter Property="Margin"     Value="0"/>
-                                                                <Setter Property="Background" Value="Transparent"/>
-                                                                <Setter Property="Template">
-                                                                    <Setter.Value>
-                                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                                            <ContentPresenter/>
-                                                                        </ControlTemplate>
-                                                                    </Setter.Value>
-                                                                </Setter>
-                                                            </Style>
-                                                        </ListBox.ItemContainerStyle>
-                                                        <ListBox.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <DockPanel Margin="4,2">
-                                                                    <Button DockPanel.Dock="Right"
-                                        Content="×" Width="20" Height="18"
-                                        FontSize="13" Padding="0"
-                                        Tag="{Binding Id}"
-                                        Click="RemoveBannedItem_Click"
-                                        ToolTip="{DynamicResource S.M.080}"
-                                        Background="#1C2230"
-                                        BorderBrush="#2A3142"
-                                        Foreground="#E7EBF3"/>
-                                                                    <Image Width="22" Height="22"
-                                         Source="{Binding Icon}"
-                                         Visibility="{Binding IconVisibility}"
-                                         RenderOptions.BitmapScalingMode="HighQuality"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,6,0"/>
-                                                                    <Ellipse Width="8" Height="8"
-                                         Fill="{Binding CategoryBrush}"
-                                         Visibility="{Binding DotVisibility}"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,6,0"/>
-                                                                    <TextBlock Text="{Binding DisplayName}"
-                                           Foreground="#E7EBF3" FontSize="12"
-                                           VerticalAlignment="Center"/>
-                                                                    <TextBlock Text="{Binding Category}"
-                                           Foreground="#8A93A8" FontSize="11"
-                                           VerticalAlignment="Center"
-                                           Margin="6,0,0,0"/>
-                                                                </DockPanel>
-                                                            </DataTemplate>
-                                                        </ListBox.ItemTemplate>
-                                                    </ListBox>
-                                                </DockPanel>
-                                            </Border>
-
-                                            <!-- Banned Spells -->
-                                            <TextBlock Text="{DynamicResource S.M.085}"
-                           Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
-                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,10">
-                                                <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBannedMagic"
-                                Content="+" Width="28"
-                                Click="BtnAddBannedMagic_Click"
-                                Background="#0B0E14"
-                                BorderBrush="#3A4258" BorderThickness="0,0,1,0"
-                                Foreground="#B3A9FF" FontSize="16"
-                                VerticalAlignment="Stretch"
-                                Cursor="Hand"/>
-                                                    <ListBox x:Name="LbBannedMagics"
-                                 MinHeight="32" MaxHeight="130"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                                        <ListBox.ItemContainerStyle>
-                                                            <Style TargetType="ListBoxItem">
-                                                                <Setter Property="Padding"    Value="0"/>
-                                                                <Setter Property="Margin"     Value="0"/>
-                                                                <Setter Property="Background" Value="Transparent"/>
-                                                                <Setter Property="Template">
-                                                                    <Setter.Value>
-                                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                                            <ContentPresenter/>
-                                                                        </ControlTemplate>
-                                                                    </Setter.Value>
-                                                                </Setter>
-                                                            </Style>
-                                                        </ListBox.ItemContainerStyle>
-                                                        <ListBox.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <DockPanel Margin="4,2">
-                                                                    <Button DockPanel.Dock="Right"
-                                        Content="×" Width="20" Height="18"
-                                        FontSize="13" Padding="0"
-                                        Tag="{Binding Id}"
-                                        Click="RemoveBannedMagic_Click"
-                                        ToolTip="{DynamicResource S.M.080}"
-                                        Background="#1C2230"
-                                        BorderBrush="#2A3142"
-                                        Foreground="#E7EBF3"/>
-                                                                    <Image Width="22" Height="22"
-                                         Source="{Binding Icon}"
-                                         Visibility="{Binding IconVisibility}"
-                                         RenderOptions.BitmapScalingMode="HighQuality"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,6,0"/>
-                                                                    <Ellipse Width="8" Height="8"
-                                         Fill="{Binding CategoryBrush}"
-                                         Visibility="{Binding DotVisibility}"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,6,0"/>
-                                                                    <TextBlock Text="{Binding DisplayName}"
-                                           Foreground="#E7EBF3" FontSize="12"
-                                           VerticalAlignment="Center"/>
-                                                                </DockPanel>
-                                                            </DataTemplate>
-                                                        </ListBox.ItemTemplate>
-                                                    </ListBox>
-                                                </DockPanel>
-                                            </Border>
-
-                                            <!-- Banned Heroes -->
-                                            <TextBlock Text="{DynamicResource S.M.086}"
-                           Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
-                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,10">
-                                                <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBannedHero"
-                                Content="+" Width="28"
-                                Click="BtnAddBannedHero_Click"
-                                Background="#0B0E14"
-                                BorderBrush="#3A4258" BorderThickness="0,0,1,0"
-                                Foreground="#B3A9FF" FontSize="16"
-                                VerticalAlignment="Stretch"
-                                Cursor="Hand"/>
-                                                    <ListBox x:Name="LbBannedHeroes"
-                                 MinHeight="32" MaxHeight="130"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                                                        <ListBox.ItemContainerStyle>
-                                                            <Style TargetType="ListBoxItem">
-                                                                <Setter Property="Padding"    Value="0"/>
-                                                                <Setter Property="Margin"     Value="0"/>
-                                                                <Setter Property="Background" Value="Transparent"/>
-                                                                <Setter Property="Template">
-                                                                    <Setter.Value>
-                                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                                            <ContentPresenter/>
-                                                                        </ControlTemplate>
-                                                                    </Setter.Value>
-                                                                </Setter>
-                                                            </Style>
-                                                        </ListBox.ItemContainerStyle>
-                                                        <ListBox.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <DockPanel Margin="4,2">
-                                                                    <Button DockPanel.Dock="Right"
-                                        Content="×" Width="20" Height="18"
-                                        FontSize="13" Padding="0"
-                                        Tag="{Binding Id}"
-                                        Click="RemoveBannedHero_Click"
-                                        ToolTip="{DynamicResource S.M.080}"
-                                        Background="#1C2230"
-                                        BorderBrush="#2A3142"
-                                        Foreground="#E7EBF3"/>
-                                                                    <Image Width="22" Height="22"
-                                         Source="{Binding Icon}"
-                                         Visibility="{Binding IconVisibility}"
-                                         RenderOptions.BitmapScalingMode="HighQuality"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,6,0"/>
-                                                                    <Ellipse Width="8" Height="8"
-                                         Fill="{Binding CategoryBrush}"
-                                         Visibility="{Binding DotVisibility}"
-                                         VerticalAlignment="Center"
-                                         Margin="0,0,6,0"/>
-                                                                    <TextBlock Text="{Binding DisplayName}"
-                                           Foreground="#E7EBF3" FontSize="12"
-                                           VerticalAlignment="Center"/>
-                                                                    <TextBlock Text="{Binding Category}"
-                                           Foreground="#8A93A8" FontSize="11"
-                                           VerticalAlignment="Center"
-                                           Margin="6,0,0,0"/>
-                                                                </DockPanel>
-                                                            </DataTemplate>
-                                                        </ListBox.ItemTemplate>
-                                                    </ListBox>
-                                                </DockPanel>
-                                            </Border>
-
-                                            <Separator Margin="0,12,0,8"/>
-                                            <TextBlock Text="{DynamicResource S.M.087}" Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
-
-                                            <!-- Value overrides (kept as free-text) -->
-                                            <TextBlock Text="{DynamicResource S.M.088}"
-                           Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
-                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1">
-                                                <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnPickValueOverride"
-                                Content="+" Width="28"
-                                Click="BtnPickValueOverride_Click"
-                                Background="#0B0E14" BorderBrush="#3A4258" BorderThickness="0,0,1,0"
-                                Foreground="#B3A9FF" FontSize="16"
-                                VerticalAlignment="Stretch" Cursor="Hand"/>
-                                                    <TextBox x:Name="TxtValueOverrides"
-                                 AcceptsReturn="True" Height="68" TextWrapping="NoWrap"
-                                 VerticalScrollBarVisibility="Auto"
-                                 Background="Transparent" BorderThickness="0"
-                                 FontFamily="Consolas" FontSize="11"
-                                 TextChanged="BansOverrides_TextChanged"/>
-                                                </DockPanel>
-                                            </Border>
-                                        </StackPanel>
-                                    </Border>
-                                </DockPanel>
-                            </ScrollViewer>
-                        </TabItem>
-
-                        <TabItem Header="{DynamicResource S.Tab.ExtraContent}">
+                        <TabItem Header="{DynamicResource S.Tab.ExtraContent}" Tag="{StaticResource BrushTabContent}">
             <Grid Margin="0,8,0,0">
                 <DockPanel>
                     <Border DockPanel.Dock="Top"
@@ -2906,7 +2639,326 @@ ValueChanged="Slider_ValueChanged"/>
                 </DockPanel>
             </Grid>
         </TabItem>
+                        <TabItem x:Name="TabBonusesBans" Header="{DynamicResource S.Tab.BonusesBans}" Tag="{StaticResource BrushTabBans}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <DockPanel Margin="0,8,0,0">
+                                    <Border DockPanel.Dock="Top" Style="{StaticResource SectionBorder}">
+                                        <StackPanel>
+                                            <TextBlock Text="{DynamicResource S.M.078}"
+                           Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
+                                            <TextBlock Text="{DynamicResource S.M.079}"
+                           Foreground="#8A93A8" FontSize="11"
+                           Margin="0,0,0,6" TextWrapping="Wrap"/>
+                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,0">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBonus"
+                                Content="+" Width="28"
+                                Click="BtnAddBonus_Click"
+                                Background="#0B0E14"
+                                BorderBrush="#3A4258" BorderThickness="0,0,1,0"
+                                Foreground="#B3A9FF" FontSize="16"
+                                VerticalAlignment="Stretch"
+                                Cursor="Hand"/>
+                                                    <ListBox x:Name="LbBonuses"
+                                 MinHeight="32"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="ListBoxItem">
+                                                                <Setter Property="Padding"    Value="0"/>
+                                                                <Setter Property="Margin"     Value="0"/>
+                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                                            <ContentPresenter/>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
+                                                        <ListBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <DockPanel Margin="4,2">
+                                                                    <Button DockPanel.Dock="Right"
+                                        Content="×" Width="20" Height="18"
+                                        FontSize="13" Padding="0"
+                                        Tag="{Binding}"
+                                        Click="RemoveBonus_Click"
+                                        ToolTip="{DynamicResource S.M.080}"
+                                        Background="#1C2230"
+                                        BorderBrush="#2A3142"
+                                        Foreground="#E7EBF3"/>
+                                                                    <Ellipse Width="8" Height="8"
+                                         Fill="{Binding DotBrush}"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,6,0"/>
+                                                                    <TextBlock Text="{Binding DisplayName}"
+                                           Foreground="#E7EBF3" FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                                                    <TextBlock Text="{Binding ReceiverLabel}"
+                                           Foreground="#8A93A8" FontSize="11"
+                                           VerticalAlignment="Center"
+                                           FontStyle="Italic"
+                                           Visibility="{Binding ShowReceiverLabel, Converter={StaticResource BoolToVis}}"/>
+                                                                </DockPanel>
+                                                            </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                    </ListBox>
+                                                </DockPanel>
+                                            </Border>
+
+                                            <Separator Margin="0,12,0,8"/>
+                                            <TextBlock Text="{DynamicResource S.M.081}" Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
+
+                                            <!-- Optional: connect installed-game assets (full roster + icons) -->
+                                            <CheckBox x:Name="ChkUseGameAssets"
+                                                      Content="{DynamicResource S.M.082}"
+                                                      Margin="0,0,0,2" VerticalContentAlignment="Center"
+                                                      Checked="ChkUseGameAssets_Changed" Unchecked="ChkUseGameAssets_Changed"/>
+                                            <TextBlock Text="{DynamicResource S.M.083}"
+                                                       Foreground="#8A93A8" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                            <!-- Banned Items -->
+                                            <TextBlock Text="{DynamicResource S.M.084}"
+                           Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
+                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,10">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBannedItem"
+                                Content="+" Width="28"
+                                Click="BtnAddBannedItem_Click"
+                                Background="#0B0E14"
+                                BorderBrush="#3A4258" BorderThickness="0,0,1,0"
+                                Foreground="#B3A9FF" FontSize="16"
+                                VerticalAlignment="Stretch"
+                                Cursor="Hand"/>
+                                                    <ListBox x:Name="LbBannedItems"
+                                 MinHeight="32" MaxHeight="130"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="ListBoxItem">
+                                                                <Setter Property="Padding"    Value="0"/>
+                                                                <Setter Property="Margin"     Value="0"/>
+                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                                            <ContentPresenter/>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
+                                                        <ListBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <DockPanel Margin="4,2">
+                                                                    <Button DockPanel.Dock="Right"
+                                        Content="×" Width="20" Height="18"
+                                        FontSize="13" Padding="0"
+                                        Tag="{Binding Id}"
+                                        Click="RemoveBannedItem_Click"
+                                        ToolTip="{DynamicResource S.M.080}"
+                                        Background="#1C2230"
+                                        BorderBrush="#2A3142"
+                                        Foreground="#E7EBF3"/>
+                                                                    <Image Width="22" Height="22"
+                                         Source="{Binding Icon}"
+                                         Visibility="{Binding IconVisibility}"
+                                         RenderOptions.BitmapScalingMode="HighQuality"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,6,0"/>
+                                                                    <Ellipse Width="8" Height="8"
+                                         Fill="{Binding CategoryBrush}"
+                                         Visibility="{Binding DotVisibility}"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,6,0"/>
+                                                                    <TextBlock Text="{Binding DisplayName}"
+                                           Foreground="#E7EBF3" FontSize="12"
+                                           VerticalAlignment="Center"/>
+                                                                    <TextBlock Text="{Binding Category}"
+                                           Foreground="#8A93A8" FontSize="11"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0"/>
+                                                                </DockPanel>
+                                                            </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                    </ListBox>
+                                                </DockPanel>
+                                            </Border>
+
+                                            <!-- Banned Spells -->
+                                            <TextBlock Text="{DynamicResource S.M.085}"
+                           Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
+                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,10">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBannedMagic"
+                                Content="+" Width="28"
+                                Click="BtnAddBannedMagic_Click"
+                                Background="#0B0E14"
+                                BorderBrush="#3A4258" BorderThickness="0,0,1,0"
+                                Foreground="#B3A9FF" FontSize="16"
+                                VerticalAlignment="Stretch"
+                                Cursor="Hand"/>
+                                                    <ListBox x:Name="LbBannedMagics"
+                                 MinHeight="32" MaxHeight="130"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="ListBoxItem">
+                                                                <Setter Property="Padding"    Value="0"/>
+                                                                <Setter Property="Margin"     Value="0"/>
+                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                                            <ContentPresenter/>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
+                                                        <ListBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <DockPanel Margin="4,2">
+                                                                    <Button DockPanel.Dock="Right"
+                                        Content="×" Width="20" Height="18"
+                                        FontSize="13" Padding="0"
+                                        Tag="{Binding Id}"
+                                        Click="RemoveBannedMagic_Click"
+                                        ToolTip="{DynamicResource S.M.080}"
+                                        Background="#1C2230"
+                                        BorderBrush="#2A3142"
+                                        Foreground="#E7EBF3"/>
+                                                                    <Image Width="22" Height="22"
+                                         Source="{Binding Icon}"
+                                         Visibility="{Binding IconVisibility}"
+                                         RenderOptions.BitmapScalingMode="HighQuality"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,6,0"/>
+                                                                    <Ellipse Width="8" Height="8"
+                                         Fill="{Binding CategoryBrush}"
+                                         Visibility="{Binding DotVisibility}"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,6,0"/>
+                                                                    <TextBlock Text="{Binding DisplayName}"
+                                           Foreground="#E7EBF3" FontSize="12"
+                                           VerticalAlignment="Center"/>
+                                                                </DockPanel>
+                                                            </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                    </ListBox>
+                                                </DockPanel>
+                                            </Border>
+
+                                            <!-- Banned Heroes -->
+                                            <TextBlock Text="{DynamicResource S.M.086}"
+                           Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
+                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,10">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBannedHero"
+                                Content="+" Width="28"
+                                Click="BtnAddBannedHero_Click"
+                                Background="#0B0E14"
+                                BorderBrush="#3A4258" BorderThickness="0,0,1,0"
+                                Foreground="#B3A9FF" FontSize="16"
+                                VerticalAlignment="Stretch"
+                                Cursor="Hand"/>
+                                                    <ListBox x:Name="LbBannedHeroes"
+                                 MinHeight="32" MaxHeight="130"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="ListBoxItem">
+                                                                <Setter Property="Padding"    Value="0"/>
+                                                                <Setter Property="Margin"     Value="0"/>
+                                                                <Setter Property="Background" Value="Transparent"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                                            <ContentPresenter/>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
+                                                        <ListBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <DockPanel Margin="4,2">
+                                                                    <Button DockPanel.Dock="Right"
+                                        Content="×" Width="20" Height="18"
+                                        FontSize="13" Padding="0"
+                                        Tag="{Binding Id}"
+                                        Click="RemoveBannedHero_Click"
+                                        ToolTip="{DynamicResource S.M.080}"
+                                        Background="#1C2230"
+                                        BorderBrush="#2A3142"
+                                        Foreground="#E7EBF3"/>
+                                                                    <Image Width="22" Height="22"
+                                         Source="{Binding Icon}"
+                                         Visibility="{Binding IconVisibility}"
+                                         RenderOptions.BitmapScalingMode="HighQuality"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,6,0"/>
+                                                                    <Ellipse Width="8" Height="8"
+                                         Fill="{Binding CategoryBrush}"
+                                         Visibility="{Binding DotVisibility}"
+                                         VerticalAlignment="Center"
+                                         Margin="0,0,6,0"/>
+                                                                    <TextBlock Text="{Binding DisplayName}"
+                                           Foreground="#E7EBF3" FontSize="12"
+                                           VerticalAlignment="Center"/>
+                                                                    <TextBlock Text="{Binding Category}"
+                                           Foreground="#8A93A8" FontSize="11"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0"/>
+                                                                </DockPanel>
+                                                            </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                    </ListBox>
+                                                </DockPanel>
+                                            </Border>
+
+                                            <Separator Margin="0,12,0,8"/>
+                                            <TextBlock Text="{DynamicResource S.M.087}" Style="{StaticResource SectionHeader}" Margin="0,0,0,4"/>
+
+                                            <!-- Value overrides (kept as free-text) -->
+                                            <TextBlock Text="{DynamicResource S.M.088}"
+                           Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
+                                            <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Left" x:Name="BtnPickValueOverride"
+                                Content="+" Width="28"
+                                Click="BtnPickValueOverride_Click"
+                                Background="#0B0E14" BorderBrush="#3A4258" BorderThickness="0,0,1,0"
+                                Foreground="#B3A9FF" FontSize="16"
+                                VerticalAlignment="Stretch" Cursor="Hand"/>
+                                                    <TextBox x:Name="TxtValueOverrides"
+                                 AcceptsReturn="True" Height="68" TextWrapping="NoWrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Background="Transparent" BorderThickness="0"
+                                 FontFamily="Consolas" FontSize="11"
+                                 TextChanged="BansOverrides_TextChanged"/>
+                                                </DockPanel>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </DockPanel>
+                            </ScrollViewer>
+                        </TabItem>
+
     </TabControl>
+            <!-- Editor lives in the tab row, set apart with a cyan accent. -->
+            <Button x:Name="BtnEditor" Content="{DynamicResource S.Btn.Editor}"
+                    Click="BtnOpenEditor_Click" ToolTip="{DynamicResource S.M.005}"
+                    Style="{StaticResource TopEditorButton}"
+                    VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,1,4,0"/>
+            </Grid>
 
             <!-- ─── PREVIEW / ACTION COLUMN ──────────────────────────── -->
             <Grid Grid.Column="2">

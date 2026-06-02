@@ -35,6 +35,7 @@ namespace Olden_Era___Template_Editor.Models
         [JsonPropertyName("heroMin")]           public int     HeroCountMin           { get; set; } = 4;
         [JsonPropertyName("heroMax")]           public int     HeroCountMax           { get; set; } = 8;
         [JsonPropertyName("heroIncrement")]     public int     HeroCountIncrement     { get; set; } = 1;
+        [JsonPropertyName("heroHireBan")]       public bool    HeroHireBan            { get; set; } = false;
         [JsonPropertyName("singleHeroMode")]    public bool    SingleHeroMode         { get; set; } = false;
         [JsonPropertyName("topology")]          public MapTopology Topology           { get; set; } = MapTopology.Balanced;
         [JsonPropertyName("terrainTheme")]      public TerrainTheme Terrain           { get; set; } = TerrainTheme.FactionBased;
@@ -61,6 +62,8 @@ namespace Olden_Era___Template_Editor.Models
         [JsonPropertyName("lostStartHero")]     public bool    LostStartHero                { get; set; } = false;
         [JsonPropertyName("cityHold")]          public bool    CityHold                     { get; set; } = false;
         [JsonPropertyName("cityHoldDays")]      public int     CityHoldDays                 { get; set; } = 6;
+        [JsonPropertyName("heroLighting")]      public bool    HeroLighting                 { get; set; } = true;
+        [JsonPropertyName("heroLightingDay")]   public int     HeroLightingDay              { get; set; } = 1;
         [JsonPropertyName("gladiatorArena")]    public bool    GladiatorArena               { get; set; } = false;
         [JsonPropertyName("gladiatorArenaDaysDelayStart")] public int GladiatorArenaDaysDelayStart { get; set; } = 30;
         [JsonPropertyName("gladiatorArenaCountDay")] public int GladiatorArenaCountDay       { get; set; } = 3;

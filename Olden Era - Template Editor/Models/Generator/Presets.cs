@@ -151,7 +151,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Малая карта, кольцо, минимум нейтралов — быстрая партия на двоих.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Дуэль", PlayerCount = 2, MapSize = 96,
+                    TemplateName = "1v1 Duel", PlayerCount = 2, MapSize = 96,
                     Topology = MapTopology.Default, NeutralZoneCount = 2, NeutralZoneCastles = 0,
                     PlayerZoneCastles = 1, HeroCountMin = 3, HeroCountMax = 6, HeroCountIncrement = 1,
                     Terrain = TerrainTheme.FactionBased,
@@ -161,7 +161,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Средняя сбалансированная карта с нейтральными зонами разного качества.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Стандарт", PlayerCount = 2, MapSize = 144,
+                    TemplateName = "1v1 Standard", PlayerCount = 2, MapSize = 144,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowCastleCount = 2, NeutralMediumCastleCount = 2, NeutralHighNoCastleCount = 1,
                     PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -172,7 +172,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Больше ресурсов и построек, случайный ландшафт, агрессивные нейтралы.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Богатые земли", PlayerCount = 2, MapSize = 160,
+                    TemplateName = "1v1 Rich Lands", PlayerCount = 2, MapSize = 160,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, NeutralHighCastleCount = 2, NeutralHighNoCastleCount = 2,
                     PlayerZoneCastles = 1, ResourceDensityPercent = 140, StructureDensityPercent = 130,
@@ -184,7 +184,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Победа за удержание центрального нейтрального города (City Hold).",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Удержание города", PlayerCount = 2, MapSize = 144,
+                    TemplateName = "1v1 City Hold", PlayerCount = 2, MapSize = 144,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowNoCastleCount = 2, NeutralMediumCastleCount = 2, NeutralHighCastleCount = 1,
                     PlayerZoneCastles = 1, VictoryCondition = "win_condition_5", CityHold = true, CityHoldDays = 7,
@@ -195,7 +195,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Турнирный режим 1v1: изолированные зеркальные кластеры, серия боёв.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Турнир", PlayerCount = 2, MapSize = 128,
+                    TemplateName = "1v1 Tournament", PlayerCount = 2, MapSize = 128,
                     Topology = MapTopology.Default, AdvancedMode = true,
                     NeutralLowCastleCount = 2, NeutralMediumCastleCount = 2,
                     PlayerZoneCastles = 1, VictoryCondition = "win_condition_6",
@@ -208,7 +208,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Зоны разделены водой, случайный ландшафт — упор на разведку и порталы.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Острова", PlayerCount = 2, MapSize = 144,
+                    TemplateName = "1v1 Islands", PlayerCount = 2, MapSize = 144,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, NeutralHighNoCastleCount = 2,
                     PlayerZoneCastles = 1, WaterLevel = WaterLevel.Medium, Terrain = TerrainTheme.Random,
@@ -220,7 +220,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один герой на игрока, малая карта — очень быстрые партии.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Блиц (один герой)", PlayerCount = 2, MapSize = 80,
+                    TemplateName = "1v1 Blitz (single hero)", PlayerCount = 2, MapSize = 80,
                     SingleHeroMode = true, Topology = MapTopology.Default,
                     NeutralZoneCount = 1, NeutralZoneCastles = 0, PlayerZoneCastles = 1,
                     HeroCountMin = 1, HeroCountMax = 1, HeroCountIncrement = 1,
@@ -231,7 +231,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один герой, средняя карта, сбалансированные нейтралы.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Дуэль (один герой)", PlayerCount = 2, MapSize = 112,
+                    TemplateName = "1v1 Duel (single hero)", PlayerCount = 2, MapSize = 112,
                     SingleHeroMode = true, Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowCastleCount = 2, NeutralMediumNoCastleCount = 1,
                     PlayerZoneCastles = 1, HeroCountMin = 1, HeroCountMax = 1, HeroCountIncrement = 1,
@@ -242,7 +242,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один герой, большая карта, много нейтралов и агрессивные монстры.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Эпопея (один герой)", PlayerCount = 2, MapSize = 176,
+                    TemplateName = "1v1 Epic (single hero)", PlayerCount = 2, MapSize = 176,
                     SingleHeroMode = true, Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowCastleCount = 2, NeutralMediumCastleCount = 2, NeutralHighCastleCount = 2,
                     NeutralHighNoCastleCount = 2, PlayerZoneCastles = 1,
@@ -256,7 +256,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Все зоны вокруг общего центрального хаба; игроки не граничат напрямую.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Хаб", PlayerCount = 2, MapSize = 144,
+                    TemplateName = "1v1 Hub", PlayerCount = 2, MapSize = 144,
                     Topology = MapTopology.HubAndSpoke, AdvancedMode = true,
                     NeutralLowCastleCount = 2, NeutralMediumCastleCount = 2,
                     HubZoneSize = 1.5, HubZoneCastles = 0, PlayerZoneCastles = 1,
@@ -267,7 +267,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Линейная карта: зоны вытянуты в цепь от одного игрока к другому.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Цепь", PlayerCount = 2, MapSize = 128,
+                    TemplateName = "1v1 Chain", PlayerCount = 2, MapSize = 128,
                     Topology = MapTopology.Chain, AdvancedMode = true,
                     NeutralLowCastleCount = 1, NeutralMediumCastleCount = 1, NeutralHighCastleCount = 1,
                     PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -277,7 +277,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Игроки соединены только через нейтральные зоны — встреча лишь через центр.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Изоляция", PlayerCount = 2, MapSize = 144,
+                    TemplateName = "1v1 Isolation", PlayerCount = 2, MapSize = 144,
                     Topology = MapTopology.Default, NoDirectPlayerConn = true, AdvancedMode = true,
                     MinNeutralZonesBetweenPlayers = 2,
                     NeutralLowCastleCount = 2, NeutralMediumCastleCount = 2, PlayerZoneCastles = 1,
@@ -289,7 +289,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Заснеженный ландшафт по всей карте.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Снежная", PlayerCount = 2, MapSize = 144,
+                    TemplateName = "1v1 Snowy", PlayerCount = 2, MapSize = 144,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, NeutralHighNoCastleCount = 2, PlayerZoneCastles = 1,
                     Terrain = TerrainTheme.Snow, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -299,7 +299,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Выжженные лавовые земли с агрессивными монстрами.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Лавовая", PlayerCount = 2, MapSize = 144,
+                    TemplateName = "1v1 Lava", PlayerCount = 2, MapSize = 144,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, NeutralHighCastleCount = 1, PlayerZoneCastles = 1,
                     Terrain = TerrainTheme.Lava, MonsterAggression = MonsterAggression.Aggressive,
@@ -311,7 +311,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Песчаные открытые пространства, мало препятствий.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Пустыня", PlayerCount = 2, MapSize = 160,
+                    TemplateName = "1v1 Desert", PlayerCount = 2, MapSize = 160,
                     Topology = MapTopology.Random, AdvancedMode = true,
                     NeutralLowCastleCount = 2, NeutralMediumCastleCount = 2, PlayerZoneCastles = 1,
                     Terrain = TerrainTheme.Sand, TerrainRoughnessPercent = 60, LakeAmountPercent = 40,
@@ -323,7 +323,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Сильная охрана, агрессивные монстры, изрезанный ландшафт.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Хардкор", PlayerCount = 2, MapSize = 144,
+                    TemplateName = "1v1 Hardcore", PlayerCount = 2, MapSize = 144,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, NeutralHighCastleCount = 2, PlayerZoneCastles = 1,
                     MonsterAggression = MonsterAggression.Aggressive,
@@ -336,7 +336,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Пассивные монстры, слабая охрана, быстрый экономический старт.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Мирная", PlayerCount = 2, MapSize = 128,
+                    TemplateName = "1v1 Peaceful", PlayerCount = 2, MapSize = 128,
                     Topology = MapTopology.Default, AdvancedMode = true,
                     NeutralLowNoCastleCount = 2, NeutralMediumNoCastleCount = 2, PlayerZoneCastles = 1,
                     MonsterAggression = MonsterAggression.Passive,
@@ -350,7 +350,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Игроки стартуют с двумя замками своей фракции в зоне.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Два замка", PlayerCount = 2, MapSize = 160,
+                    TemplateName = "1v1 Two Towns", PlayerCount = 2, MapSize = 160,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, NeutralHighCastleCount = 1,
                     PlayerZoneCastles = 2, PlayerStartsWithCastles = true, MatchPlayerCastleFactions = true,
@@ -361,7 +361,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один герой на игрока, центральный хаб.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Хаб (один герой)", PlayerCount = 2, MapSize = 128,
+                    TemplateName = "1v1 Hub (single hero)", PlayerCount = 2, MapSize = 128,
                     SingleHeroMode = true, Topology = MapTopology.HubAndSpoke, AdvancedMode = true,
                     NeutralLowCastleCount = 2, HubZoneSize = 1.5, PlayerZoneCastles = 1,
                     HeroCountMin = 1, HeroCountMax = 1, HeroCountIncrement = 1,
@@ -371,7 +371,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один герой, малая заснеженная карта — очень быстро.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Снежный блиц (один герой)", PlayerCount = 2, MapSize = 96,
+                    TemplateName = "1v1 Snow Blitz (single hero)", PlayerCount = 2, MapSize = 96,
                     SingleHeroMode = true, Topology = MapTopology.Default,
                     NeutralZoneCount = 2, NeutralZoneCastles = 0, PlayerZoneCastles = 1,
                     Terrain = TerrainTheme.Snow, HeroCountMin = 1, HeroCountMax = 1, HeroCountIncrement = 1,
@@ -402,7 +402,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Четверо вокруг общего центрального хаба.",
                 new SettingsFile
                 {
-                    TemplateName = "FFA 4 Хаб", PlayerCount = 4, MapSize = 176,
+                    TemplateName = "FFA 4 Hub", PlayerCount = 4, MapSize = 176,
                     Topology = MapTopology.HubAndSpoke, AdvancedMode = true,
                     NeutralMediumCastleCount = 4, HubZoneSize = 2.0, HubZoneCastles = 1, PlayerZoneCastles = 1,
                     HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -412,7 +412,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Шестеро игроков по кольцу.",
                 new SettingsFile
                 {
-                    TemplateName = "FFA 6 Кольцо", PlayerCount = 6, MapSize = 192,
+                    TemplateName = "FFA 6 Ring", PlayerCount = 6, MapSize = 192,
                     Topology = MapTopology.Default, AdvancedMode = true,
                     NeutralLowCastleCount = 6, NeutralMediumNoCastleCount = 6, PlayerZoneCastles = 1,
                     HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -433,7 +433,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Победа за удержание центрального города-хаба. Четыре игрока.",
                 new SettingsFile
                 {
-                    TemplateName = "Король горы 4", PlayerCount = 4, MapSize = 176,
+                    TemplateName = "King of the Hill 4", PlayerCount = 4, MapSize = 176,
                     Topology = MapTopology.HubAndSpoke, AdvancedMode = true,
                     NeutralMediumCastleCount = 4, HubZoneSize = 2.0, HubZoneCastles = 1, PlayerZoneCastles = 1,
                     VictoryCondition = "win_condition_5", CityHold = true, CityHoldDays = 7,
@@ -444,7 +444,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Малая карта, всё рядом, изобилие ресурсов — постоянные стычки.",
                 new SettingsFile
                 {
-                    TemplateName = "Бойня 4", PlayerCount = 4, MapSize = 112,
+                    TemplateName = "Massacre 4", PlayerCount = 4, MapSize = 112,
                     Topology = MapTopology.Random, NeutralZoneCount = 4, NeutralZoneCastles = 0,
                     PlayerZoneCastles = 1, MonsterAggression = MonsterAggression.Passive,
                     ResourceDensityPercent = 160, StructureDensityPercent = 140,
@@ -456,7 +456,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один игрок против двух компьютеров. Сбалансированная карта на троих.",
                 new SettingsFile
                 {
-                    TemplateName = "ПвЕ 1 против 2", PlayerCount = 3, MapSize = 160,
+                    TemplateName = "PvE 1 vs 2", PlayerCount = 3, MapSize = 160,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowCastleCount = 3, NeutralMediumCastleCount = 3, PlayerZoneCastles = 1,
                     HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -466,7 +466,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один игрок против трёх компьютеров. Сбалансированная карта на четверых.",
                 new SettingsFile
                 {
-                    TemplateName = "ПвЕ 1 против 3", PlayerCount = 4, MapSize = 176,
+                    TemplateName = "PvE 1 vs 3", PlayerCount = 4, MapSize = 176,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowCastleCount = 4, NeutralMediumCastleCount = 4, NeutralHighNoCastleCount = 2,
                     PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -476,7 +476,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один игрок против четырёх компьютеров. Пятеро на сбалансированной карте.",
                 new SettingsFile
                 {
-                    TemplateName = "ПвЕ 1 против 4", PlayerCount = 5, MapSize = 184,
+                    TemplateName = "PvE 1 vs 4", PlayerCount = 5, MapSize = 184,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowCastleCount = 5, NeutralMediumCastleCount = 5, NeutralHighNoCastleCount = 2,
                     PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -486,7 +486,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один игрок против пяти компьютеров. Шестеро на большой карте.",
                 new SettingsFile
                 {
-                    TemplateName = "ПвЕ 1 против 5", PlayerCount = 6, MapSize = 192,
+                    TemplateName = "PvE 1 vs 5", PlayerCount = 6, MapSize = 192,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowCastleCount = 6, NeutralMediumCastleCount = 6, NeutralHighNoCastleCount = 3,
                     PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -496,7 +496,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один игрок против шести компьютеров. Семеро на большой карте.",
                 new SettingsFile
                 {
-                    TemplateName = "ПвЕ 1 против 6", PlayerCount = 7, MapSize = 200,
+                    TemplateName = "PvE 1 vs 6", PlayerCount = 7, MapSize = 200,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowCastleCount = 7, NeutralMediumCastleCount = 6, NeutralHighNoCastleCount = 3,
                     PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -506,7 +506,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один игрок против семи компьютеров. Восемь сторон на самой большой карте.",
                 new SettingsFile
                 {
-                    TemplateName = "ПвЕ 1 против 7", PlayerCount = 8, MapSize = 208,
+                    TemplateName = "PvE 1 vs 7", PlayerCount = 8, MapSize = 208,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowCastleCount = 8, NeutralMediumCastleCount = 6, NeutralHighNoCastleCount = 4,
                     PlayerZoneCastles = 1, HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -517,7 +517,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один герой, турнирный режим 1v1: серия зеркальных боёв.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Турнир (один герой)", PlayerCount = 2, MapSize = 112,
+                    TemplateName = "1v1 Tournament (single hero)", PlayerCount = 2, MapSize = 112,
                     SingleHeroMode = true, Topology = MapTopology.Default, AdvancedMode = true,
                     NeutralLowCastleCount = 2, NeutralMediumCastleCount = 2,
                     VictoryCondition = "win_condition_6", Tournament = true,
@@ -530,7 +530,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один герой, победа за удержание центрального нейтрального города.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Удержание (один герой)", PlayerCount = 2, MapSize = 128,
+                    TemplateName = "1v1 City Hold (single hero)", PlayerCount = 2, MapSize = 128,
                     SingleHeroMode = true, Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowNoCastleCount = 2, NeutralMediumCastleCount = 2, NeutralHighCastleCount = 1,
                     VictoryCondition = "win_condition_5", CityHold = true, CityHoldDays = 6,
@@ -541,7 +541,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один герой, зоны разделены водой, есть порталы.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Острова (один герой)", PlayerCount = 2, MapSize = 128,
+                    TemplateName = "1v1 Islands (single hero)", PlayerCount = 2, MapSize = 128,
                     SingleHeroMode = true, Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, NeutralHighNoCastleCount = 2,
                     WaterLevel = WaterLevel.Medium, Terrain = TerrainTheme.Random,
@@ -553,7 +553,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Один герой, линейная карта-цепь.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Цепь (один герой)", PlayerCount = 2, MapSize = 112,
+                    TemplateName = "1v1 Chain (single hero)", PlayerCount = 2, MapSize = 112,
                     SingleHeroMode = true, Topology = MapTopology.Chain, AdvancedMode = true,
                     NeutralLowCastleCount = 1, NeutralMediumCastleCount = 1, NeutralHighCastleCount = 1,
                     HeroCountMin = 1, HeroCountMax = 1, HeroCountIncrement = 1,
@@ -564,7 +564,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Богатый, хорошо охраняемый центральный хаб — гонка за центр.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Сокровищница хаба", PlayerCount = 2, MapSize = 160,
+                    TemplateName = "1v1 Hub Treasury", PlayerCount = 2, MapSize = 160,
                     Topology = MapTopology.HubAndSpoke, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, HubZoneSize = 2.0, HubZoneCastles = 1,
                     StructureDensityPercent = 140, NeutralStackStrengthPercent = 140,
@@ -576,7 +576,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Случайная раскладка, игроки изолированы, много порталов между зонами.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Порталы", PlayerCount = 2, MapSize = 160,
+                    TemplateName = "1v1 Portals", PlayerCount = 2, MapSize = 160,
                     Topology = MapTopology.Random, NoDirectPlayerConn = true, AdvancedMode = true,
                     MinNeutralZonesBetweenPlayers = 1,
                     NeutralLowCastleCount = 2, NeutralMediumCastleCount = 2,
@@ -588,7 +588,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Максимум ресурсов и построек, пассивные монстры, два стартовых замка.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Мега-богатая", PlayerCount = 2, MapSize = 176,
+                    TemplateName = "1v1 Mega Rich", PlayerCount = 2, MapSize = 176,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, NeutralHighCastleCount = 2,
                     ResourceDensityPercent = 200, StructureDensityPercent = 180,
@@ -601,7 +601,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Мало ресурсов и построек, сильные нейтралы — борьба за каждый рудник.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Аскеза", PlayerCount = 2, MapSize = 144,
+                    TemplateName = "1v1 Asceticism", PlayerCount = 2, MapSize = 144,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralLowNoCastleCount = 2, NeutralMediumNoCastleCount = 2,
                     ResourceDensityPercent = 50, StructureDensityPercent = 60,
@@ -613,7 +613,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Широкие водные границы и порталы — морская карта.",
                 new SettingsFile
                 {
-                    TemplateName = "1v1 Глубокая вода", PlayerCount = 2, MapSize = 160,
+                    TemplateName = "1v1 Deep Water", PlayerCount = 2, MapSize = 160,
                     Topology = MapTopology.Balanced, AdvancedMode = true,
                     NeutralMediumCastleCount = 2, NeutralHighNoCastleCount = 2,
                     WaterLevel = WaterLevel.Large, Terrain = TerrainTheme.Random,
@@ -626,7 +626,7 @@ namespace Olden_Era___Template_Editor.Models
                 "Восемь игроков вокруг одного большого центрального хаба.",
                 new SettingsFile
                 {
-                    TemplateName = "FFA 8 Хаб", PlayerCount = 8, MapSize = 208,
+                    TemplateName = "FFA 8 Hub", PlayerCount = 8, MapSize = 208,
                     Topology = MapTopology.HubAndSpoke, AdvancedMode = true,
                     NeutralMediumNoCastleCount = 8, HubZoneSize = 2.5, HubZoneCastles = 1, PlayerZoneCastles = 1,
                     HeroCountMin = 4, HeroCountMax = 8, HeroCountIncrement = 1,
@@ -664,6 +664,7 @@ namespace Olden_Era___Template_Editor.Models
                 HeroCountMin = s.HeroCountMin,
                 HeroCountMax = s.HeroCountMax,
                 HeroCountIncrement = s.HeroCountIncrement,
+                HeroHireBan = s.HeroHireBan,
             },
             MapSize = s.MapSize,
             GameEndConditions = new GameEndConditions
@@ -674,6 +675,8 @@ namespace Olden_Era___Template_Editor.Models
                 LostStartHero = s.LostStartHero,
                 CityHold = s.CityHold,
                 CityHoldDays = s.CityHoldDays,
+                HeroLighting = s.HeroLighting,
+                HeroLightingDay = s.HeroLightingDay,
             },
             ZoneCfg = new ZoneConfiguration
             {
