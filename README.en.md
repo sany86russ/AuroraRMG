@@ -53,6 +53,7 @@ The headline feature is a **Simple generation mode** for players who don't want 
 - [Build authenticity verification](#-build-authenticity-verification)
 - [Auto-update](#-auto-update)
 - [Quick start](#-quick-start)
+- [Working modes: Simple and Advanced](#-working-modes-simple-and-advanced)
 - [Interface overview](#-interface-overview)
 - [All settings (in detail)](#️-all-settings)
   - [Tab "Rules"](#tab--rules)
@@ -85,6 +86,7 @@ A map template is a set of rules the game uses to build a random map when you st
 
 | | |
 |---|---|
+| ⚡ **Two working modes** | **Simple** — a map in a few clicks (pick a few options → done); **Advanced** — full manual control. Toggle in the header. See [Working modes](#-working-modes-simple-and-advanced). |
 | 🎲 **43 built-in presets** | 1v1 Classic, 1v1 Single-hero, FFA for 3–8 players, **PvE 1×2…1×7**, special modes — one-click load |
 | 🗺 **Visual zone editor** | interactive canvas: zones, connections, inspector, PNG export — edit the map graph by hand |
 | 🌍 **Two languages (RU/EN)** | instant language switch in the header, no restart; auto-detected from the OS locale |
@@ -155,16 +157,24 @@ The current version is always shown **in the window header**, in the badge next 
 
 ## 🚀 Quick start
 
-**Way 1 — via a preset (fastest):**
+**Way 1 — Simple Mode (easiest, recommended for newcomers):**
 
-1. Launch AuroraRMG.
-2. On the **"Rules"** tab, at the very top, in the **TEMPLATE** block, click the **"Preset ▾"** button.
-3. Pick a ready-made config from the grouped menu (e.g. *"Standard"* under *1v1 — Classic*).
-4. Click **"⚔ Create template"** in the right panel.
-5. Click save and store the `.rmg.json` in the game's templates folder.
-6. Launch Olden Era → start a new game → pick your template from the list.
+1. Launch AuroraRMG — it opens in **Simple Mode** by default (the **Simple / Advanced** toggle is in the header, next to the language).
+2. Pick a few options: players, game type, size, length, victory condition.
+3. Click **"⚔ Create map"** — a preview and a short summary appear on the right.
+4. Click **"💾 Save to game folder"** — enter a name, and the map lands straight in the game.
+5. Launch Olden Era → start a new game → pick your template from the list.
 
-**Way 2 — manually:**
+More in [Working modes](#-working-modes-simple-and-advanced).
+
+**Way 2 — via a preset (Advanced mode):**
+
+1. Switch to **Advanced** mode.
+2. On the **"Map Rules"** tab, in the **TEMPLATE** block, open the **"Preset ▾"** menu and pick a config (e.g. *"Standard"* under *1v1 — Classic*).
+3. Click **"⚔ Create template"** in the right panel, then save.
+4. Launch Olden Era → start a new game → pick the template.
+
+**Way 3 — manually (Advanced mode):**
 
 1. Set the **name**, **player count** and **map size**.
 2. Go through the tabs and tune topology, zones, economy, environment.
@@ -173,7 +183,42 @@ The current version is always shown **in the window header**, in the badge next 
 
 ---
 
+## 🎮 Working modes: Simple and Advanced
+
+Since **1.2.0**, AuroraRMG has **two working modes**. The **Simple / Advanced** toggle sits **in the top bar, next to the language switch (RU/EN)**. The chosen mode is remembered between launches; on first launch it opens in **Simple**.
+
+### ⚡ Simple Mode — "a map in a few clicks"
+
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-simple-en.png" alt="Simple Mode" width="100%"/>
+
+For players who **don't want to learn templates**. You set just a few clear options — everything else is chosen at random within safe values, giving you a ready, playable map right away:
+
+| Option | What it sets |
+|---|---|
+| **Players** | How many players (starting castles) are on the map. |
+| **Game type** | Layout: **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Team game** *(this mode isn't in the game yet)*. |
+| **Map size** | Small / Medium / Large. |
+| **Game length** | Short / Medium / Long — affects size, zone count and guard strength. |
+| **Chaos level** | Tame / Normal / Wild — how wild and unpredictable the map gets. |
+| **Victory condition** | All the real in-game modes — classic, city/capital hold, final battle, tournament (see [Victory conditions](#-victory-conditions--special-modes)). |
+| **Extras** | Water, portals, stronger neutrals. |
+| **Seed** 🎲 📋 | The map's fingerprint: the same seed always yields the same map. **Share the seed** to play an identical map with friends. 🎲 = new random, 📋 = copy. |
+
+Then: **"⚔ Create map"** → a **preview** and a short **summary** (including an estimated game length) appear on the right → **"💾 Save to game folder"** (asks for a name and drops the map straight into the game) or **"Save as…"**. A **hint for every option** sits at the bottom of the window. Any map can be **"Opened in Advanced mode"** and fine-tuned by hand.
+
+### 🛠 Advanced Mode — full control
+
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-rules-en.png" alt="Advanced mode — Map Rules tab" width="100%"/>
+
+The classic mode with **every** setting across four tabs (**Map Rules · Zone Setup · Zone Content · Bonuses & Bans**) plus the right-hand generation/preview panel. Everything is here: topology, economy, monster strength, terrain, water, victory conditions, bans, fine neutral-zone distribution, mandatory content and the **visual zone editor**. Details below in [Interface overview](#-interface-overview) and [All settings](#️-all-settings).
+
+> 💡 **Which to pick?** Want a good random map fast — **Simple**. Want to tweak every detail — **Advanced**. You can switch any time, and a Simple-mode result can always be refined in Advanced.
+
+---
+
 ## 🧭 Interface overview
+
+> The section below describes **Advanced mode** (the full set of tabs). If you're in **Simple Mode**, switch with the **Advanced** button in the header. For Simple Mode see [Working modes](#-working-modes-simple-and-advanced).
 
 The window has three areas:
 
@@ -202,13 +247,14 @@ The window has three areas:
 | 📂 | Open saved settings | `Ctrl + O` |
 | 💾 | Save settings | `Ctrl + S` |
 | 💾… | Save settings as… | `Ctrl + Shift + S` |
+| **Simple** / **Advanced** | Switch the working mode (Simple by default; remembered). See [Working modes](#-working-modes-simple-and-advanced) | — |
 | 🗺 **Editor** | Open the visual zone editor | — |
 | **RU** / **EN** | Switch UI language (instant) | — |
 | `_` `☐` `✕` | Minimize / maximize / close | — |
 
 > "Settings" (💾) is an `.oetgs` file with **all** editor parameters so you can continue later. It is **not** a game template. The game `.rmg.json` is created separately via "Create template" → "Save".
 
-### Left navigation rail — 4 main tabs
+### Main tabs of Advanced mode (4)
 
 | Tab | About |
 |---|---|
@@ -593,6 +639,8 @@ Game templates `.rmg.json` live here:
 
 > AuroraRMG tries to **find** this folder via the Steam registry and open the save dialog right there. If the game is installed in a non-standard place (another drive, a custom Steam library) — just point to the path manually in the dialog.
 
+> 💡 In **Simple Mode** the **"💾 Save to game folder"** button drops the map into this folder automatically (it just asks for a name) — no path picking needed.
+
 After saving, launch Olden Era and pick the template when creating a new game.
 
 ---
@@ -664,6 +712,12 @@ Tips based on how the generator and the Olden Era engine work — they help you 
 ---
 
 ## ❓ FAQ
+
+**What's the difference between Simple and Advanced mode?**
+**Simple** — pick a few basic options and hit "Create map"; everything else is chosen automatically (great for a quick game). **Advanced** — full manual control over every parameter across four tabs. The toggle is in the header, next to the language; it opens in Simple by default. A Simple-mode map can be "Opened in Advanced" and refined. More: [Working modes](#-working-modes-simple-and-advanced).
+
+**What is the "seed" in Simple Mode?**
+It's the map's fingerprint. The same seed always yields the same map, so it's handy to share: a friend enters the same seed and plays an identical map. The 🎲 button rolls a new random seed, 📋 copies the current one.
 
 **The game doesn't see my template.**
 Make sure the `.rmg.json` sits exactly in `…\HeroesOldenEra_Data\StreamingAssets\map_templates` and restart the game.
