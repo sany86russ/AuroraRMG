@@ -14,7 +14,9 @@ namespace Olden_Era___Template_Editor.Models
     }
 
     /// <summary>Rough map size band; resolved to a concrete <see cref="GeneratorSettings.MapSize"/> within the band.</summary>
-    public enum QuickMapScale { Small, Medium, Large }
+    /// <remarks><see cref="Huge"/> reaches into the experimental sizes above the official 240×240 cap
+    /// (≈256–400) — the game engine handles them, but they aren't backed by official templates.</remarks>
+    public enum QuickMapScale { Small, Medium, Large, Huge }
 
     /// <summary>Desired game length — drives size, neutral count, guard strength and content density.</summary>
     public enum QuickGameLength { Short, Medium, Long }

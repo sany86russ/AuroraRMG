@@ -24,30 +24,34 @@
 
 ---
 
-## 🆕 What's new in 1.2.0
+## 🆕 What's new in 1.3.0
 
-### ⚡ Simple Mode — "a map in a few clicks"
+### 🗺 Large maps — bigger than 240×240
 
-The headline feature is a **Simple generation mode** for players who don't want to learn templates. Pick a few clear options — **number of players, game type, map size, game length, chaos level and victory condition** — and click **"Create map"**. Everything else is chosen at random within safe, sensible values, and you get a ready, playable map.
+By popular request you can now create maps larger than the old 240×240 cap — better for long, rich games.
 
 ![Simple Mode](docs/ui-simple-en.png)
 
-- A **Simple / Advanced** toggle in the top bar (next to the language). The full manual mode with every setting is still there.
-- **Map seed** — its fingerprint: the same seed always yields the same map. Share the seed to play an identical map with friends (🎲 = new random, 📋 = copy).
-- **Save straight into the game folder** with one button (it asks for a name) — the map shows up in a custom game right away.
-- All the real in-game **victory conditions**: classic, city hold, capital hold, final battle, tournament — each with its own rules.
-- A short **hint for every option** and an estimated game length, right in the window.
-- The app **remembers** your last selections.
+- In **Simple Mode** — a new map size **"Huge (256–400)"**.
+- In **Advanced Mode** the large-maps option **256×256 … 512×512** is now in plain sight — a highlighted checkbox right under the size picker (it existed before, but was hard to find).
+- Official templates stop at 240×240, but the game engine handles larger maps.
 
-### 🛠 Also
+### ⚖ Map analysis — balance & contents
 
-- **Fixed loading the game's own templates.** The editor failed to open some stock templates (e.g. `Expanse.rmg.json`) because the game writes certain fields sometimes as a string and sometimes as an array — all 120 now load.
+After generating (in **both** modes) you immediately see **what you got** and **how fair it is**:
+
+- **Balance score 0–100** — how equal the players' starts are (wealth, room to expand, distances, castle access), plus plain-language notes: poor start, uneven castle access, players starting too close.
+- **"What's inside the map"** — zones by role (players / neutral / castles), number of links, total treasure and resources.
+
+### 🏛 Curated landmarks
+
+Neutral zones now reliably get **signature objects** (dragon utopias, research labs, observatories, etc.) — so a map feels designed, not merely random.
 
 ---
 
 ## 📑 Contents
 
-- [What's new in 1.2.0](#-whats-new-in-120)
+- [What's new in 1.3.0](#-whats-new-in-130)
 - [What is this](#-what-is-this)
 - [Installation](#-installation)
 - [Build authenticity verification](#-build-authenticity-verification)

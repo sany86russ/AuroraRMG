@@ -2117,6 +2117,7 @@ namespace Olden_Era___Template_Editor
             ImgPreview.Source = TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology);
             lblNoPreview.Content = "?";
             BtnSaveGenerated.Visibility = Visibility.Visible;
+            UpdateBalanceReport();
             UpdateOutdatedWarning();
             Validate(); // refresh warnings now that template is up to date
         }
@@ -2207,7 +2208,7 @@ namespace Olden_Era___Template_Editor
         // ── Simple Mode / Quick Generate ──────────────────────────────────────────
 
         private static readonly string[] SimpleTypeKeys   = ["S.Simple.Type.Duel", "S.Simple.Type.FFA", "S.Simple.Type.Pve", "S.Simple.Type.Team"];
-        private static readonly string[] SimpleScaleKeys  = ["S.Simple.Scale.Small", "S.Simple.Scale.Medium", "S.Simple.Scale.Large"];
+        private static readonly string[] SimpleScaleKeys  = ["S.Simple.Scale.Small", "S.Simple.Scale.Medium", "S.Simple.Scale.Large", "S.Simple.Scale.Huge"];
         private static readonly string[] SimpleLengthKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];
         private static readonly string[] SimpleChaosKeys  = ["S.Simple.Chaos.Tame", "S.Simple.Chaos.Normal", "S.Simple.Chaos.Wild"];
 
@@ -2300,7 +2301,7 @@ namespace Olden_Era___Template_Editor
         {
             PlayerCount    = (int)SldSimplePlayers.Value,
             GameType       = (QuickGameType)Math.Clamp(CmbSimpleType.SelectedIndex, 0, 3),
-            Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 2),
+            Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 3),
             Length         = (QuickGameLength)Math.Clamp(CmbSimpleLength.SelectedIndex, 0, 2),
             Chaos          = (QuickChaos)Math.Clamp(CmbSimpleChaos.SelectedIndex, 0, 2),
             Water          = ChkSimpleWater.IsChecked == true,
@@ -2336,6 +2337,65 @@ namespace Olden_Era___Template_Editor
 
         private static readonly string[] SimpleLenLabelKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];
 
+        // ── Balance report (shared by the Simple summary + the Advanced result panel) ──
+
+        /// <summary>Formats the balance report for <paramref name="template"/> as a "⚖ score + findings"
+        /// block (warnings first, max 3 findings); null when the map has fewer than two players.</summary>
+        private static string? FormatBalanceSummary(RmgTemplate? template)
+        {
+            if (template is null) return null;
+            var report = Services.Analysis.TemplateBalanceReport.Analyze(template);
+            if (!report.Applicable) return null;
+
+            var sb = new System.Text.StringBuilder();
+            sb.Append(L.Get("S.Bal.Score", report.Score));
+            foreach (var f in report.Findings
+                .OrderByDescending(f => f.Severity == Services.Analysis.BalanceSeverity.Warning)
+                .Take(3))
+                sb.Append("\n•  ").Append(L.Get(f.Key, f.Args));
+            return sb.ToString();
+        }
+
+        /// <summary>Formats the "what's inside" content breakdown for <paramref name="template"/> as a
+        /// compact 2-line block (zones-by-role + total treasure/resources); null when there are no zones.</summary>
+        private static string? FormatContentSummary(RmgTemplate? template)
+        {
+            if (template is null) return null;
+            var c = Services.Analysis.TemplateContentSummary.Analyze(template);
+            if (c.ZoneCount == 0) return null;
+            return L.Get("S.Content.Zones", c.ZoneCount, c.PlayerZones, c.NeutralZones, c.CastleZones, c.ConnectionCount)
+                 + "\n" + L.Get("S.Content.Wealth", FormatBig(c.TotalTreasure), FormatBig(c.TotalResources));
+        }
+
+        /// <summary>Compact human number: 1234→"1k", 2500000→"2.5M".</summary>
+        private static string FormatBig(long v)
+        {
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            if (v >= 1_000_000) return (v / 1_000_000.0).ToString("0.#", ci) + "M";
+            if (v >= 1_000) return (v / 1_000.0).ToString("0", ci) + "k";
+            return v.ToString(ci);
+        }
+
+        /// <summary>Combined analysis block (content breakdown + balance report) shared by both modes.</summary>
+        private static string? FormatAnalysis(RmgTemplate? template)
+        {
+            var parts = new System.Collections.Generic.List<string>();
+            string? content = FormatContentSummary(template);
+            if (content != null) parts.Add(content);
+            string? balance = FormatBalanceSummary(template);
+            if (balance != null) parts.Add(balance);
+            return parts.Count > 0 ? string.Join("\n\n", parts) : null;
+        }
+
+        /// <summary>Refreshes the Advanced-mode analysis line (content + balance) from the last generated template.</summary>
+        private void UpdateBalanceReport()
+        {
+            if (TxtBalanceReport is null) return;
+            string? text = FormatAnalysis(_generatedTemplate);
+            TxtBalanceReport.Text = text ?? string.Empty;
+            TxtBalanceReport.Visibility = text != null ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private string BuildSimpleSummary(GeneratorSettings s, QuickGenerateOptions opts)
         {
             var topo = TopologyOptions.FirstOrDefault(t => t.Topology == s.Topology);
@@ -2350,6 +2410,13 @@ namespace Olden_Era___Template_Editor
             if (s.RandomPortals) extras.Add(L.Get("S.Simple.Portals"));
             if (s.MonsterAggression == MonsterAggression.Aggressive) extras.Add(L.Get("S.Simple.StrongNeutrals"));
             if (extras.Count > 0) summary += "\n" + L.Get("S.Simple.SumExtras", string.Join(", ", extras));
+
+            // Flag maps beyond the official 240×240 cap so the player knows it's an experimental large map.
+            if (s.MapSize > KnownValues.MaxOfficialMapSize)
+                summary += "\n" + L.Get("S.Simple.ExpNote");
+
+            string? analysis = FormatAnalysis(_generatedTemplate);
+            if (analysis != null) summary += "\n\n" + analysis;
             return summary;
         }
 

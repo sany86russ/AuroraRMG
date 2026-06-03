@@ -1063,7 +1063,7 @@ public class TemplateGeneratorTests
                 Seed = seed,
                 PlayerCount = pick.Next(2, 9),
                 GameType = (QuickGameType)pick.Next(0, 4),
-                Scale = (QuickMapScale)pick.Next(0, 3),
+                Scale = (QuickMapScale)pick.Next(0, 4),
                 Length = (QuickGameLength)pick.Next(0, 3),
                 Chaos = (QuickChaos)pick.Next(0, 3),
                 Water = pick.NextDouble() < 0.5,
@@ -1139,6 +1139,29 @@ public class TemplateGeneratorTests
         Assert.All(s.TemplateName, ch => Assert.True(ch < 128, $"non-ASCII char in name: {s.TemplateName}"));
     }
 
+    [Fact]
+    public void QuickGenerate_HugeScale_ProducesLargeExperimentalMap()
+    {
+        // The Huge scale is the answer to "I want maps bigger than 240×240": it must always land
+        // above the official cap, inside the experimental size set, and stay in the ≈256–400 band.
+        foreach (QuickGameType type in Enum.GetValues<QuickGameType>())
+        foreach (QuickGameLength length in Enum.GetValues<QuickGameLength>())
+        for (int seed = 0; seed < 8; seed++)
+        for (int players = 2; players <= 8; players++)
+        {
+            GeneratorSettings s = RandomTemplateBuilder.Build(new QuickGenerateOptions
+            {
+                Seed = seed * 31 + players, PlayerCount = players, GameType = type,
+                Scale = QuickMapScale.Huge, Length = length, Chaos = QuickChaos.Normal,
+            });
+            string id = $"{type}/{length} p={players} seed={seed}";
+
+            Assert.True(s.MapSize > KnownValues.MaxOfficialMapSize, $"{id}: {s.MapSize} not above the 240 cap");
+            Assert.True(KnownValues.IsExperimentalMapSize(s.MapSize), $"{id}: {s.MapSize} not an experimental size");
+            Assert.InRange(s.MapSize, 256, 400);
+        }
+    }
+
     // Helper: enumerate a broad, deterministic spread of quick options for the invariant sweeps.
     private static IEnumerable<QuickGenerateOptions> QuickOptionMatrix()
     {
@@ -1172,7 +1195,9 @@ public class TemplateGeneratorTests
             var z = s.ZoneCfg;
             string id = $"{opts.GameType}/{opts.Scale}/{opts.Length}/{opts.Chaos} p={s.PlayerCount}";
 
-            Assert.True(KnownValues.MapSizes.Contains(s.MapSize), $"{id}: map size {s.MapSize} not an official size");
+            // Advanced UI can also produce the experimental 256–512 sizes (the "large maps" checkbox),
+            // so AllMapSizes — not just the official set — is the correct envelope. The Huge scale uses it.
+            Assert.True(KnownValues.AllMapSizes.Contains(s.MapSize), $"{id}: map size {s.MapSize} not a known size");
             Assert.InRange(s.PlayerCount, 2, 8);
             Assert.InRange(z.ResourceDensityPercent, 20, 400);   // SldResourceDensity
             Assert.InRange(z.StructureDensityPercent, 20, 200);  // SldStructureDensity

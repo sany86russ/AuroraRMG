@@ -349,7 +349,10 @@
                             <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2">
                                 <CheckBox x:Name="ChkExperimentalMapSizes"
                                           Content="{DynamicResource S.Chk.ExpMaps}"
-                                          Margin="0,2,0,0"
+                                          Foreground="{StaticResource BrushCyan}"
+                                          FontWeight="SemiBold"
+                                          Margin="0,4,0,0"
+                                          ToolTip="{DynamicResource S.CB.V.ExpSize}"
                                           Checked="ChkExperimentalMapSizes_Changed"
                                           Unchecked="ChkExperimentalMapSizes_Changed"/>
                                 <TextBlock x:Name="TxtExperimentalMapSizeWarning"
@@ -2975,17 +2978,19 @@ ValueChanged="Slider_ValueChanged"/>
             <!-- ─── PREVIEW / ACTION COLUMN ──────────────────────────── -->
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>   <!-- generate button -->
+                    <RowDefinition Height="Auto"/>   <!-- 0 generate button -->
                     <RowDefinition Height="6"/>
-                    <RowDefinition Height="Auto"/>   <!-- hints / validation -->
+                    <RowDefinition Height="Auto"/>   <!-- 2 hints / validation -->
                     <RowDefinition Height="8"/>
-                    <RowDefinition Height="*"/>      <!-- image -->
+                    <RowDefinition Height="*"/>      <!-- 4 image -->
                     <RowDefinition Height="8"/>
-                    <RowDefinition Height="Auto"/>   <!-- outdated warning -->
+                    <RowDefinition Height="Auto"/>   <!-- 6 balance report -->
                     <RowDefinition Height="6"/>
-                    <RowDefinition Height="Auto"/>   <!-- show preview checkbox -->
+                    <RowDefinition Height="Auto"/>   <!-- 8 outdated warning -->
                     <RowDefinition Height="6"/>
-                    <RowDefinition Height="Auto"/>   <!-- save button -->
+                    <RowDefinition Height="Auto"/>   <!-- 10 show preview checkbox -->
+                    <RowDefinition Height="6"/>
+                    <RowDefinition Height="Auto"/>   <!-- 12 save button -->
                 </Grid.RowDefinitions>
 
                 <Button Grid.Row="0"
@@ -3042,7 +3047,14 @@ ValueChanged="Slider_ValueChanged"/>
                             
                         </Border>
 
-                <CheckBox Grid.Row="8"
+                <TextBlock Grid.Row="6"
+                           x:Name="TxtBalanceReport"
+                           Foreground="{StaticResource BrushText}"
+                           FontSize="12" TextWrapping="Wrap"
+                           Visibility="Collapsed"
+                           HorizontalAlignment="Stretch"/>
+
+                <CheckBox Grid.Row="10"
                           x:Name="ChkSavePreviewImage"
                           Content="{DynamicResource S.Chk.ShowPreview}"
                           IsChecked="True"
@@ -3050,7 +3062,7 @@ ValueChanged="Slider_ValueChanged"/>
                           Foreground="{StaticResource BrushText}"
                           HorizontalAlignment="Left" Click="ChkSavePreviewImage_Click" />
 
-                <TextBlock Grid.Row="6"
+                <TextBlock Grid.Row="8"
                            x:Name="TxtOutdatedWarning"
                            Foreground="{StaticResource BrushError}"
                            FontSize="12" TextWrapping="Wrap"
@@ -3058,7 +3070,7 @@ ValueChanged="Slider_ValueChanged"/>
                            HorizontalAlignment="Stretch" TextAlignment="Center"
                            Text="{DynamicResource S.M.113}"/>
 
-                <Button Grid.Row="10"
+                <Button Grid.Row="12"
                         x:Name="BtnSaveGenerated"
                         Content="{DynamicResource S.Btn.SaveTemplate}"
                         Style="{StaticResource GenerateButton}"

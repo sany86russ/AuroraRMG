@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Olden_Era___Template_Editor.Models;
 using OldenEraTemplateEditor.Models;
+using OldenEraTemplateEditor.Services.ContentManagement;
 
 namespace Olden_Era___Template_Editor.Services.Generation
 {
@@ -72,8 +73,41 @@ namespace Olden_Era___Template_Editor.Services.Generation
             };
 
             ConfigureZones(settings, opts, playerCount, mapSize, victory, rng);
+
+            // NOTE: seed landmarks LAST so these rng draws come after every structural decision — that
+            // keeps a given seed's map structure byte-for-byte unchanged vs. before this feature; only
+            // the guaranteed landmark content is added on top.
+            SeedSignatureLandmarks(settings, rng);
             return settings;
         }
+
+        // ── Curated landmarks (Phase 2: make a quick map feel "designed", not just budget-filled) ────
+
+        // Signature high-end encounters. Per the real templates + ZoneContentManager tier notes, ONLY
+        // high zones carry these. All are uncapped in contentCountLimits, so forcing one never conflicts
+        // with a limit. Shapes mirror the game's own mandatory items (bare sid, engine-guarded internally).
+        private static readonly string[] HighLandmarks =
+            ["dragon_utopia", "research_laboratory", "unstable_ruins", "eternal_dragon"];
+
+        // Mid-tier signature anchor (confirmed as mandatory content in the real corpus).
+        private static readonly string[] MediumLandmarks =
+            ["orb_observatory"];
+
+        /// <summary>
+        /// Adds one guaranteed signature landmark to the medium- and high-tier neutral mandatory-content
+        /// lists. The generator only consumes a tier's list when a zone of that tier exists, so this is
+        /// purely additive and safe on any map. Deterministic: same seed → same landmark.
+        /// </summary>
+        private static void SeedSignatureLandmarks(GeneratorSettings settings, Random rng)
+        {
+            settings.HighNeutralMandatoryContent.Add(Landmark(HighLandmarks[rng.Next(HighLandmarks.Length)]));
+            settings.MediumNeutralMandatoryContent.Add(Landmark(MediumLandmarks[rng.Next(MediumLandmarks.Length)]));
+        }
+
+        /// <summary>A minimal, real-shaped mandatory landmark: bare sid, not RMG-guarded (it guards itself),
+        /// no name (nothing references it) and no placement rules (placed anywhere in the zone).</summary>
+        private static ContentItem Landmark(string sid) =>
+            ContentItemBuilder.Create(sid).Guarded(false).Build();
 
         // ── Players / size / topology ─────────────────────────────────────────────
 
@@ -94,6 +128,10 @@ namespace Olden_Era___Template_Editor.Services.Generation
             {
                 QuickMapScale.Small => [64, 80, 96],
                 QuickMapScale.Large => [176, 192, 208, 240],
+                // Experimental large maps (above the official 240 cap). Biased to the 300–400
+                // sweet spot players ask for; the game engine handles these even though no
+                // official template ships at this size.
+                QuickMapScale.Huge => [256, 288, 320, 352, 384, 400],
                 _ => [112, 128, 144, 160],
             };
             // Game length biases the pick within the band: short → smaller end, long → larger end.
