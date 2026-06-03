@@ -86,6 +86,8 @@ namespace Olden_Era___Template_Editor
                 // ── Simple Mode (the default landing view) ──
                 SetMode(advanced: false, persist: false);
                 try { BtnSimpleGenerate_Click(this, new RoutedEventArgs()); } catch { /* preview is best-effort */ }
+                // Reveal the (default-hidden) preview so the docs screenshot shows the full feature.
+                try { if (SimplePreviewBox != null) { SimplePreviewBox.Visibility = Visibility.Visible; UpdateSimplePreviewToggle(); } } catch { }
                 await Dispatcher.Yield(DispatcherPriority.Background);
                 root.UpdateLayout();
                 await Task.Delay(550);

@@ -3212,12 +3212,14 @@ ValueChanged="Slider_ValueChanged"/>
                     </ScrollViewer>
                 </Border>
 
-                <!-- ── Preview / summary / actions ─────────────────────── -->
+                <!-- ── Result summary / optional preview / actions ─────── -->
                 <Grid Grid.Column="2">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>     <!-- preview -->
+                        <RowDefinition Height="Auto"/>  <!-- result summary (leads) -->
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="Auto"/>  <!-- show/hide preview toggle -->
                         <RowDefinition Height="8"/>
-                        <RowDefinition Height="Auto"/>  <!-- summary -->
+                        <RowDefinition Height="*"/>     <!-- collapsible preview / breathing room -->
                         <RowDefinition Height="10"/>
                         <RowDefinition Height="Auto"/>  <!-- save to game (primary) -->
                         <RowDefinition Height="6"/>
@@ -3226,7 +3228,22 @@ ValueChanged="Slider_ValueChanged"/>
                         <RowDefinition Height="Auto"/>  <!-- open advanced -->
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" BorderThickness="2" CornerRadius="4"
+                    <!-- The result leads — keeps the "random map" feel; the template structure stays hidden. -->
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="{DynamicResource S.Simple.SummaryTitle}" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock x:Name="TxtSimpleSummary" TextWrapping="Wrap"
+                                   Foreground="{StaticResource BrushText}" FontSize="12"/>
+                    </StackPanel>
+
+                    <!-- Template preview is opt-in (hidden by default) for the "illusion of randomness". -->
+                    <Button Grid.Row="2" x:Name="BtnSimpleTogglePreview"
+                            Content="{DynamicResource S.Simple.ShowPreview}"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource ToolbarButton}"
+                            IsEnabled="False" Click="BtnSimpleTogglePreview_Click"/>
+
+                    <Border Grid.Row="4" x:Name="SimplePreviewBox" Visibility="Collapsed"
+                            BorderThickness="2" CornerRadius="4"
                             BorderBrush="{StaticResource BrushBorder}" Background="#0E1117">
                         <Grid>
                             <TextBlock x:Name="TxtSimpleNoPreview"
@@ -3241,22 +3258,16 @@ ValueChanged="Slider_ValueChanged"/>
                         </Grid>
                     </Border>
 
-                    <StackPanel Grid.Row="2">
-                        <TextBlock Text="{DynamicResource S.Simple.SummaryTitle}" Style="{StaticResource SectionHeader}"/>
-                        <TextBlock x:Name="TxtSimpleSummary" TextWrapping="Wrap"
-                                   Foreground="{StaticResource BrushText}" FontSize="12"/>
-                    </StackPanel>
-
-                    <Button Grid.Row="4" x:Name="BtnSimpleSaveToGame"
+                    <Button Grid.Row="6" x:Name="BtnSimpleSaveToGame"
                             Content="{DynamicResource S.Simple.SaveToGame}"
                             Style="{StaticResource GenerateButton}"
                             IsEnabled="False" Click="BtnSimpleSaveToGame_Click"/>
 
-                    <Button Grid.Row="6" x:Name="BtnSimpleSave"
+                    <Button Grid.Row="8" x:Name="BtnSimpleSave"
                             Content="{DynamicResource S.Simple.SaveAs}"
                             IsEnabled="False" Click="BtnSimpleSave_Click"/>
 
-                    <Button Grid.Row="8" x:Name="BtnSimpleOpenAdvanced"
+                    <Button Grid.Row="10" x:Name="BtnSimpleOpenAdvanced"
                             Content="{DynamicResource S.Simple.OpenAdvanced}"
                             IsEnabled="False" Click="BtnSimpleOpenAdvanced_Click"/>
                 </Grid>

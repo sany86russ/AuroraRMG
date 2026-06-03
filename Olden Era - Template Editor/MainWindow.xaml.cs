@@ -2048,10 +2048,42 @@ namespace Olden_Era___Template_Editor
             var result = MessageBox.Show(L.Get("S.D.ResetConfirm"), L.Get("S.D.ResetTitle"),
                                          MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (result != MessageBoxResult.Yes) return;
+
+            // Simple Mode has its own controls (the Advanced ApplySettings does not touch them),
+            // so the reset must be routed to whichever view is currently shown.
+            if (SimpleView != null && SimpleView.Visibility == Visibility.Visible)
+            {
+                ResetSimpleToDefaults();
+                return;
+            }
+
             ApplySettings(new SettingsFile());
             _currentSettingsPath = null;
             _isDirty = false;
             UpdateTitle();
+        }
+
+        /// <summary>Resets the Simple-mode options to defaults (+ a fresh seed) and clears the last result,
+        /// mirroring what BtnNew does for the Advanced view. Used by the header "Reset settings" in Simple mode.</summary>
+        private void ResetSimpleToDefaults()
+        {
+            ApplySimpleState(new Services.GameData.SimpleModeState()); // default selections
+            TxtSimpleSeed.Text = ((uint)NewSeed()).ToString("X8");      // a fresh seed too
+            SaveSimpleState();                                          // persist the reset
+
+            // Clear the result panel + collapse the optional preview.
+            _generatedTemplate = null;
+            _lastQuickSettings = null;
+            if (ImgSimplePreview   != null) ImgSimplePreview.Source = null;
+            if (TxtSimpleNoPreview != null) TxtSimpleNoPreview.Visibility = Visibility.Visible;
+            if (SimplePreviewBox   != null) SimplePreviewBox.Visibility   = Visibility.Collapsed;
+            if (TxtSimpleSummary   != null) TxtSimpleSummary.Text = string.Empty;
+            BtnSimpleSaveToGame.IsEnabled   = false;
+            BtnSimpleSave.IsEnabled         = false;
+            BtnSimpleOpenAdvanced.IsEnabled = false;
+            if (BtnSimpleTogglePreview != null) BtnSimpleTogglePreview.IsEnabled = false;
+            BtnSaveGenerated.Visibility = Visibility.Collapsed;
+            UpdateSimplePreviewToggle();
         }
 
         private void BtnOpen_Click(object sender, RoutedEventArgs e)
@@ -2154,6 +2186,7 @@ namespace Olden_Era___Template_Editor
             BuildPresetMenu();          // submenu group names + preset display names
             RefreshBannedHeroNames();   // ban rows re-resolve names
             UpdateLanguageButtons();
+            UpdateSimplePreviewToggle();   // Simple-mode preview toggle caption (code-set, re-localize here)
             if (TxtWipWarning != null) TxtWipWarning.Text = L.Get("S.CB.Wip");
             if (IsInitialized) { Validate(); UpdateTitle(); }  // refresh validation hints in the new language
         }
@@ -2219,6 +2252,8 @@ namespace Olden_Era___Template_Editor
         {
             ApplySimpleState(Services.GameData.AppSettings.Current.Simple); // restore last-used selections
             TxtSimpleSeed.Text = ((uint)NewSeed()).ToString("X8");           // always a fresh seed per launch
+
+            UpdateSimplePreviewToggle();   // initial caption ("Show preview"); button stays disabled until a map exists
 
             bool advanced = string.Equals(Services.GameData.AppSettings.Current.Mode, "advanced", StringComparison.OrdinalIgnoreCase);
             SetMode(advanced, persist: false);
@@ -2331,8 +2366,28 @@ namespace Olden_Era___Template_Editor
             BtnSimpleSaveToGame.IsEnabled = true;
             BtnSimpleSave.IsEnabled = true;
             BtnSimpleOpenAdvanced.IsEnabled = true;
+            BtnSimpleTogglePreview.IsEnabled = true;          // preview is now available on demand
+            UpdateSimplePreviewToggle();                       // (re)sync the toggle caption; preview stays hidden by default
             BtnSaveGenerated.Visibility = Visibility.Visible; // keep the advanced save path in sync too
             SaveSimpleState();                                 // remember these selections for next launch
+        }
+
+        /// <summary>Toggles the optional template-structure preview in Simple mode. Hidden by default so the
+        /// generator feels like a "real random map generator"; the player reveals the layout only if they wish.</summary>
+        private void BtnSimpleTogglePreview_Click(object sender, RoutedEventArgs e)
+        {
+            if (SimplePreviewBox == null) return;
+            bool show = SimplePreviewBox.Visibility != Visibility.Visible;
+            SimplePreviewBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            UpdateSimplePreviewToggle();
+        }
+
+        /// <summary>Syncs the Simple-mode preview toggle caption to the current preview visibility (re-localizable).</summary>
+        private void UpdateSimplePreviewToggle()
+        {
+            if (BtnSimpleTogglePreview == null) return;
+            bool shown = SimplePreviewBox != null && SimplePreviewBox.Visibility == Visibility.Visible;
+            BtnSimpleTogglePreview.Content = L.Get(shown ? "S.Simple.HidePreview" : "S.Simple.ShowPreview");
         }
 
         private static readonly string[] SimpleLenLabelKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];

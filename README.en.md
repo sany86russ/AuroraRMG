@@ -24,13 +24,18 @@
 
 ---
 
-## 🆕 What's new in 1.3.0
+## 🆕 What's new in 1.3.1
 
-### 🗺 Large maps — bigger than 240×240
-
-By popular request you can now create maps larger than the old 240×240 cap — better for long, rich games.
+### 🎲 Simple Mode got cleaner — from player feedback
 
 ![Simple Mode](docs/ui-simple-en.png)
+
+- **The template preview is hidden by default.** Simple Mode now leads with the result ("what you got" + the balance score); the map structure is one click away via **"👁 Show template preview"** — so generation feels genuinely random.
+- **"Reset settings" now works in Simple Mode too.** It used to reset only Advanced — now it resets Simple as well (fresh seed, cleared result).
+
+### 🗺 Large maps — bigger than 240×240 *(from 1.3.0)*
+
+By popular request you can now create maps larger than the old 240×240 cap — better for long, rich games.
 
 - In **Simple Mode** — a new map size **"Huge (256–400)"**.
 - In **Advanced Mode** the large-maps option **256×256 … 512×512** is now in plain sight — a highlighted checkbox right under the size picker (it existed before, but was hard to find).
@@ -51,7 +56,7 @@ Neutral zones now reliably get **signature objects** (dragon utopias, research l
 
 ## 📑 Contents
 
-- [What's new in 1.3.0](#-whats-new-in-130)
+- [What's new in 1.3.1](#-whats-new-in-131)
 - [What is this](#-what-is-this)
 - [Installation](#-installation)
 - [Build authenticity verification](#-build-authenticity-verification)
