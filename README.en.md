@@ -65,6 +65,7 @@ Neutral zones now reliably get **signature objects** (dragon utopias, research l
   - [Tab "Bonuses & Bans"](#tab--bonuses--bans)
   - [Tab "Extra Content"](#tab--extra-content-exp)
 - [Preview panel & generation](#-preview-panel--generation)
+- [Map analysis: balance & contents](#-map-analysis-balance--contents)
 - [Visual zone editor](#-visual-zone-editor)
 - [UI language (RU/EN)](#-ui-language-ruen)
 - [Built-in presets (43)](#-built-in-presets-43)
@@ -95,7 +96,8 @@ A map template is a set of rules the game uses to build a random map when you st
 | 🗺 **Visual zone editor** | interactive canvas: zones, connections, inspector, PNG export — edit the map graph by hand |
 | 🌍 **Two languages (RU/EN)** | instant language switch in the header, no restart; auto-detected from the OS locale |
 | 🚫 **Item, spell & hero bans** | full hero roster with real names (optionally from the game's assets) |
-| 🧩 **Full control** | zone topology, economy, monster strength, terrain, water, victory conditions |
+| 🧩 **Full control** | zone topology, economy, monster strength, terrain, water, victory conditions, map size **up to 512×512** |
+| ⚖ **Map analysis** | right after generation — a **balance score 0–100** + a "what's inside" breakdown (zones, links, treasure) |
 | 🖼 **Map preview** | a visual schematic of zone placement and connections before you save |
 | 🌑 **Aurora theme** | dark neon UI (violet → cyan) with branded menus |
 | 🔄 **Auto-update** | the app finds and installs new versions from GitHub by itself |
@@ -201,14 +203,14 @@ For players who **don't want to learn templates**. You set just a few clear opti
 |---|---|
 | **Players** | How many players (starting castles) are on the map. |
 | **Game type** | Layout: **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Team game** *(this mode isn't in the game yet)*. |
-| **Map size** | Small / Medium / Large. |
+| **Map size** | Small / Medium / Large / **Huge (256–400)**. "Huge" goes past the official 240×240 cap (experimental), but the game engine supports it. |
 | **Game length** | Short / Medium / Long — affects size, zone count and guard strength. |
 | **Chaos level** | Tame / Normal / Wild — how wild and unpredictable the map gets. |
 | **Victory condition** | All the real in-game modes — classic, city/capital hold, final battle, tournament (see [Victory conditions](#-victory-conditions--special-modes)). |
 | **Extras** | Water, portals, stronger neutrals. |
 | **Seed** 🎲 📋 | The map's fingerprint: the same seed always yields the same map. **Share the seed** to play an identical map with friends. 🎲 = new random, 📋 = copy. |
 
-Then: **"⚔ Create map"** → a **preview** and a short **summary** (including an estimated game length) appear on the right → **"💾 Save to game folder"** (asks for a name and drops the map straight into the game) or **"Save as…"**. A **hint for every option** sits at the bottom of the window. Any map can be **"Opened in Advanced mode"** and fine-tuned by hand.
+Then: **"⚔ Create map"** → a **preview** and a short **summary** (including an estimated game length, a **balance score** and a **"what's inside"** breakdown — see [Map analysis](#-map-analysis-balance--contents)) appear on the right → **"💾 Save to game folder"** (asks for a name and drops the map straight into the game) or **"Save as…"**. A **hint for every option** sits at the bottom of the window. Any map can be **"Opened in Advanced mode"** and fine-tuned by hand.
 
 ### 🛠 Advanced Mode — full control
 
@@ -314,7 +316,7 @@ The window has three areas:
 | **Preset** | A menu of 43 ready configs (grouped by mode type). Picking one fills every field instantly. See [Presets](#-built-in-presets-43). |
 | **Template name** | The name the template appears under in the game. |
 | **Map size** | Playfield size. Standard values roughly from 80×80 to 240×240. |
-| **Experimental large maps** `[EXP.]` | Adds sizes from 256×256 to 512×512. Official maps stop at 240×240, so larger ones may fail to load, freeze or behave unpredictably. |
+| 🗺 **Large maps: 256×256 … 512×512** `[EXP.]` | A highlighted checkbox right under the size picker — adds the larger sizes (up to 512×512) to the list. No official template ships this big, so they aren't guaranteed, but the game engine handles them (players run games at 300–400). In **Simple Mode** this corresponds to the **"Huge"** size. |
 | **Players** | Number of players on the map *(2 – 8, default 2)*. |
 
 #### "Heroes" block
@@ -466,9 +468,31 @@ The right column of the window:
 | **⚔ Create template** | Generates the map from the current settings and builds its **preview**. |
 | **Validation list** | If there are problems (e.g. a tournament with ≠2 players, or no City-Hold town was found) — warnings/errors show up here. Errors block saving. |
 | **Map preview** | A zone schematic: placement, connections, towns; the City-Hold town is marked with a **gold house icon**. |
+| **Map analysis** | Under the preview — a **balance score 0–100** with notes and a **"what's inside"** line (zones, links, treasure, resources). See [Map analysis](#-map-analysis-balance--contents). |
 | **Outdated warning** | If you change settings after generation, the preview is marked outdated and must be regenerated. |
 | **Save preview next to the template** | Checkbox: save the preview image in the template folder (the game may show it when picking a map). |
 | **💾 Save** | Saves the finished `.rmg.json` (opens the game's templates folder by default). |
+
+---
+
+## ⚖ Map analysis: balance & contents
+
+After generating (in **both** modes) AuroraRMG immediately shows a quick analysis of the resulting map — in the Simple-mode summary and in the Advanced right-hand panel. Everything is computed **locally** from the map graph; nothing is sent to the network.
+
+### ⚖ Balance score (0–100)
+
+How equal the players' starting conditions are. For each player it considers: the zone's **starting wealth**, nearby **room to expand** (the value of adjacent zones), the **distance to the nearest opponent** and **access to neutral castles**. The smaller the spread between players, the higher the score. Plain-language notes appear alongside, e.g.:
+
+- "Player N starts X% poorer"
+- "Uneven access to neutral castles"
+- "Players N and M start close together"
+- "The map is well balanced" — when everything is even
+
+> Symmetry isn't a field in the `.rmg.json` format — it emerges from the topology. So we **measure** balance rather than impose it. For the fairest 1v1 play, pick the **Balanced** topology or the **Tournament** mode.
+
+### 🔍 What's inside the map
+
+The map's contents in one line: how many zones and of which kind (**players / neutral / castles**), how many **links** between them, and the total **treasure** and **resources**. Helps you gauge the scale and richness of a map before playing.
 
 ---
 
@@ -679,6 +703,7 @@ Tips based on how the generator and the Olden Era engine work — they help you 
 - **Neutral zone quality** = how rich and heavily guarded it is. "Strong" zones give better rewards, but their guards are tougher.
 - **"Towns in neutral zones"** only applies to zones flagged "with town".
 - **The economy** is easiest to tune with three sliders: "Resource frequency", "Structure frequency" and "Neutral army strength". For a sandbox — crank resources up and army strength down; for hardcore — the opposite.
+- **Signature landmarks.** Neutral zones are guaranteed one notable object matching the zone's tier (dragon utopias, research labs, observatories, etc.) — so a map feels designed, not merely random.
 
 ### Terrain and the engine
 
@@ -700,7 +725,7 @@ Tips based on how the generator and the Olden Era engine work — they help you 
 
 > [!WARNING]
 > Anything tagged `[EXP.]` isn't fully tested and may produce broken maps:
-> - **Experimental large maps** (256×256 … 512×512): official maps stop at 240×240, so larger ones may fail to load or freeze.
+> - **Large maps** (256×256 … 512×512): no official template ships this big; the game engine handles them (players run games at 300–400), but behaviour on the very largest (near 512) isn't guaranteed.
 > - **Zone fine-tuning** (zone sizes, guard spread) and **mandatory "Extra Content"**: the generator places content *where possible* and is limited by free space. Overdoing mandatory content breaks balance, especially on small maps and with small player zones.
 
 > [!CAUTION]
@@ -722,6 +747,12 @@ Tips based on how the generator and the Olden Era engine work — they help you 
 
 **What is the "seed" in Simple Mode?**
 It's the map's fingerprint. The same seed always yields the same map, so it's handy to share: a friend enters the same seed and plays an identical map. The 🎲 button rolls a new random seed, 📋 copies the current one.
+
+**Can I create maps bigger than 240×240?**
+Yes. In **Simple Mode** pick the **"Huge (256–400)"** size; in **Advanced** tick **"🗺 Large maps: 256×256 … 512×512"** right under the size picker — the larger sizes (up to 512×512) appear in the list. Official templates stop at 240×240, but the game engine handles larger maps (which is why the option is marked experimental).
+
+**What does "Balance: NN/100" mean?**
+It's a measure of how equal the players' starting conditions are (wealth, room to expand, distances, castle access). The higher, the fairer the map; specific notes appear alongside. More: [Map analysis](#-map-analysis-balance--contents).
 
 **The game doesn't see my template.**
 Make sure the `.rmg.json` sits exactly in `…\HeroesOldenEra_Data\StreamingAssets\map_templates` and restart the game.
