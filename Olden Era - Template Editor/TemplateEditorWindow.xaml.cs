@@ -331,6 +331,13 @@ namespace Olden_Era___Template_Editor
                 AddTextField(L("S.EC.GuardMult"), (z.GuardMultiplier ?? 1.0).ToString(CultureInfo.InvariantCulture),
                     v => { if (double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) { z.GuardMultiplier = d; MarkDirty(); } });
 
+                // Castle ↔ outpost: capturing an AbandonedOutpost grants the player their NATIVE town
+                // instead of a random castle. Only offered for castle/outpost zones (never player spawns).
+                var primaryObj = z.MainObjects?.FirstOrDefault(o => o.Type is "City" or "AbandonedOutpost");
+                if (primaryObj != null)
+                    AddComboField(L("S.EC.MainObj"), MainObjectKinds, primaryObj.Type,
+                        v => { SetMainObjectKind(primaryObj, v); MarkDirty(); });
+
                 int conns = Connections.Count(c => c.From == z.Name || c.To == z.Name);
                 AddReadOnly(L("S.EC.ConnCount"), conns.ToString());
             }
@@ -349,6 +356,34 @@ namespace Olden_Era___Template_Editor
             else
             {
                 TxtInspectorHint.Text = L("S.Ed.011");
+            }
+        }
+
+        private static readonly string[] MainObjectKinds = ["City", "AbandonedOutpost"];
+
+        /// <summary>Switches a zone's primary main object between a castle (<c>City</c>) and an
+        /// <c>AbandonedOutpost</c>. An outpost is neutral (no faction/owner) and, when captured, grants the
+        /// taker their OWN faction's town instead of a random castle — the shape mirrors the official
+        /// templates (e.g. Hallway: guarded 30k, rich buildings, Uniform placement).</summary>
+        private static void SetMainObjectKind(MainObject o, string kind)
+        {
+            if (o.Type == kind) return;
+            o.Type = kind;
+            if (kind == "AbandonedOutpost")
+            {
+                o.Faction = null;        // outposts carry no faction — the captor gets their native town
+                o.Owner = null;
+                o.HoldCityWinCon = null;
+                o.BuildingsConstructionSid ??= "rich_buildings_construction";
+                o.GuardChance ??= 1.0;
+                o.GuardValue ??= 30000;
+                o.GuardWeeklyIncrement ??= 0.20;
+                o.Placement ??= "Uniform";
+            }
+            else // City
+            {
+                o.Faction ??= new TypedSelector { Type = "Random", Args = [] };
+                o.BuildingsConstructionSid ??= "default_buildings_construction";
             }
         }
 
@@ -560,7 +595,7 @@ namespace Olden_Era___Template_Editor
                 UpdateSelectionVisuals();
                 return;
             }
-            var conn = new Connection { From = _connectFrom.Name, To = z.Name, ConnectionType = "default" };
+            var conn = new Connection { From = _connectFrom.Name, To = z.Name, ConnectionType = "Direct" };
             Connections.Add(conn);
             UpdateStatus(L("S.EC.ConnAdded", conn.From, conn.To));
             _connectFrom = null;

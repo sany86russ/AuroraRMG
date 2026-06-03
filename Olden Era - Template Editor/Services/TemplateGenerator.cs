@@ -76,7 +76,8 @@ namespace Olden_Era___Template_Editor.Services
                 Biomes.Resolve(settings.Terrain),
                 settings.EncounterHoles,
                 WaterWidthFor(settings.WaterLevel),
-                Biomes.WaterType(settings.Terrain));
+                Biomes.WaterType(settings.Terrain),
+                settings.MatchSpawnTerrainToFaction);
 
             string effectiveVictoryCondition = settings.GameEndConditions.VictoryCondition;
 
@@ -507,7 +508,8 @@ namespace Olden_Era___Template_Editor.Services
             IReadOnlyList<string>? ForcedBiomes,
             bool EncounterHoles,
             int WaterWidth,
-            string WaterType);
+            string WaterType,
+            bool MatchSpawnTerrainToFaction);
 
         /// <summary>Maps a <see cref="WaterLevel"/> to the engine's <c>border.waterWidth</c>.</summary>
         private static int WaterWidthFor(WaterLevel level) => level switch
@@ -2700,7 +2702,12 @@ namespace Olden_Era___Template_Editor.Services
                 });
             }
 
-            var biomes = Biomes.ForZone(tuning.ForcedBiomes, hasCastle: true);
+            // A player's home terrain should match their faction. When MatchSpawnTerrainToFaction is on
+            // we ignore any forced global theme for the SPAWN zone only (null forcedBiomes →
+            // MatchMainObject[0] = the town's faction), so neutral zones can stay themed while every
+            // player still starts on their faction's native terrain.
+            var biomes = Biomes.ForZone(
+                tuning.MatchSpawnTerrainToFaction ? null : tuning.ForcedBiomes, hasCastle: true);
 
             return new Zone
             {

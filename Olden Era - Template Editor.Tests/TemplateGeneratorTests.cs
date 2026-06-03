@@ -1612,6 +1612,52 @@ public class TemplateGeneratorTests
     }
 
     [Fact]
+    public void Generate_MatchSpawnTerrainToFaction_KeepsSpawnFactionDerivedDespiteForcedTheme()
+    {
+        // A forced theme (Snow) normally locks the spawn biome to "FromList"; with the flag on, the
+        // SPAWN zone stays faction-derived (MatchMainObject[0]) so a player's home matches their faction.
+        RmgTemplate template = TemplateGenerator.Generate(
+            new GeneratorSettings { Terrain = TerrainTheme.Snow, MatchSpawnTerrainToFaction = true });
+
+        Zone spawn = FirstSpawnZone(template);
+        Assert.Equal("MatchMainObject", spawn.ZoneBiome?.Type);
+        Assert.Equal(new[] { "0" }, spawn.ZoneBiome?.Args);
+        Assert.Equal("MatchMainObject", spawn.ContentBiome?.Type);
+    }
+
+    [Fact]
+    public void QuickGenerate_SeedsStarterMinesAndFactionMatchedHomeTerrain()
+    {
+        // Round-6 feedback (Toni): quick maps must spawn ownable mines (not just one-shot resource piles),
+        // and each player's starting terrain must match their faction regardless of the rolled theme.
+        foreach (int seed in new[] { 1, 7, 99, 12345 })
+        {
+            GeneratorSettings s = RandomTemplateBuilder.Build(new QuickGenerateOptions
+            {
+                Seed = seed, PlayerCount = 4, GameType = QuickGameType.FreeForAll,
+                Scale = QuickMapScale.Medium, Length = QuickGameLength.Medium, Chaos = QuickChaos.Normal,
+            });
+
+            // Starter mines (Wood/Ore/Gold) are guaranteed in every player's spawn zone.
+            Assert.True(s.MatchSpawnTerrainToFaction);
+            var sids = s.PlayerZoneMandatoryContent.Select(c => c.Sid).ToList();
+            Assert.Contains("mine_wood", sids);
+            Assert.Contains("mine_ore", sids);
+            Assert.Contains("mine_gold", sids);
+
+            // Every player's spawn zone is faction-derived regardless of the rolled terrain theme.
+            RmgTemplate template = TemplateGenerator.Generate(s);
+            foreach (Zone z in RequiredZones(SingleVariant(template))
+                         .Where(z => z.Name.StartsWith("Spawn-", StringComparison.Ordinal)))
+                Assert.Equal("MatchMainObject", z.ZoneBiome?.Type);
+
+            // End-to-end: the mines actually reach the serialised .rmg.json (not just the settings object).
+            string json = JsonSerializer.Serialize(template, JsonExport.Options);
+            Assert.Contains("mine_gold", json);
+        }
+    }
+
+    [Fact]
     public void Generate_NormalAggression_ReproducesHistoricalSpawnReaction()
     {
         RmgTemplate template = TemplateGenerator.Generate(new GeneratorSettings());

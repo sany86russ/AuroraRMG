@@ -24,9 +24,22 @@
 
 ---
 
-## 🆕 What's new in 1.3.1
+## 🆕 What's new in 1.3.2
 
-### 🎲 Simple Mode got cleaner — from player feedback
+### ⚙️ Quick-generation quality (from player feedback)
+
+- **Mines for every player.** Quick maps now guarantee starter mines (wood/ore/gold) in each player's home zone, not just one-shot resource piles — so there's a real economy.
+- **Starting terrain matches the faction.** Each player's home is now on their faction's native terrain, even on themed maps (neutral zones still vary).
+- **Simple → Advanced transfer.** "Open in Advanced mode" now carries the neutral-zone count across correctly (it used to show 0).
+
+### 🗺 Manual control in the zone editor
+
+In the **visual editor** ("🗺 Editor") you can override by hand what the generator does automatically:
+
+- **Castle or outpost.** A castle zone now has a castle ↔ outpost toggle: capturing an outpost grants the player their **native** town instead of a random castle.
+- **Connections, portals and guards — precisely.** Which zones connect (e.g. parallel bronze→silver→gold corridors), which use **portals**, and the **guard strength per connection** (the "Highway" pattern). See [Visual zone editor](#-visual-zone-editor).
+
+### 🎲 Simple Mode got cleaner *(from 1.3.1)*
 
 ![Simple Mode](docs/ui-simple-en.png)
 
@@ -56,7 +69,7 @@ Neutral zones now reliably get **signature objects** (dragon utopias, research l
 
 ## 📑 Contents
 
-- [What's new in 1.3.1](#-whats-new-in-131)
+- [What's new in 1.3.2](#-whats-new-in-132)
 - [What is this](#-what-is-this)
 - [Installation](#-installation)
 - [Build authenticity verification](#-build-authenticity-verification)
@@ -509,10 +522,17 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 
 - **Canvas:** zones are shown as nodes (🟢 player · 🔵 hub · 🟤/⚪/🟡 neutral by quality), connections as edges (gold = direct, dashed cyan = portal, dashed brown = road). There's a grid, a **legend** and a controls hint.
 - **Navigation:** wheel to zoom (or **−/+** buttons), drag the background to pan, **"Reset view"** and **"Auto-layout"**.
-- **Editing:** drag zones; the **inspector** on the right edits the selected zone (name, size, layout, diplomacy, guards) or connection (from/to, type, guards, road).
+- **Editing:** drag zones; the **inspector** on the right edits the selected zone (name, size, layout, diplomacy, guards, **castle/outpost**) or connection (from/to, **type**, **guard strength**, road).
 - **Functions:** **➕ Zone** (or double-click the canvas), **🔗 Connect** (link two zones), **🗑 Delete** (or the `Del` key), **✓ Validate** (validation: dangling links, duplicate names, self-loops, isolated zones), **💾 Save .rmg.json** and **📂 Load**.
 - **🖼 Export PNG** — save an image of the zone graph to share.
 - Keys: `Del` — delete the selection, `Esc` — cancel connecting / clear the selection.
+
+**Full manual control of the graph** (override by hand what the auto-generator does for you):
+
+- **Which zones connect — and which don't.** Delete unwanted edges and add your own. For example, build 4 independent bronze→silver→gold "corridors" that only meet in the centre, so players clash only at the end. **✓ Validate** confirms connectivity.
+- **Portals, precisely.** Select an edge → **Type = Portal**: those exact zones get a portal (instead of random ones).
+- **Per-connection guard strength.** An edge has a **guard value**; a zone has a **guard multiplier**. You can do it like "Highway": a moderate entry into your own gold zone and a brutal breakthrough between two gold zones.
+- **Castle or outpost.** A castle zone has a **castle ↔ outpost** toggle: capturing an outpost grants the player their **native** town instead of a random castle.
 
 > The editor reuses the same layout as the preview, so the graph matches the generated map. Node positions are for clarity only (the `.rmg.json` stores no coordinates — the game computes them).
 

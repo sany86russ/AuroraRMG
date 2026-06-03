@@ -2528,7 +2528,18 @@ namespace Olden_Era___Template_Editor
                 SldTerrainRoughness.Value    = s.TerrainRoughnessPercent;
                 SldLakeAmount.Value          = s.LakeAmountPercent;
 
+                // Advanced reads neutral zones ONLY from the per-tier sliders (the SldNeutral aggregate is
+                // hidden in Advanced mode), so push every tier here — otherwise opening a quick map in
+                // Advanced shows zero neutral zones (the reported Simple→Advanced transfer bug).
                 var a = s.ZoneCfg.Advanced;
+                SldNeutralLowNoCastle.Value    = a.NeutralLowNoCastleCount;
+                SldNeutralLowCastle.Value      = a.NeutralLowCastleCount;
+                SldNeutralMediumNoCastle.Value = a.NeutralMediumNoCastleCount;
+                SldNeutralMediumCastle.Value   = a.NeutralMediumCastleCount;
+                SldNeutralHighNoCastle.Value   = a.NeutralHighNoCastleCount;
+                SldNeutralHighCastle.Value     = a.NeutralHighCastleCount;
+                SldPlayerCastles.Value         = s.ZoneCfg.PlayerZoneCastles;
+                SldNeutralCastles.Value        = s.ZoneCfg.NeutralZoneCastles;
                 SldNeutral.Value = a.NeutralLowNoCastleCount + a.NeutralLowCastleCount
                                  + a.NeutralMediumNoCastleCount + a.NeutralMediumCastleCount
                                  + a.NeutralHighNoCastleCount + a.NeutralHighCastleCount;

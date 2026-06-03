@@ -88,6 +88,10 @@ namespace Olden_Era___Template_Editor.Models
         public bool SpawnRemoteFootholds { get; set; } = true;
         public bool GenerateRoads { get; set; } = true;
         public bool MatchPlayerCastleFactions { get; set; } = false;
+        // When true, each player's spawn zone uses faction-derived terrain (the town's native biome)
+        // even if a global terrain theme is forced — so the starting terrain always matches the
+        // player's faction. Default false keeps the Advanced behaviour (whole map follows the theme).
+        public bool MatchSpawnTerrainToFaction { get; set; } = false;
         public bool PlayerStartsWithCastles { get; set; } = false;
         public int MinNeutralZonesBetweenPlayers { get; set; } = 0;
         public MapTopology Topology { get; set; } = MapTopology.Balanced;

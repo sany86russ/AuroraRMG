@@ -55,6 +55,8 @@ namespace Olden_Era___Template_Editor.Services.Generation
 
                 HeroSettings = BuildHeroSettings(rng),
                 GenerateRoads = true,
+                MatchSpawnTerrainToFaction = true,            // each player's home terrain matches their faction
+                PlayerZoneMandatoryContent = DefaultPlayerMines(), // guarantee starter mines, not just resource piles
                 SpawnRemoteFootholds = true,
                 NoDirectPlayerConnections = opts.GameType == QuickGameType.Duel,
                 RandomPortals = opts.Portals,
@@ -108,6 +110,17 @@ namespace Olden_Era___Template_Editor.Services.Generation
         /// no name (nothing references it) and no placement rules (placed anywhere in the zone).</summary>
         private static ContentItem Landmark(string sid) =>
             ContentItemBuilder.Create(sid).Guarded(false).Build();
+
+        /// <summary>Standard guarded starter mines (Wood, Ore, Gold) anchored in every player's spawn zone,
+        /// so a quick map has a real, ownable economy — not just one-shot resource piles that only reward
+        /// the first visiting hero. Mirrors the Advanced default (`Presets.DefaultPlayerMines`) — the proven,
+        /// in-range shape.</summary>
+        private static List<ContentItem> DefaultPlayerMines() =>
+        [
+            ContentItemBuilder.Create(ContentIds.MineWood.Sid).WithName("name_mine_wood").Mine().Guarded().Build(),
+            ContentItemBuilder.Create(ContentIds.MineOre.Sid).WithName("name_mine_ore").Mine().Guarded().Build(),
+            ContentItemBuilder.Create(ContentIds.MineGold.Sid).WithName("name_mine_gold").Mine().Guarded().Build(),
+        ];
 
         // ── Players / size / topology ─────────────────────────────────────────────
 
