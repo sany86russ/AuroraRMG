@@ -863,7 +863,7 @@
                                     TickFrequency="5" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
 
-                            <DockPanel Grid.Row="13" Grid.Column="0">
+                            <DockPanel Grid.Row="13" Grid.Column="0" ToolTip="{DynamicResource S.Tip.BorderGuards}">
                                 <Label Content="{DynamicResource S.M.058}" DockPanel.Dock="Left"/>
                                 <TextBlock x:Name="TxtBorderGuardStrength" Text="100%" DockPanel.Dock="Right"
                                            HorizontalAlignment="Right" VerticalAlignment="Center"
@@ -872,6 +872,7 @@
                             <Slider Grid.Row="13" Grid.Column="1" x:Name="SldBorderGuardStrength"
                                     Minimum="25" Maximum="300" Value="100"
                                     TickFrequency="5" IsSnapToTickEnabled="True"
+                                    ToolTip="{DynamicResource S.Tip.BorderGuards}"
                                     ValueChanged="Slider_ValueChanged"/>
                         </Grid>
                         <StackPanel x:Name="PnlAdvancedNeutralZones"

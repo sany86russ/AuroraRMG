@@ -24,9 +24,18 @@
 
 ---
 
-## 🆕 What's new in 1.3.3
+## 🆕 What's new in 1.3.4
 
-### 🛡 Border-guard strength on zone borders (from player feedback)
+### 🧭 "Border guards" is now discoverable in Advanced mode too (from player feedback)
+
+1.3.3 added the **"Border guards"** setting to Simple mode, but in Advanced the same parameter had a different name — the "Border/portal strength" slider — and players couldn't find it. Fixed:
+
+- the slider is renamed to **"Border/portal guards"** (the **"Zone Setup" tab → "◆ ZONE SETUP"** block) so it matches the Simple-mode wording;
+- a hover tooltip was added: it's the same setting as "Border guards" in Simple mode (25–300%, default 100%; higher = a tougher "face-control").
+
+How the Simple-mode levels map to the slider: **Weak** ≈ 45–80%, **Normal** ≈ 80–140%, **Strong** ≈ 150–220%, **Fortress** ≈ 230–300%.
+
+### 🛡 Border-guard strength on zone borders *(from 1.3.3)*
 
 ![Simple Mode](docs/ui-simple-en.png)
 
@@ -80,7 +89,7 @@ Neutral zones now reliably get **signature objects** (dragon utopias, research l
 
 ## 📑 Contents
 
-- [What's new in 1.3.3](#-whats-new-in-133)
+- [What's new in 1.3.4](#-whats-new-in-134)
 - [What is this](#-what-is-this)
 - [Installation](#-installation)
 - [Build authenticity verification](#-build-authenticity-verification)
