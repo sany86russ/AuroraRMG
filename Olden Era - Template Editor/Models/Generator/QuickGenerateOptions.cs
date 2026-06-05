@@ -25,6 +25,14 @@ namespace Olden_Era___Template_Editor.Models
     public enum QuickChaos { Tame, Normal, Wild }
 
     /// <summary>
+    /// Strength of the monster guards on the passages between zones (the "borderland" gate). Higher
+    /// levels keep aggressive opponents — human or AI — penned in their own zones longer, acting as a
+    /// "face-control" against early rushes. <see cref="Normal"/> reproduces the historical band so a
+    /// given seed's map is byte-identical to maps made before this control existed.
+    /// </summary>
+    public enum QuickGuardLevel { Weak, Normal, Strong, Fortress }
+
+    /// <summary>
     /// The handful of player-facing options for Simple Mode / Quick Generate. The
     /// <see cref="Services.Generation.RandomTemplateBuilder"/> turns these (plus a <see cref="Seed"/>)
     /// into a full <see cref="GeneratorSettings"/> within safe, curated ranges.
@@ -43,6 +51,13 @@ namespace Olden_Era___Template_Editor.Models
         public bool Portals { get; set; }
         /// <summary>Crank neutral guard strength + aggression (PvE-ish).</summary>
         public bool StrongNeutrals { get; set; }
+
+        /// <summary>
+        /// Strength of the guards on zone borders (the gate between zones). Lets the player set how hard
+        /// it is to cross into a neighbouring zone — a stronger gate keeps an aggressive opponent out
+        /// longer. Default <see cref="QuickGuardLevel.Normal"/> keeps the historical border-guard band.
+        /// </summary>
+        public QuickGuardLevel BorderGuards { get; set; } = QuickGuardLevel.Normal;
 
         /// <summary>
         /// Win condition / game mode, as a <c>win_condition_N</c> id (the same set the Advanced tab

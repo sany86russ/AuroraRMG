@@ -77,5 +77,6 @@ namespace Olden_Era___Template_Editor.Services.GameData
         [JsonPropertyName("water")] public bool Water { get; set; }
         [JsonPropertyName("portals")] public bool Portals { get; set; }
         [JsonPropertyName("strongNeutrals")] public bool StrongNeutrals { get; set; }
+        [JsonPropertyName("guards")] public int Guards { get; set; } = 1;   // border-guard level: Normal
     }
 }

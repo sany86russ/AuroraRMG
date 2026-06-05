@@ -410,6 +410,8 @@ FodyWeavers.xsd
 .claude-flow/
 .mcp.json
 ruvector.db
+agentdb.rvf
+agentdb.rvf.lock
 CLAUDE.md
 AGENTS.md
 # Build staging / release artifacts (the .exe is a release asset, not source)

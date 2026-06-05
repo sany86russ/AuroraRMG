@@ -24,15 +24,28 @@
 
 ---
 
-## 🆕 What's new in 1.3.2
+## 🆕 What's new in 1.3.3
 
-### ⚙️ Quick-generation quality (from player feedback)
+### 🛡 Border-guard strength on zone borders (from player feedback)
+
+![Simple Mode](docs/ui-simple-en.png)
+
+**Simple Mode** gains a **"Border guards"** setting — you can now pick how strong the monster guards on the passages between zones are:
+
+- **Weak** — passages break easily (early rushes get through);
+- **Normal** — as before (old seeds are unchanged);
+- **Strong** — tough gates;
+- **Fortress** — a real wall: an aggressive opponent (including the AI that got smarter after the patch) stays penned in its own zone for weeks and can't rush you early — the "face-control" you asked for.
+
+Border strength used to be Advanced-only (the "Border/portal strength" slider) — now it's right there in Simple Mode too. The actual strength (in %) is shown in the post-generation summary.
+
+### ⚙️ Quick-generation quality *(from 1.3.2)*
 
 - **Mines for every player.** Quick maps now guarantee starter mines (wood/ore/gold) in each player's home zone, not just one-shot resource piles — so there's a real economy.
 - **Starting terrain matches the faction.** Each player's home is now on their faction's native terrain, even on themed maps (neutral zones still vary).
 - **Simple → Advanced transfer.** "Open in Advanced mode" now carries the neutral-zone count across correctly (it used to show 0).
 
-### 🗺 Manual control in the zone editor
+### 🗺 Manual control in the zone editor *(from 1.3.2)*
 
 In the **visual editor** ("🗺 Editor") you can override by hand what the generator does automatically:
 
@@ -40,8 +53,6 @@ In the **visual editor** ("🗺 Editor") you can override by hand what the gener
 - **Connections, portals and guards — precisely.** Which zones connect (e.g. parallel bronze→silver→gold corridors), which use **portals**, and the **guard strength per connection** (the "Highway" pattern). See [Visual zone editor](#-visual-zone-editor).
 
 ### 🎲 Simple Mode got cleaner *(from 1.3.1)*
-
-![Simple Mode](docs/ui-simple-en.png)
 
 - **The template preview is hidden by default.** Simple Mode now leads with the result ("what you got" + the balance score); the map structure is one click away via **"👁 Show template preview"** — so generation feels genuinely random.
 - **"Reset settings" now works in Simple Mode too.** It used to reset only Advanced — now it resets Simple as well (fresh seed, cleared result).
@@ -69,7 +80,7 @@ Neutral zones now reliably get **signature objects** (dragon utopias, research l
 
 ## 📑 Contents
 
-- [What's new in 1.3.2](#-whats-new-in-132)
+- [What's new in 1.3.3](#-whats-new-in-133)
 - [What is this](#-what-is-this)
 - [Installation](#-installation)
 - [Build authenticity verification](#-build-authenticity-verification)

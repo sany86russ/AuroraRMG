@@ -3111,6 +3111,7 @@ ValueChanged="Slider_ValueChanged"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
@@ -3142,6 +3143,10 @@ ValueChanged="Slider_ValueChanged"/>
                             <!-- Victory condition (the real in-game modes) -->
                             <Label Grid.Row="10" Grid.Column="0" Content="{DynamicResource S.Simple.Victory}" VerticalAlignment="Center"/>
                             <ComboBox Grid.Row="10" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CmbSimpleVictory"/>
+
+                            <!-- Border guard strength — the "face-control" on zone borders against early rushes -->
+                            <Label Grid.Row="12" Grid.Column="0" Content="{DynamicResource S.Simple.Guards}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="12" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CmbSimpleGuards"/>
                         </Grid>
 
                         <!-- Extras -->
@@ -3197,6 +3202,8 @@ ValueChanged="Slider_ValueChanged"/>
                                 <TextBlock Text="{DynamicResource S.Simple.Help.Chaos}" TextWrapping="Wrap"
                                            Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
                                 <TextBlock Text="{DynamicResource S.Simple.Help.Victory}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="{DynamicResource S.Simple.Help.Guards}" TextWrapping="Wrap"
                                            Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
                                 <TextBlock Text="{DynamicResource S.Simple.Help.Extras}" TextWrapping="Wrap"
                                            Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,8"/>

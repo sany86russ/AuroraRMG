@@ -1128,6 +1128,27 @@ public class TemplateGeneratorTests
     }
 
     [Fact]
+    public void QuickGenerate_BorderGuardLevel_SetsDistinctStrengthBands()
+    {
+        // The player-facing "border guards" control must actually move the border-guard strength so the
+        // player can pick how hard it is to cross a zone border (the "face-control" against early rushes).
+        // Each level lands in its own band; Normal keeps the historical 80–140% so old seeds are unchanged.
+        QuickGenerateOptions Opt(QuickGuardLevel g) => new()
+        {
+            Seed = 0x51EED5, PlayerCount = 4, GameType = QuickGameType.FreeForAll,
+            Scale = QuickMapScale.Medium, Length = QuickGameLength.Medium, Chaos = QuickChaos.Normal,
+            BorderGuards = g,
+        };
+
+        int Strength(QuickGuardLevel g) => RandomTemplateBuilder.Build(Opt(g)).ZoneCfg.BorderGuardStrengthPercent;
+
+        Assert.InRange(Strength(QuickGuardLevel.Weak),     45, 80);
+        Assert.InRange(Strength(QuickGuardLevel.Normal),   80, 140);
+        Assert.InRange(Strength(QuickGuardLevel.Strong),   150, 220);
+        Assert.InRange(Strength(QuickGuardLevel.Fortress), 230, 300);
+    }
+
+    [Fact]
     public void QuickGenerate_DuelForcesTwoPlayers_AndNameIsAscii()
     {
         GeneratorSettings s = RandomTemplateBuilder.Build(new QuickGenerateOptions
@@ -1179,6 +1200,7 @@ public class TemplateGeneratorTests
                     GameType = type, Scale = scale, Length = length, Chaos = chaos,
                     Water = pick.NextDouble() < 0.5, Portals = pick.NextDouble() < 0.4,
                     StrongNeutrals = pick.NextDouble() < 0.4,
+                    BorderGuards = (QuickGuardLevel)pick.Next(0, 4),
                 };
         }
     }

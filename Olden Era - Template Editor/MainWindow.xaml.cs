@@ -2216,6 +2216,7 @@ namespace Olden_Era___Template_Editor
                 Rebind(CmbSimpleScale,  [.. SimpleScaleKeys.Select(k => L.Get(k))]);
                 Rebind(CmbSimpleLength, [.. SimpleLengthKeys.Select(k => L.Get(k))]);
                 Rebind(CmbSimpleChaos,  [.. SimpleChaosKeys.Select(k => L.Get(k))]);
+                Rebind(CmbSimpleGuards, [.. SimpleGuardsKeys.Select(k => L.Get(k))]);
                 // Same victory-condition set the Advanced tab exposes (the real in-game modes).
                 Rebind(CmbSimpleVictory, [.. KnownValues.VictoryConditionLabels.Select((_, i) => L.Get($"S.Victory.{i}"))]);
 
@@ -2244,6 +2245,7 @@ namespace Olden_Era___Template_Editor
         private static readonly string[] SimpleScaleKeys  = ["S.Simple.Scale.Small", "S.Simple.Scale.Medium", "S.Simple.Scale.Large", "S.Simple.Scale.Huge"];
         private static readonly string[] SimpleLengthKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];
         private static readonly string[] SimpleChaosKeys  = ["S.Simple.Chaos.Tame", "S.Simple.Chaos.Normal", "S.Simple.Chaos.Wild"];
+        private static readonly string[] SimpleGuardsKeys = ["S.Simple.Guards.Weak", "S.Simple.Guards.Normal", "S.Simple.Guards.Strong", "S.Simple.Guards.Fortress"];
 
         private GeneratorSettings? _lastQuickSettings;
 
@@ -2269,6 +2271,7 @@ namespace Olden_Era___Template_Editor
             SetCombo(CmbSimpleScale, st.Scale);
             SetCombo(CmbSimpleLength, st.Length);
             SetCombo(CmbSimpleChaos, st.Chaos);
+            SetCombo(CmbSimpleGuards, st.Guards);
             SetCombo(CmbSimpleVictory, st.Victory);
             ChkSimpleWater.IsChecked = st.Water;
             ChkSimplePortals.IsChecked = st.Portals;
@@ -2283,6 +2286,7 @@ namespace Olden_Era___Template_Editor
             st.Scale          = CmbSimpleScale.SelectedIndex;
             st.Length         = CmbSimpleLength.SelectedIndex;
             st.Chaos          = CmbSimpleChaos.SelectedIndex;
+            st.Guards         = CmbSimpleGuards.SelectedIndex;
             st.Victory        = CmbSimpleVictory.SelectedIndex;
             st.Water          = ChkSimpleWater.IsChecked == true;
             st.Portals        = ChkSimplePortals.IsChecked == true;
@@ -2339,6 +2343,7 @@ namespace Olden_Era___Template_Editor
             Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 3),
             Length         = (QuickGameLength)Math.Clamp(CmbSimpleLength.SelectedIndex, 0, 2),
             Chaos          = (QuickChaos)Math.Clamp(CmbSimpleChaos.SelectedIndex, 0, 2),
+            BorderGuards   = (QuickGuardLevel)Math.Clamp(CmbSimpleGuards.SelectedIndex, 0, 3),
             Water          = ChkSimpleWater.IsChecked == true,
             Portals        = ChkSimplePortals.IsChecked == true,
             StrongNeutrals = ChkSimpleStrong.IsChecked == true,
@@ -2465,6 +2470,10 @@ namespace Olden_Era___Template_Editor
             if (s.RandomPortals) extras.Add(L.Get("S.Simple.Portals"));
             if (s.MonsterAggression == MonsterAggression.Aggressive) extras.Add(L.Get("S.Simple.StrongNeutrals"));
             if (extras.Count > 0) summary += "\n" + L.Get("S.Simple.SumExtras", string.Join(", ", extras));
+
+            // Surface the border-guard strength the player asked for, with the actual rolled % as feedback.
+            summary += "\n" + L.Get("S.Simple.Sum.Guards",
+                L.Get(SimpleGuardsKeys[(int)opts.BorderGuards]), s.ZoneCfg.BorderGuardStrengthPercent);
 
             // Flag maps beyond the official 240×240 cap so the player knows it's an experimental large map.
             if (s.MapSize > KnownValues.MaxOfficialMapSize)

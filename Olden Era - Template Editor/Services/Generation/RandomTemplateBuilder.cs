@@ -253,7 +253,7 @@ namespace Olden_Era___Template_Editor.Services.Generation
             cfg.ResourceDensityPercent = PickPercent(LengthBase(opts.Length, 80, 100, 120), LengthBase(opts.Length, 110, 130, 170), opts.Chaos, rng);
             cfg.StructureDensityPercent = PickPercent(LengthBase(opts.Length, 80, 95, 110), LengthBase(opts.Length, 110, 125, 160), opts.Chaos, rng);
             cfg.NeutralStackStrengthPercent = dense ? PickPercent(130, 220, opts.Chaos, rng) : PickPercent(80, 130, opts.Chaos, rng);
-            cfg.BorderGuardStrengthPercent = PickPercent(80, 140, opts.Chaos, rng);
+            cfg.BorderGuardStrengthPercent = PickBorderGuardStrength(opts.BorderGuards, opts.Chaos, rng);
 
             // How many neutral zones can the map hold? Two hard limits the generator/UI respect:
             //   - at most (32 - players) named zones are available;
@@ -325,6 +325,21 @@ namespace Olden_Era___Template_Editor.Services.Generation
         }
 
         // ── Helpers ─────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Border-guard strength band for the player's chosen gate level — the strength of the monster
+        /// guards on zone borders. <see cref="QuickGuardLevel.Normal"/> keeps the historical 80–140% band
+        /// at the same single rng draw, so a given seed's map stays byte-identical to before this control
+        /// existed; the other levels shift the band so the player can dial the border "fence" up or down.
+        /// Exactly one rng draw in every branch (the seed contract relies on that).
+        /// </summary>
+        private static int PickBorderGuardStrength(QuickGuardLevel level, QuickChaos chaos, Random rng) => level switch
+        {
+            QuickGuardLevel.Weak     => PickPercent(45, 80, chaos, rng),    // soft gates — early rushes get through
+            QuickGuardLevel.Strong   => PickPercent(150, 220, chaos, rng),  // tough gates
+            QuickGuardLevel.Fortress => PickPercent(230, 300, chaos, rng),  // a real wall — keeps rushers out for weeks
+            _                        => PickPercent(80, 140, chaos, rng),    // Normal — unchanged historical band
+        };
 
         /// <summary>Picks a percentage in [min,max]; <see cref="QuickChaos.Wild"/> widens the band by 20%.</summary>
         private static int PickPercent(int min, int max, QuickChaos chaos, Random rng)
