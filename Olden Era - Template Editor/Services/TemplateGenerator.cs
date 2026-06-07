@@ -149,6 +149,7 @@ namespace Olden_Era___Template_Editor.Services
             MapTopology.SharedWeb => "Shared Web",
             MapTopology.Random => "Random",
             MapTopology.Balanced => "Balanced",
+            MapTopology.Lanes => "Lanes",
             _ => topology.ToString()
         };
 
@@ -338,6 +339,30 @@ namespace Olden_Era___Template_Editor.Services
                     int rn = ordered.Count;
                     for (int i = 0; i < rn; i++)
                         Link(ordered[i], ordered[(i + 1) % rn]);
+                    break;
+                }
+
+                case MapTopology.Lanes:
+                {
+                    if (neutralZones.Count == 0)
+                    {
+                        // No neutral to host the arena → BuildVariantLanes falls back to the ring layout;
+                        // mirror that here so hold-city/balance distances match the generated graph.
+                        var ordered = BuildOrderedLetters(settings, playerLetters, neutralZones, isRing: true);
+                        int ln = ordered.Count;
+                        for (int i = 0; i < ln; i++)
+                            Link(ordered[i], ordered[(i + 1) % ln]);
+                        break;
+                    }
+                    var (arena, lanes) = BuildLanePlan(playerLetters, neutralZones);
+                    for (int i = 0; i < playerLetters.Count; i++)
+                    {
+                        var seq = new List<string> { playerLetters[i] };
+                        seq.AddRange(lanes[i]);
+                        seq.Add(arena);
+                        for (int k = 0; k < seq.Count - 1; k++)
+                            Link(seq[k], seq[k + 1]);
+                    }
                     break;
                 }
 
@@ -642,6 +667,9 @@ namespace Olden_Era___Template_Editor.Services
                 MapTopology.Chain => neutralZoneCount >= (settings.PlayerCount - 1) * min,
                 MapTopology.HubAndSpoke => min <= 1,
                 MapTopology.SharedWeb => min <= 1 && neutralZoneCount >= 1,
+                // Lanes keep every player on a private corridor that only meets others at the shared
+                // arena, so players are never adjacent — any requested separation is honoured structurally.
+                MapTopology.Lanes => neutralZoneCount >= 1,
                 _ => false, // Random and Balanced use position-based adjacency, no fixed separation guarantee
             };
         }
@@ -895,6 +923,7 @@ namespace Olden_Era___Template_Editor.Services
                 MapTopology.SharedWeb   => BuildVariantSharedWeb(settings, playerLetters, neutralZones, tuning, holdCityNeutralLetter),
                 MapTopology.Random      => BuildVariantRandom(settings, playerLetters, neutralZones, tuning, holdCityNeutralLetter),
                 MapTopology.Balanced    => BuildVariantBalanced(settings, playerLetters, neutralZones, tuning, holdCityNeutralLetter),
+                MapTopology.Lanes       => BuildVariantLanes(settings, playerLetters, neutralZones, tuning, holdCityNeutralLetter),
                 _                       => BuildVariantDefault(settings, playerLetters, neutralZones, tuning, holdCityNeutralLetter),
             };
         }
@@ -2310,6 +2339,128 @@ namespace Olden_Era___Template_Editor.Services
                 spokeConnsByPlayer[playerLetter].Add(connName);
                 spokeConnsByNeutral[neutralLetter].Add(connName);
             }
+        }
+
+        // ── Topology: Lanes ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Parallel, non-crossing lanes. Each player owns a private corridor of tiered neutral zones
+        /// (sorted low→high quality = bronze→silver→gold) that only meets the other players at ONE
+        /// shared central "arena" zone — the contested endgame. Players never border each other; the
+        /// only route between two players runs through the arena. Per-edge guards rise with the entered
+        /// zone's quality (the "Highway" pattern) for free via <see cref="BorderGuardValue"/>.
+        /// </summary>
+        private static Variant BuildVariantLanes(GeneratorSettings settings, List<string> playerLetters, List<NeutralZonePlan> neutralZones, GenerationTuning tuning, string? holdCityNeutralLetter = null)
+        {
+            // Lanes need at least one neutral to serve as the shared arena. With none, fall back to the
+            // ring layout so an Advanced "Lanes + 0 neutrals" pick still yields a valid map.
+            if (neutralZones.Count == 0)
+                return BuildVariantDefault(settings, playerLetters, neutralZones, tuning, holdCityNeutralLetter);
+
+            var neutralByLetter = neutralZones.ToDictionary(zone => zone.Letter);
+            var (arena, lanes) = BuildLanePlan(playerLetters, neutralZones);
+
+            // When a hold city is active the central arena hosts it (it is the most equidistant zone),
+            // guaranteeing the win-condition castle sits at the shared contested centre.
+            bool arenaIsHoldCity = holdCityNeutralLetter != null;
+
+            var connNamesByLetter = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            List<string> ConnsOf(string letter) =>
+                connNamesByLetter.TryGetValue(letter, out var list) ? list : (connNamesByLetter[letter] = new List<string>());
+
+            var connections = new List<Connection>();
+
+            // One Direct edge per adjacent pair along each lane: Spawn → bronze → … → gold → Arena.
+            for (int i = 0; i < playerLetters.Count; i++)
+            {
+                var seq = new List<string> { playerLetters[i] };
+                seq.AddRange(lanes[i]);
+                seq.Add(arena);
+                for (int k = 0; k < seq.Count - 1; k++)
+                {
+                    string fromL = seq[k], toL = seq[k + 1];
+                    string name = $"Lane{i}-{fromL}-{toL}";
+                    ConnsOf(fromL).Add(name);
+                    ConnsOf(toL).Add(name);
+
+                    string fromZone = playerLetters.Contains(fromL) ? $"Spawn-{fromL}" : $"Neutral-{fromL}";
+                    string toZone   = playerLetters.Contains(toL)   ? $"Spawn-{toL}"   : $"Neutral-{toL}";
+                    connections.Add(new Connection
+                    {
+                        Name = name,
+                        From = fromZone,
+                        To = toZone,
+                        ConnectionType = "Direct",
+                        GuardZone = fromZone,
+                        GuardEscape = false,
+                        SimTurnSquad = true,
+                        GuardValue = BorderGuardValue(fromL, toL, playerLetters, neutralByLetter, tuning),
+                        GuardWeeklyIncrement = 0.15,
+                        GuardMatchGroup = $"lane_guard_{i}_{fromL}_{toL}"
+                    });
+                }
+            }
+
+            var zones = new List<Zone>();
+
+            // Player spawn zones (each has a single outgoing lane connection).
+            for (int i = 0; i < playerLetters.Count; i++)
+            {
+                string letter = playerLetters[i];
+                zones.Add(BuildSpawnZone(letter, $"Player{i + 1}", ConnsOf(letter).ToArray(), settings.ZoneCfg.PlayerZoneCastles, settings.MatchPlayerCastleFactions, settings.PlayerStartsWithCastles, settings.ZoneCfg.Advanced.PlayerZoneSize, settings.SpawnRemoteFootholds, settings.GenerateRoads, tuning));
+            }
+
+            // Lane + arena neutral zones. No-castle zones get connector roads (handles any degree,
+            // including the high-degree arena), mirroring the Shared-Web connector handling.
+            foreach (var plan in neutralZones)
+            {
+                bool isArena = plan.Letter == arena;
+                bool holdHere = isArena && arenaIsHoldCity;
+                string[] nConns = ConnsOf(plan.Letter).ToArray();
+                Zone neutralZone = BuildNeutralZone(neutralByLetter[plan.Letter], nConns, settings.ZoneCfg.Advanced.NeutralZoneSize, settings.SpawnRemoteFootholds, settings.GenerateRoads, tuning, holdHere);
+                if (plan.CastleCount == 0 && !holdHere)
+                    neutralZone.Roads = BuildConnectorZoneRoads(nConns, settings.GenerateRoads);
+                zones.Add(neutralZone);
+            }
+
+            if (settings.RandomPortals)
+            {
+                var allLetters = playerLetters.Concat(neutralZones.Select(z => z.Letter)).ToList();
+                connections.AddRange(BuildRandomPortalConnections(playerLetters, allLetters, tuning, settings.MaxPortalConnections));
+            }
+
+            return MakeVariant(playerLetters, playerLetters[0], zones.Count, zones, connections, tuning);
+        }
+
+        /// <summary>
+        /// Computes the Lanes layout from a neutral plan: the single shared central "arena" zone
+        /// (highest quality, castle preferred) plus one ordered low→high lane of neutral letters per
+        /// player. Neutrals are dealt round-robin (lowest tier first) so every lane gets a balanced
+        /// bronze→silver→gold gradient. Shared by <see cref="BuildVariantLanes"/> and
+        /// <see cref="BuildTopologyAdjacency"/> so the graph used for hold-city / balance analysis
+        /// matches the one actually generated.
+        /// </summary>
+        private static (string Arena, List<List<string>> Lanes) BuildLanePlan(
+            List<string> playerLetters, List<NeutralZonePlan> neutralZones)
+        {
+            string arena = neutralZones
+                .OrderByDescending(z => (int)z.Quality)
+                .ThenByDescending(z => z.CastleCount)
+                .ThenBy(z => z.Letter, StringComparer.Ordinal)
+                .First().Letter;
+
+            var laneNeutrals = neutralZones
+                .Where(z => z.Letter != arena)
+                .OrderBy(z => (int)z.Quality)
+                .ThenBy(z => z.Letter, StringComparer.Ordinal)
+                .ToList();
+
+            int p = Math.Max(1, playerLetters.Count);
+            var lanes = new List<List<string>>();
+            for (int i = 0; i < p; i++) lanes.Add(new List<string>());
+            for (int i = 0; i < laneNeutrals.Count; i++)
+                lanes[i % p].Add(laneNeutrals[i].Letter);
+            return (arena, lanes);
         }
 
         // ── Hub zone (only used by Hub & Spoke topology) ─────────────────────────

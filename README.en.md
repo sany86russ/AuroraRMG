@@ -24,72 +24,8 @@
 
 ---
 
-## 🆕 What's new in 1.3.4
-
-### 🧭 "Border guards" is now discoverable in Advanced mode too (from player feedback)
-
-1.3.3 added the **"Border guards"** setting to Simple mode, but in Advanced the same parameter had a different name — the "Border/portal strength" slider — and players couldn't find it. Fixed:
-
-- the slider is renamed to **"Border/portal guards"** (the **"Zone Setup" tab → "◆ ZONE SETUP"** block) so it matches the Simple-mode wording;
-- a hover tooltip was added: it's the same setting as "Border guards" in Simple mode (25–300%, default 100%; higher = a tougher "face-control").
-
-How the Simple-mode levels map to the slider: **Weak** ≈ 45–80%, **Normal** ≈ 80–140%, **Strong** ≈ 150–220%, **Fortress** ≈ 230–300%.
-
-### 🛡 Border-guard strength on zone borders *(from 1.3.3)*
-
-![Simple Mode](docs/ui-simple-en.png)
-
-**Simple Mode** gains a **"Border guards"** setting — you can now pick how strong the monster guards on the passages between zones are:
-
-- **Weak** — passages break easily (early rushes get through);
-- **Normal** — as before (old seeds are unchanged);
-- **Strong** — tough gates;
-- **Fortress** — a real wall: an aggressive opponent (including the AI that got smarter after the patch) stays penned in its own zone for weeks and can't rush you early — the "face-control" you asked for.
-
-Border strength used to be Advanced-only (the "Border/portal strength" slider) — now it's right there in Simple Mode too. The actual strength (in %) is shown in the post-generation summary.
-
-### ⚙️ Quick-generation quality *(from 1.3.2)*
-
-- **Mines for every player.** Quick maps now guarantee starter mines (wood/ore/gold) in each player's home zone, not just one-shot resource piles — so there's a real economy.
-- **Starting terrain matches the faction.** Each player's home is now on their faction's native terrain, even on themed maps (neutral zones still vary).
-- **Simple → Advanced transfer.** "Open in Advanced mode" now carries the neutral-zone count across correctly (it used to show 0).
-
-### 🗺 Manual control in the zone editor *(from 1.3.2)*
-
-In the **visual editor** ("🗺 Editor") you can override by hand what the generator does automatically:
-
-- **Castle or outpost.** A castle zone now has a castle ↔ outpost toggle: capturing an outpost grants the player their **native** town instead of a random castle.
-- **Connections, portals and guards — precisely.** Which zones connect (e.g. parallel bronze→silver→gold corridors), which use **portals**, and the **guard strength per connection** (the "Highway" pattern). See [Visual zone editor](#-visual-zone-editor).
-
-### 🎲 Simple Mode got cleaner *(from 1.3.1)*
-
-- **The template preview is hidden by default.** Simple Mode now leads with the result ("what you got" + the balance score); the map structure is one click away via **"👁 Show template preview"** — so generation feels genuinely random.
-- **"Reset settings" now works in Simple Mode too.** It used to reset only Advanced — now it resets Simple as well (fresh seed, cleared result).
-
-### 🗺 Large maps — bigger than 240×240 *(from 1.3.0)*
-
-By popular request you can now create maps larger than the old 240×240 cap — better for long, rich games.
-
-- In **Simple Mode** — a new map size **"Huge (256–400)"**.
-- In **Advanced Mode** the large-maps option **256×256 … 512×512** is now in plain sight — a highlighted checkbox right under the size picker (it existed before, but was hard to find).
-- Official templates stop at 240×240, but the game engine handles larger maps.
-
-### ⚖ Map analysis — balance & contents
-
-After generating (in **both** modes) you immediately see **what you got** and **how fair it is**:
-
-- **Balance score 0–100** — how equal the players' starts are (wealth, room to expand, distances, castle access), plus plain-language notes: poor start, uneven castle access, players starting too close.
-- **"What's inside the map"** — zones by role (players / neutral / castles), number of links, total treasure and resources.
-
-### 🏛 Curated landmarks
-
-Neutral zones now reliably get **signature objects** (dragon utopias, research labs, observatories, etc.) — so a map feels designed, not merely random.
-
----
-
 ## 📑 Contents
 
-- [What's new in 1.3.4](#-whats-new-in-134)
 - [What is this](#-what-is-this)
 - [Installation](#-installation)
 - [Build authenticity verification](#-build-authenticity-verification)
@@ -240,11 +176,12 @@ For players who **don't want to learn templates**. You set just a few clear opti
 | Option | What it sets |
 |---|---|
 | **Players** | How many players (starting castles) are on the map. |
-| **Game type** | Layout: **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Team game** *(this mode isn't in the game yet)*. |
+| **Game type** | Layout: **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Lanes (corridors)** *(parallel corridors converging on a central arena)*, **Team game** *(this mode isn't in the game yet)*. |
 | **Map size** | Small / Medium / Large / **Huge (256–400)**. "Huge" goes past the official 240×240 cap (experimental), but the game engine supports it. |
 | **Game length** | Short / Medium / Long — affects size, zone count and guard strength. |
 | **Chaos level** | Tame / Normal / Wild — how wild and unpredictable the map gets. |
 | **Victory condition** | All the real in-game modes — classic, city/capital hold, final battle, tournament (see [Victory conditions](#-victory-conditions--special-modes)). |
+| **Border guards** | Strength of the monster guards on the passages between zones: **Weak / Normal / Strong / Fortress** — a "face-control" against early rushes (in Advanced mode it's the "Border/portal guards" slider). |
 | **Extras** | Water, portals, stronger neutrals. |
 | **Seed** 🎲 📋 | The map's fingerprint: the same seed always yields the same map. **Share the seed** to play an identical map with friends. 🎲 = new random, 📋 = copy. |
 
@@ -268,7 +205,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.0]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG  [v1.4]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │
@@ -405,6 +342,9 @@ The window has three areas:
 | **Ring** | All zones in a circle, each linked to two neighbours. |
 | **Hub** | All zones connect to a shared central hub; players never border directly. |
 | **Chain** | Zones in a line from one end to the other, not closed. |
+| **Lanes** | Parallel non-crossing corridors: each player advances down their own path of **bronze → silver → gold** zones, and all corridors converge only on a single central contested "arena" at the end. Players meet only there; guards on the passages rise toward the centre. In Simple Mode this corresponds to the **"Lanes (corridors)"** game type. |
+
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-simple-lanes-en.png" alt="Lanes topology" width="100%"/>
 
 Extra (topology-dependent):
 
@@ -881,11 +821,16 @@ AuroraRMG is based on **[Olden-Era---Template-Generator](https://github.com/Khan
 
 That's where the very idea and the basic approach to programmatically building `.rmg.json` templates for Olden Era come from. Huge thanks to the original author for the initial work! 🙌
 
-What was added and reworked in AuroraRMG (as of version **1.0.0**):
+What was added and reworked in AuroraRMG:
 
+- ⚡ **Simple Mode / Quick Generate** — a playable random map in a few clicks (+ a seed for reproducibility and sharing);
+- 🛣 the **"Lanes" topology** — parallel bronze→silver→gold corridors converging on a central arena;
+- ⚖ **map analysis** — a balance score 0–100 and a "what's inside" breakdown right after generation;
+- 🛡 **zone border guards** — adjustable guard strength on the passages between zones (a "face-control");
+- 🗺 **large maps** up to **512×512** (beyond the official 240×240 cap);
 - 🌑 a new look — the dark neon **Aurora** theme, a new icon/logo and branded menus;
 - 🌍 **full bilingual localization (RU/EN)** with an instant language switch in the header;
-- 🗺 a **visual zone-graph editor** (canvas, inspector, validation, PNG export);
+- 🗺 a **visual zone-graph editor** (canvas, inspector, validation, PNG export, castle/outpost, manual control of connections/portals/guards);
 - 🚫 **hero bans** (full roster with names from the game assets) on top of item and spell bans;
 - 🎲 a set of **43 built-in presets** (incl. **PvE 1×2…1×7**) with matching auto-tests, grouped in a menu;
 - ⚙️ expanded environment options (terrain, aggression, water, diplomacy, lakes, holes) and zone fine-tuning;

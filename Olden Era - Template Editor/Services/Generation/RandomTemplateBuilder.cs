@@ -41,7 +41,12 @@ namespace Olden_Era___Template_Editor.Services.Generation
             if (tournament) playerCount = 2; // RMG tournament = two isolated 1v1 clusters
 
             int mapSize = PickMapSize(opts.Scale, opts.Length, playerCount, rng);
-            MapTopology topology = PickTopology(opts.GameType, opts.Chaos, rng);
+            // The Lanes game type IS a topology choice, so it bypasses the random topology pool
+            // (no rng draw here for it). Every other type keeps its exact historical draw → their
+            // existing seeds stay byte-identical.
+            MapTopology topology = opts.GameType == QuickGameType.Lanes
+                ? MapTopology.Lanes
+                : PickTopology(opts.GameType, opts.Chaos, rng);
 
             var settings = new GeneratorSettings
             {
@@ -269,6 +274,9 @@ namespace Olden_Era___Template_Editor.Services.Generation
             };
             int target = (int)Math.Round(playerCount * lengthFactor);
             if (opts.GameType == QuickGameType.Duel) target += 1; // duels still want a contested middle
+            // Lanes want depth: ~2 tiered zones per player's corridor plus the one shared arena, so a
+            // lane reads bronze→silver→gold rather than collapsing to a single mid zone (clamped by maxNeutrals).
+            if (opts.GameType == QuickGameType.Lanes) target = Math.Max(target, playerCount * 2 + 1);
 
             // Some win conditions need a minimum number of neutral zones:
             //   City Hold (_5)   → a neutral hold city;   Tournament (_6) → neutrals to split per cluster.

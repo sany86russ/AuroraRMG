@@ -94,6 +94,22 @@ namespace Olden_Era___Template_Editor
                 await Dispatcher.Yield(DispatcherPriority.Background);
                 CaptureRoot(root, dir, "ui-simple");
 
+                // ── Lanes showcase (v1.4.0 headline): pick the new game type, 4 players, generate ──
+                try
+                {
+                    int lanesIdx = Array.IndexOf(SimpleTypeKeys, "S.Simple.Type.Lanes");
+                    if (CmbSimpleType != null && lanesIdx >= 0) CmbSimpleType.SelectedIndex = lanesIdx;
+                    if (SldSimplePlayers != null) SldSimplePlayers.Value = 4;
+                    try { BtnSimpleGenerate_Click(this, new RoutedEventArgs()); } catch { /* preview is best-effort */ }
+                    try { if (SimplePreviewBox != null) { SimplePreviewBox.Visibility = Visibility.Visible; UpdateSimplePreviewToggle(); } } catch { }
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+                    root.UpdateLayout();
+                    await Task.Delay(550);
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+                    CaptureRoot(root, dir, "ui-simple-lanes");
+                }
+                catch { /* showcase shot is best-effort */ }
+
                 // ── Advanced Mode tabs ──
                 SetMode(advanced: true, persist: false);
                 await Dispatcher.Yield(DispatcherPriority.Background);

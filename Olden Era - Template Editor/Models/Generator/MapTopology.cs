@@ -18,6 +18,9 @@ namespace Olden_Era___Template_Editor.Models
         Random,
 
         /// <summary>Zones are placed on concentric rings by quality tier; each zone connects to neighbouring zones across adjacent rings.</summary>
-        Balanced
+        Balanced,
+
+        /// <summary>Each player owns a private, non-crossing lane of tiered zones (bronze→silver→gold) that all converge on a single shared central "arena" zone; players meet only at the end.</summary>
+        Lanes
     }
 }

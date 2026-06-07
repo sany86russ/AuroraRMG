@@ -211,6 +211,11 @@ namespace Olden_Era___Template_Editor.Services
             // matches the actual in-game arrangement perfectly.
             // Random and Balanced topologies use GeneratorPosition stamps; Balanced
             // uses the ring-snap pass while Random falls back to the Kamada-Kawai solver.
+            // Lanes get a dedicated radial layout (arena at the centre, each lane a tiered spoke) so
+            // the parallel-corridors structure reads at a glance in the preview and the editor.
+            if (topology == MapTopology.Lanes)
+                return LayoutZonesLanes(zones, connections);
+
             if (topology != MapTopology.Random && topology != MapTopology.Balanced)
                 return LayoutZonesRing(zones, connections);
 
@@ -1453,6 +1458,124 @@ namespace Olden_Era___Template_Editor.Services
             }
 
             return positions;
+        }
+
+        /// <summary>
+        /// Radial layout for the Lanes topology: the shared central "arena" (the highest-degree
+        /// neutral, where every lane converges) sits at the canvas centre and each player's lane is a
+        /// straight spoke of tiered zones — the spawn on the rim, the gold zone nearest the arena.
+        /// Tiers align across lanes via a shared maxDepth grid, so the parallel-corridors structure
+        /// reads at a glance. Falls back to the ring layout when the graph isn't lane-shaped.
+        /// </summary>
+        private static Dictionary<string, Point> LayoutZonesLanes(List<Zone> zones, List<Connection> connections)
+        {
+            var positions = new Dictionary<string, Point>(StringComparer.Ordinal);
+            int n = zones.Count;
+            if (n == 0) { _zoneRadius = ZoneRadiusMax; return positions; }
+            if (n == 1)
+            {
+                _zoneRadius = ZoneRadiusMax;
+                positions[zones[0].Name] = new Point(Width / 2.0, Height / 2.0);
+                return positions;
+            }
+
+            // ── Direct adjacency (ignore Proximity/Portal hints) ──
+            var adj = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            foreach (var z in zones) adj[z.Name] = [];
+            foreach (var c in connections)
+            {
+                if (string.Equals(c.ConnectionType, "Proximity", StringComparison.Ordinal)) continue;
+                if (string.Equals(c.ConnectionType, "Portal", StringComparison.Ordinal)) continue;
+                if (c.From is null || c.To is null) continue;
+                if (!adj.ContainsKey(c.From) || !adj.ContainsKey(c.To)) continue;
+                adj[c.From].Add(c.To);
+                adj[c.To].Add(c.From);
+            }
+
+            // Arena = the neutral zone every lane converges on (highest Direct degree).
+            string? arena = zones
+                .Where(z => z.Name.StartsWith("Neutral-", StringComparison.Ordinal))
+                .OrderByDescending(z => adj[z.Name].Count)
+                .ThenBy(z => z.Name, StringComparer.Ordinal)
+                .FirstOrDefault()?.Name;
+
+            var spawns = zones
+                .Where(z => z.Name.StartsWith("Spawn-", StringComparison.Ordinal))
+                .Select(z => z.Name)
+                .ToList();
+
+            // Not lane-shaped (no arena or no spawns) → fall back to the generic ring layout.
+            if (arena is null || spawns.Count == 0)
+                return LayoutZonesRing(zones, connections);
+
+            // Recover each lane as the shortest spawn→arena path (spawn first, arena dropped).
+            var lanes = new List<List<string>>();
+            int maxDepth = 1;
+            foreach (var spawn in spawns)
+            {
+                var path = BfsPath(adj, spawn, arena) ?? [spawn, arena];
+                path.RemoveAt(path.Count - 1); // drop the arena (placed at the centre)
+                if (path.Count == 0) path.Add(spawn);
+                lanes.Add(path);
+                maxDepth = Math.Max(maxDepth, path.Count);
+            }
+
+            const double margin = 20;
+            const double minGap = 8;
+            var center = new Point(Width / 2.0, Height / 2.0);
+            double canvasHalf = Math.Min(Width, Height) / 2.0 - margin;
+
+            int p = lanes.Count;
+            double sinA = p > 1 ? Math.Sin(Math.PI / p) : 1.0;
+            double radialStep = canvasHalf / maxDepth;
+            double byRadial = (radialStep - minGap) / 2.0;
+            double byAngular = (canvasHalf * sinA - minGap) / 2.0;
+            double zoneRadius = Math.Max(6.0, Math.Min(ZoneRadiusMax, Math.Min(byRadial, byAngular)));
+            _zoneRadius = zoneRadius;
+
+            positions[arena] = center;
+            for (int i = 0; i < p; i++)
+            {
+                double angle = -Math.PI / 2.0 + i * Math.PI * 2.0 / p;
+                double dx = Math.Cos(angle), dy = Math.Sin(angle);
+                var lane = lanes[i];
+                for (int k = 0; k < lane.Count; k++)
+                {
+                    // k = 0 (spawn) → rim; deeper tiers sit closer to the arena, aligned across lanes
+                    // via the shared maxDepth grid.
+                    double r = canvasHalf * (maxDepth - k) / maxDepth;
+                    positions[lane[k]] = new Point(center.X + dx * r, center.Y + dy * r);
+                }
+            }
+
+            // Defensive: place any unplaced zone at the centre.
+            foreach (var z in zones)
+                if (!positions.ContainsKey(z.Name))
+                    positions[z.Name] = center;
+
+            return positions;
+
+            static List<string>? BfsPath(Dictionary<string, List<string>> g, string src, string dst)
+            {
+                var prev = new Dictionary<string, string>(StringComparer.Ordinal);
+                var seen = new HashSet<string>(StringComparer.Ordinal) { src };
+                var q = new Queue<string>();
+                q.Enqueue(src);
+                while (q.Count > 0)
+                {
+                    var cur = q.Dequeue();
+                    if (string.Equals(cur, dst, StringComparison.Ordinal))
+                    {
+                        var path = new List<string> { cur };
+                        while (prev.TryGetValue(path[^1], out var pr)) path.Add(pr);
+                        path.Reverse();
+                        return path;
+                    }
+                    foreach (var nb in g[cur])
+                        if (seen.Add(nb)) { prev[nb] = cur; q.Enqueue(nb); }
+                }
+                return null;
+            }
         }
 
         // Per-layout computed zone radius (set by LayoutZones, used by DrawZone)

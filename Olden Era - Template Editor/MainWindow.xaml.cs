@@ -52,6 +52,7 @@ namespace Olden_Era___Template_Editor
             (MapTopology.Default,     "S.Topo.Ring",     "S.TopoDesc.Ring"),
             (MapTopology.HubAndSpoke, "S.Topo.Hub",      "S.TopoDesc.Hub"),
             (MapTopology.Chain,       "S.Topo.Chain",    "S.TopoDesc.Chain"),
+            (MapTopology.Lanes,       "S.Topo.Lanes",    "S.TopoDesc.Lanes"),
         ];
 
         private static readonly (TerrainTheme Theme, string Label)[] TerrainOptions =
@@ -2241,7 +2242,7 @@ namespace Olden_Era___Template_Editor
 
         // ── Simple Mode / Quick Generate ──────────────────────────────────────────
 
-        private static readonly string[] SimpleTypeKeys   = ["S.Simple.Type.Duel", "S.Simple.Type.FFA", "S.Simple.Type.Pve", "S.Simple.Type.Team"];
+        private static readonly string[] SimpleTypeKeys   = ["S.Simple.Type.Duel", "S.Simple.Type.FFA", "S.Simple.Type.Pve", "S.Simple.Type.Team", "S.Simple.Type.Lanes"];
         private static readonly string[] SimpleScaleKeys  = ["S.Simple.Scale.Small", "S.Simple.Scale.Medium", "S.Simple.Scale.Large", "S.Simple.Scale.Huge"];
         private static readonly string[] SimpleLengthKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];
         private static readonly string[] SimpleChaosKeys  = ["S.Simple.Chaos.Tame", "S.Simple.Chaos.Normal", "S.Simple.Chaos.Wild"];
@@ -2339,7 +2340,7 @@ namespace Olden_Era___Template_Editor
         private QuickGenerateOptions BuildQuickOptions() => new()
         {
             PlayerCount    = (int)SldSimplePlayers.Value,
-            GameType       = (QuickGameType)Math.Clamp(CmbSimpleType.SelectedIndex, 0, 3),
+            GameType       = (QuickGameType)Math.Clamp(CmbSimpleType.SelectedIndex, 0, 4),
             Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 3),
             Length         = (QuickGameLength)Math.Clamp(CmbSimpleLength.SelectedIndex, 0, 2),
             Chaos          = (QuickChaos)Math.Clamp(CmbSimpleChaos.SelectedIndex, 0, 2),

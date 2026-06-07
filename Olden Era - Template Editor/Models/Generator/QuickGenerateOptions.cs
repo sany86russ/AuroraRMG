@@ -10,7 +10,9 @@ namespace Olden_Era___Template_Editor.Models
         /// <summary>Player(s) versus strong, aggressive neutrals.</summary>
         Pve,
         /// <summary>Even teams on a balanced layout.</summary>
-        Team
+        Team,
+        /// <summary>Parallel non-crossing lanes (bronze→silver→gold) that meet only at a shared central arena.</summary>
+        Lanes
     }
 
     /// <summary>Rough map size band; resolved to a concrete <see cref="GeneratorSettings.MapSize"/> within the band.</summary>

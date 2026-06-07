@@ -182,6 +182,126 @@ public class TemplateGeneratorTests
     }
 
     [Fact]
+    public void Generate_LanesTopology_BuildsParallelCorridorsMeetingAtSharedArena()
+    {
+        var settings = new GeneratorSettings
+        {
+            PlayerCount = 4,
+            ZoneCfg = new ZoneConfiguration
+            {
+                Advanced = new AdvancedSettings()
+                {
+                    NeutralLowNoCastleCount = 4,
+                    NeutralMediumNoCastleCount = 4,
+                    NeutralHighCastleCount = 1, // highest quality + castle → becomes the shared arena
+                },
+                PlayerZoneCastles = 1,
+                NeutralZoneCastles = 1,
+            },
+            MapSize = 240,
+            Topology = MapTopology.Lanes,
+            RandomPortals = false,
+        };
+
+        Variant variant = SingleVariant(TemplateGenerator.Generate(settings));
+        var zones = RequiredZones(variant);
+        var connections = RequiredConnections(variant);
+
+        // Four players + nine neutral zones (8 lane zones + 1 arena).
+        Assert.Equal(4, zones.Count(z => z.Name.StartsWith("Spawn-", StringComparison.Ordinal)));
+        Assert.Equal(9, zones.Count(z => z.Name.StartsWith("Neutral-", StringComparison.Ordinal)));
+
+        // Players never border each other directly: no connection links two Spawn zones, and every
+        // lane passage is Direct.
+        Assert.DoesNotContain(connections, c =>
+            c.From.StartsWith("Spawn-", StringComparison.Ordinal) &&
+            c.To.StartsWith("Spawn-", StringComparison.Ordinal));
+        Assert.All(connections, c => Assert.Equal("Direct", c.ConnectionType));
+
+        // The lanes converge on exactly ONE shared arena: removing it leaves no two players in the
+        // same connected component (every player-to-player route runs through the arena).
+        var adjacency = BuildAdjacency(connections);
+        var spawns = zones.Where(z => z.Name.StartsWith("Spawn-", StringComparison.Ordinal))
+            .Select(z => z.Name).ToList();
+        var arenaCandidates = zones
+            .Where(z => z.Name.StartsWith("Neutral-", StringComparison.Ordinal))
+            .Select(z => z.Name)
+            .Where(arena => PlayersPairwiseSeparatedWithout(adjacency, spawns, arena))
+            .ToList();
+        Assert.Single(arenaCandidates);
+
+        // Border guards rise with the entered zone's quality (the "Highway" pattern): the toughest
+        // lane guard (entering the high-tier arena) outweighs the softest (entering a low-tier zone).
+        var laneGuards = connections
+            .Where(c => c.Name?.StartsWith("Lane", StringComparison.Ordinal) == true)
+            .Select(c => c.GuardValue).ToList();
+        Assert.NotEmpty(laneGuards);
+        Assert.True(laneGuards.Max() > laneGuards.Min());
+
+        static Dictionary<string, HashSet<string>> BuildAdjacency(IEnumerable<Connection> conns)
+        {
+            var adj = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            HashSet<string> Bucket(string k)
+            {
+                if (!adj.TryGetValue(k, out var s)) adj[k] = s = new HashSet<string>(StringComparer.Ordinal);
+                return s;
+            }
+            foreach (var c in conns)
+            {
+                Bucket(c.From).Add(c.To);
+                Bucket(c.To).Add(c.From);
+            }
+            return adj;
+        }
+
+        static bool PlayersPairwiseSeparatedWithout(
+            Dictionary<string, HashSet<string>> adj, List<string> spawns, string removed)
+        {
+            foreach (var start in spawns)
+            {
+                var seen = new HashSet<string>(StringComparer.Ordinal) { start };
+                var queue = new Queue<string>();
+                queue.Enqueue(start);
+                while (queue.Count > 0)
+                {
+                    var cur = queue.Dequeue();
+                    if (!adj.TryGetValue(cur, out var nbrs)) continue;
+                    foreach (var nb in nbrs)
+                        if (nb != removed && seen.Add(nb)) queue.Enqueue(nb);
+                }
+                if (spawns.Any(s => s != start && seen.Contains(s))) return false;
+            }
+            return true;
+        }
+    }
+
+    [Fact]
+    public void QuickGenerate_LanesGameType_UsesLanesTopologyAndIsDeterministic()
+    {
+        var opts = new QuickGenerateOptions
+        {
+            Seed = 0x1A2E5,
+            PlayerCount = 4,
+            GameType = QuickGameType.Lanes,
+            Scale = QuickMapScale.Medium,
+            Length = QuickGameLength.Medium,
+            Chaos = QuickChaos.Normal,
+        };
+
+        GeneratorSettings a = RandomTemplateBuilder.Build(opts);
+        GeneratorSettings b = RandomTemplateBuilder.Build(opts);
+
+        // The Lanes game type maps straight to the Lanes topology (not a random pool pick).
+        Assert.Equal(MapTopology.Lanes, a.Topology);
+        Assert.Equal(a.Topology, b.Topology);
+
+        // Deterministic: identical serialised maps for the same options + seed (the seed contract).
+        string ja = JsonSerializer.Serialize(TemplateGenerator.Generate(a), JsonExport.Options);
+        string jb = JsonSerializer.Serialize(TemplateGenerator.Generate(b), JsonExport.Options);
+        Assert.Equal(ja, jb);
+    }
+
+    [Fact]
     public void Generate_WhenRoadsAreDisabledLeavesZoneRoadListsEmpty()
     {
         var settings = new GeneratorSettings
