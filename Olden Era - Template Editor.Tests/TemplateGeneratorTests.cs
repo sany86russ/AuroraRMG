@@ -1262,10 +1262,11 @@ public class TemplateGeneratorTests
 
         int Strength(QuickGuardLevel g) => RandomTemplateBuilder.Build(Opt(g)).ZoneCfg.BorderGuardStrengthPercent;
 
-        Assert.InRange(Strength(QuickGuardLevel.Weak),     45, 80);
-        Assert.InRange(Strength(QuickGuardLevel.Normal),   80, 140);
-        Assert.InRange(Strength(QuickGuardLevel.Strong),   150, 220);
-        Assert.InRange(Strength(QuickGuardLevel.Fortress), 230, 300);
+        Assert.InRange(Strength(QuickGuardLevel.Weak),       45, 80);
+        Assert.InRange(Strength(QuickGuardLevel.Normal),     80, 140);
+        Assert.InRange(Strength(QuickGuardLevel.Strong),     150, 220);
+        Assert.InRange(Strength(QuickGuardLevel.Fortress),   230, 300);
+        Assert.InRange(Strength(QuickGuardLevel.Impassable), 300, 500);
     }
 
     [Fact]
@@ -1320,7 +1321,7 @@ public class TemplateGeneratorTests
                     GameType = type, Scale = scale, Length = length, Chaos = chaos,
                     Water = pick.NextDouble() < 0.5, Portals = pick.NextDouble() < 0.4,
                     StrongNeutrals = pick.NextDouble() < 0.4,
-                    BorderGuards = (QuickGuardLevel)pick.Next(0, 4),
+                    BorderGuards = (QuickGuardLevel)pick.Next(0, 5),
                 };
         }
     }
@@ -1344,7 +1345,7 @@ public class TemplateGeneratorTests
             Assert.InRange(z.ResourceDensityPercent, 20, 400);   // SldResourceDensity
             Assert.InRange(z.StructureDensityPercent, 20, 200);  // SldStructureDensity
             Assert.InRange(z.NeutralStackStrengthPercent, 25, 300); // SldNeutralStackStrength
-            Assert.InRange(z.BorderGuardStrengthPercent, 20, 400);
+            Assert.InRange(z.BorderGuardStrengthPercent, 20, 540); // Impassable (300–500) widened by Wild chaos → up to 540
             Assert.InRange(s.TerrainRoughnessPercent, 20, 400);
             Assert.InRange(s.LakeAmountPercent, 20, 400);
             Assert.InRange(s.NeutralDiplomacyModifier, -1.0, 0.5);

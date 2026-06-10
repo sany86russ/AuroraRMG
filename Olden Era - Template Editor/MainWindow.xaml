@@ -870,7 +870,7 @@
                                            Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                             </DockPanel>
                             <Slider Grid.Row="13" Grid.Column="1" x:Name="SldBorderGuardStrength"
-                                    Minimum="25" Maximum="300" Value="100"
+                                    Minimum="25" Maximum="500" Value="100"
                                     TickFrequency="5" IsSnapToTickEnabled="True"
                                     ToolTip="{DynamicResource S.Tip.BorderGuards}"
                                     ValueChanged="Slider_ValueChanged"/>

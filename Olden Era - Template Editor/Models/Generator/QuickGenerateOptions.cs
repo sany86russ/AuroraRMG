@@ -30,9 +30,10 @@ namespace Olden_Era___Template_Editor.Models
     /// Strength of the monster guards on the passages between zones (the "borderland" gate). Higher
     /// levels keep aggressive opponents — human or AI — penned in their own zones longer, acting as a
     /// "face-control" against early rushes. <see cref="Normal"/> reproduces the historical band so a
-    /// given seed's map is byte-identical to maps made before this control existed.
+    /// given seed's map is byte-identical to maps made before this control existed. <see cref="Impassable"/>
+    /// reaches up to 500% — a wall a high-difficulty AI grinds against for weeks before breaking out.
     /// </summary>
-    public enum QuickGuardLevel { Weak, Normal, Strong, Fortress }
+    public enum QuickGuardLevel { Weak, Normal, Strong, Fortress, Impassable }
 
     /// <summary>
     /// The handful of player-facing options for Simple Mode / Quick Generate. The

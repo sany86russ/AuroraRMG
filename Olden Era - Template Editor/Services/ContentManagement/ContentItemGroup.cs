@@ -123,6 +123,7 @@ public static class ContentItemGroup
         ContentIds.TwilightBloom,
         ContentIds.UnstableRuins,
         ContentIds.DragonUtopia,
+        ContentIds.EternalDragon,
         ContentIds.ResearchLaboratory,
         IncludeListIds.UtopiaBuildings,
         IncludeListIds.EpicGuardedResourceBanks,

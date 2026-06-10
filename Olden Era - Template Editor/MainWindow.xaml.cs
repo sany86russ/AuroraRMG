@@ -2246,7 +2246,7 @@ namespace Olden_Era___Template_Editor
         private static readonly string[] SimpleScaleKeys  = ["S.Simple.Scale.Small", "S.Simple.Scale.Medium", "S.Simple.Scale.Large", "S.Simple.Scale.Huge"];
         private static readonly string[] SimpleLengthKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];
         private static readonly string[] SimpleChaosKeys  = ["S.Simple.Chaos.Tame", "S.Simple.Chaos.Normal", "S.Simple.Chaos.Wild"];
-        private static readonly string[] SimpleGuardsKeys = ["S.Simple.Guards.Weak", "S.Simple.Guards.Normal", "S.Simple.Guards.Strong", "S.Simple.Guards.Fortress"];
+        private static readonly string[] SimpleGuardsKeys = ["S.Simple.Guards.Weak", "S.Simple.Guards.Normal", "S.Simple.Guards.Strong", "S.Simple.Guards.Fortress", "S.Simple.Guards.Impassable"];
 
         private GeneratorSettings? _lastQuickSettings;
 
@@ -2344,7 +2344,7 @@ namespace Olden_Era___Template_Editor
             Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 3),
             Length         = (QuickGameLength)Math.Clamp(CmbSimpleLength.SelectedIndex, 0, 2),
             Chaos          = (QuickChaos)Math.Clamp(CmbSimpleChaos.SelectedIndex, 0, 2),
-            BorderGuards   = (QuickGuardLevel)Math.Clamp(CmbSimpleGuards.SelectedIndex, 0, 3),
+            BorderGuards   = (QuickGuardLevel)Math.Clamp(CmbSimpleGuards.SelectedIndex, 0, 4),
             Water          = ChkSimpleWater.IsChecked == true,
             Portals        = ChkSimplePortals.IsChecked == true,
             StrongNeutrals = ChkSimpleStrong.IsChecked == true,
