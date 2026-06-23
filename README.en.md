@@ -205,7 +205,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.4]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG  [v1.5]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │
@@ -482,8 +482,9 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 
 - **Canvas:** zones are shown as nodes (🟢 player · 🔵 hub · 🟤/⚪/🟡 neutral by quality), connections as edges (gold = direct, dashed cyan = portal, dashed brown = road). There's a grid, a **legend** and a controls hint.
 - **Navigation:** wheel to zoom (or **−/+** buttons), drag the background to pan, **"Reset view"** and **"Auto-layout"**.
-- **Editing:** drag zones; the **inspector** on the right edits the selected zone (name, size, layout, diplomacy, guards, **castle/outpost**) or connection (from/to, **type**, **guard strength**, road).
+- **Editing:** drag zones; the **inspector** on the right is grouped into tabs (**Main · Guard · Pools · Content · Biome · Objects**) and edits **every** serializable field of the selected zone (name, size, layout, diplomacy, guard cutoff/randomization/increment, guard reaction, encounter holes, content pools and their value, zone/content/meta-object biomes, roads, castle/outpost, main objects with faction/owner) or connection (name, from/to, type, guard strength and zone, increment, gate, length, road).
 - **Functions:** **➕ Zone** (or double-click the canvas), **🔗 Connect** (link two zones), **🗑 Delete** (or the `Del` key), **✓ Validate** (validation: dangling links, duplicate names, self-loops, isolated zones), **💾 Save .rmg.json** and **📂 Load**.
+- **📋 Pool contents / ➕ Pool creator** (the "Pools" tab): the viewer shows what each content pool actually holds (lists → objects, weights, biomes), and the creator assembles a custom pool from the game's real content lists. The data is read **on the fly from the installed game's `Core.zip`** — nothing is downloaded and nothing ships in the distribution.
 - **🖼 Export PNG** — save an image of the zone graph to share.
 - Keys: `Del` — delete the selection, `Esc` — cancel connecting / clear the selection.
 

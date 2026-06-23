@@ -725,5 +725,199 @@ namespace OldenEraTemplateEditor.Models
             if (s.Length == 0) return sid;
             return char.ToUpper(s[0]) + s[1..];
         }
+
+        // ── Content pools (visual editor pickers) ─────────────────────────────────
+
+        /// <summary>Known guarded content pool SID prefixes (T2–T5 tiers).</summary>
+        public static readonly string[] GuardedContentPoolSids =
+        [
+            "classic_template_pool_random_t2_item",
+            "classic_template_pool_random_t2_pandora",
+            "classic_template_pool_random_t2_hire",
+            "classic_template_pool_random_t2_unit_bank",
+            "classic_template_pool_random_t2_res_bank",
+            "classic_template_pool_random_t2_stat",
+            "classic_template_pool_random_t2_magic",
+            "classic_template_pool_random_t3_item",
+            "classic_template_pool_random_t3_pandora",
+            "classic_template_pool_random_t3_hire",
+            "classic_template_pool_random_t3_unit_bank",
+            "classic_template_pool_random_t3_res_bank",
+            "classic_template_pool_random_t3_stat",
+            "classic_template_pool_random_t3_magic",
+            "classic_template_pool_random_t4_item",
+            "classic_template_pool_random_t4_pandora",
+            "classic_template_pool_random_t4_hire",
+            "classic_template_pool_random_t4_unit_bank",
+            "classic_template_pool_random_t4_res_bank",
+            "classic_template_pool_random_t4_stat",
+            "classic_template_pool_random_t4_magic",
+            "classic_template_pool_random_t5_item",
+            "classic_template_pool_random_t5_pandora",
+            "classic_template_pool_random_t5_hire",
+            "classic_template_pool_random_t5_unit_bank",
+            "classic_template_pool_random_t5_res_bank",
+            "classic_template_pool_random_t5_stat",
+            "classic_template_pool_random_t5_magic",
+        ];
+
+        /// <summary>Known unguarded content pool SID prefixes (T2–T5 tiers).</summary>
+        public static readonly string[] UnguardedContentPoolSids =
+        [
+            "classic_template_pool_random_unguarded_t2_item",
+            "classic_template_pool_random_unguarded_t2_pandora",
+            "classic_template_pool_random_unguarded_t2_hire",
+            "classic_template_pool_random_unguarded_t2_unit_bank",
+            "classic_template_pool_random_unguarded_t2_res_bank",
+            "classic_template_pool_random_unguarded_t2_stat",
+            "classic_template_pool_random_unguarded_t2_magic",
+            "classic_template_pool_random_unguarded_t3_item",
+            "classic_template_pool_random_unguarded_t3_pandora",
+            "classic_template_pool_random_unguarded_t3_hire",
+            "classic_template_pool_random_unguarded_t3_unit_bank",
+            "classic_template_pool_random_unguarded_t3_res_bank",
+            "classic_template_pool_random_unguarded_t3_stat",
+            "classic_template_pool_random_unguarded_t3_magic",
+            "classic_template_pool_random_unguarded_t4_item",
+            "classic_template_pool_random_unguarded_t4_pandora",
+            "classic_template_pool_random_unguarded_t4_hire",
+            "classic_template_pool_random_unguarded_t4_unit_bank",
+            "classic_template_pool_random_unguarded_t4_res_bank",
+            "classic_template_pool_random_unguarded_t4_stat",
+            "classic_template_pool_random_unguarded_t4_magic",
+            "classic_template_pool_random_unguarded_t5_item",
+            "classic_template_pool_random_unguarded_t5_pandora",
+            "classic_template_pool_random_unguarded_t5_hire",
+            "classic_template_pool_random_unguarded_t5_unit_bank",
+            "classic_template_pool_random_unguarded_t5_res_bank",
+            "classic_template_pool_random_unguarded_t5_stat",
+            "classic_template_pool_random_unguarded_t5_magic",
+        ];
+
+        /// <summary>Known resources content pool SID prefixes.</summary>
+        public static readonly string[] ResourcesContentPoolSids =
+        [
+            "content_pool_general_resources_start_zone_poor",
+            "content_pool_general_resources_start_zone_medium",
+            "content_pool_general_resources_start_zone_rich",
+        ];
+
+        /// <summary>Known zone-level mandatory content group name patterns.</summary>
+        public static readonly string[] MandatoryContentNames =
+        [
+            "mandatory_content_side_A",
+            "mandatory_content_side_B",
+            "mandatory_content_side_C",
+            "mandatory_content_side_D",
+            "mandatory_content_side_E",
+            "mandatory_content_side_F",
+            "mandatory_content_side_G",
+            "mandatory_content_side_H",
+            "mandatory_content_neutral_A",
+            "mandatory_content_neutral_B",
+            "mandatory_content_neutral_C",
+            "mandatory_content_neutral_D",
+            "mandatory_content_neutral_E",
+            "mandatory_content_neutral_F",
+            "mandatory_content_neutral_G",
+            "mandatory_content_neutral_H",
+            "mandatory_content_neutral_I",
+            "mandatory_content_neutral_J",
+            "mandatory_content_neutral_K",
+            "mandatory_content_neutral_L",
+            "mandatory_content_neutral_M",
+            "mandatory_content_neutral_N",
+            "mandatory_content_neutral_O",
+            "mandatory_content_neutral_P",
+            "mandatory_content_neutral_Q",
+            "mandatory_content_neutral_R",
+            "mandatory_content_neutral_S",
+            "mandatory_content_neutral_T",
+            "mandatory_content_neutral_U",
+            "mandatory_content_neutral_V",
+            "mandatory_content_neutral_W",
+            "mandatory_content_neutral_X",
+            "mandatory_content_neutral_Y",
+            "mandatory_content_neutral_Z",
+            "mandatory_content_hub",
+        ];
+
+        /// <summary>Known zone-level content count limit name patterns.</summary>
+        public static readonly string[] ContentCountLimitNames =
+        [
+            "content_limits_side_1_2",
+            "content_limits_side_1_3",
+            "content_limits_side_1_4",
+            "content_limits_side_1_5",
+            "content_limits_side_1_6",
+            "content_limits_side_2_3",
+            "content_limits_side_2_4",
+            "content_limits_side_2_5",
+            "content_limits_side_2_6",
+            "content_limits_side_3_4",
+            "content_limits_side_3_5",
+            "content_limits_side_3_6",
+            "content_limits_side_4_5",
+            "content_limits_side_4_6",
+            "content_limits_side_5_6",
+            "content_limits_center_1",
+            "content_limits_center_2",
+            "content_limits_center_3",
+            "content_limits_center_4",
+            "content_limits_center_5",
+            "content_limits_center_6",
+        ];
+
+        /// <summary>Zone layout legend entry: color + label for each layout type.</summary>
+        public static readonly (string Layout, string Label, string Color)[] ZoneLayoutLegend =
+        [
+            ("zone_layout_player_spawn", "Spawn (player)", "#5EB36E"),
+            ("zone_layout_ai_spawn", "Spawn (AI)", "#5EB36E"),
+            ("zone_layout_spawn", "Spawn", "#5EB36E"),
+            ("zone_layout_spawns", "Spawns", "#5EB36E"),
+            ("zone_layout_second_spawn", "2nd Spawn", "#5EB36E"),
+            ("zone_layout_side_spawn_zone", "Side Spawn", "#5EB36E"),
+            ("zone_layout_sides", "Sides (Bronze)", "#CD7F32"),
+            ("zone_layout_side_zone", "Side Zone (Bronze)", "#CD7F32"),
+            ("zone_layout_treasure", "Treasure (Silver)", "#C0C0C0"),
+            ("zone_layout_treasure_zone", "Treasure Zone (Silver)", "#C0C0C0"),
+            ("zone_layout_treasures", "Treasures (Silver)", "#C0C0C0"),
+            ("zone_layout_supertreasure_zone", "Super Treasure (Gold)", "#FFD232"),
+            ("zone_layout_center", "Center (Gold)", "#FFD232"),
+            ("zone_layout_center_zone", "Center Zone (Gold)", "#FFD232"),
+            ("zone_layout_start_zone", "Start Zone", "#5080A0"),
+            ("zone_layout_back", "Back Zone", "#5080A0"),
+            ("zone_layout_leaf", "Leaf Zone", "#5080A0"),
+            ("zone_layout_wincondition_zone", "Win Condition", "#B4913C"),
+        ];
+
+        // ── FromList arguments (visual editor biome/faction selectors) ────────────
+
+        /// <summary>Available biome names for FromList zoneBiome/contentBiome/metaObjectsBiome args.</summary>
+        public static readonly string[] FromListBiomeArgs =
+        [
+            "Grass",
+            "Snow",
+            "Lava",
+            "Sand",
+            "Dirt",
+            "Deathland",
+            "Autumn",
+        ];
+
+        /// <summary>Available faction names for FromList faction args.</summary>
+        public static readonly string[] FromListFactionArgs =
+        [
+            "Human",
+            "Undead",
+            "Dungeon",
+            "Nature",
+            "Demon",
+            "Unfrozen",
+            "Random",
+        ];
+
+        /// <summary>Prefix for "different from zone/object" FromList args.</summary>
+        public const string DifferentFromPrefix = "differentFrom:";
     }
 }

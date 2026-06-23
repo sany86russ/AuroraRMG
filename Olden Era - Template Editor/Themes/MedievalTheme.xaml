@@ -876,4 +876,96 @@
         </Setter>
     </Style>
 
+    <!-- ── Expander (collapsible inspector section) ──────────────────────────── -->
+    <Style x:Key="InspectorExpander" TargetType="Expander">
+        <Setter Property="Foreground" Value="{StaticResource BrushText}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Margin" Value="0,2,0,2"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Border Background="Transparent">
+                        <DockPanel>
+                            <ToggleButton x:Name="HeaderSite"
+                                          DockPanel.Dock="Top"
+                                          IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                          Cursor="Hand"
+                                          Padding="4,6">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="HdrBd"
+                                                Background="{StaticResource BrushPanel}"
+                                                BorderBrush="{StaticResource BrushBorder}"
+                                                BorderThickness="1"
+                                                CornerRadius="8"
+                                                Padding="8,6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Path x:Name="Arrow"
+                                                      Data="M 0 0 L 5 5 L 10 0"
+                                                      Stroke="{StaticResource BrushGold}"
+                                                      StrokeThickness="1.6"
+                                                      Width="11" Height="6"
+                                                      Stretch="Fill"
+                                                      VerticalAlignment="Center"
+                                                      Margin="0,0,8,0"
+                                                      RenderTransformOrigin="0.5,0.5">
+                                                    <Path.RenderTransform>
+                                                        <RotateTransform Angle="0"/>
+                                                    </Path.RenderTransform>
+                                                </Path>
+                                                <ContentPresenter Grid.Column="1"
+                                                                  ContentSource="Content"
+                                                                  VerticalAlignment="Center"
+                                                                  RecognizesAccessKey="True"/>
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="HdrBd" Property="Background" Value="{StaticResource BrushHover}"/>
+                                                <Setter TargetName="HdrBd" Property="BorderBrush" Value="{StaticResource BrushGoldDim}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="Arrow">
+                                                    <Setter.Value>
+                                                        <Path Data="M 0 0 L 5 5 L 10 0"
+                                                              Stroke="{StaticResource BrushGold}"
+                                                              StrokeThickness="1.6"
+                                                              Width="11" Height="6"
+                                                              Stretch="Fill"
+                                                              VerticalAlignment="Center"
+                                                              Margin="0,0,8,0"
+                                                              RenderTransformOrigin="0.5,0.5">
+                                                            <Path.RenderTransform>
+                                                                <RotateTransform Angle="180"/>
+                                                            </Path.RenderTransform>
+                                                        </Path>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                                <ContentPresenter ContentSource="Header"/>
+                            </ToggleButton>
+                            <ContentPresenter x:Name="ExpandSite"
+                                              DockPanel.Dock="Top"
+                                              Visibility="Collapsed"
+                                              Margin="8,2,0,4"/>
+                        </DockPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

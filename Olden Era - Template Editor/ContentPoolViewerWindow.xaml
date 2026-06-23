@@ -1,0 +1,79 @@
+<Window x:Class="Olden_Era___Template_Editor.ContentPoolViewerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource S.PV.Title}"
+        Height="600" Width="900"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BrushPanel}"
+        UseLayoutRounding="True">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Search panel -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="160"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="SearchBox" Grid.Column="0" FontSize="11" Padding="4"
+                     TextChanged="SearchBox_TextChanged" VerticalContentAlignment="Center"/>
+            <Button x:Name="ClearSearchBtn" Grid.Column="1" Content="✕" Width="24" Height="24"
+                    Margin="4,0,0,0" Click="ClearSearchBtn_Click" ToolTip="{DynamicResource S.PV.ClearSearch}"/>
+            <ComboBox x:Name="CategoryCombo" Grid.Column="3" Margin="8,0,0,0" FontSize="11" Padding="4"
+                      SelectionChanged="CategoryCombo_SelectionChanged"/>
+            <Button x:Name="ClearCategoryBtn" Grid.Column="4" Content="✕" Width="24" Height="24"
+                    Margin="4,0,0,0" Click="ClearCategoryBtn_Click" ToolTip="{DynamicResource S.PV.ClearCategory}"/>
+        </Grid>
+
+        <!-- Status + debug -->
+        <DockPanel Grid.Row="1" Margin="0,0,0,8">
+            <TextBlock x:Name="ResultCount" Foreground="{StaticResource BrushTextDim}" FontSize="10" VerticalAlignment="Center"/>
+            <Button x:Name="DebugBtn" Content="{DynamicResource S.PV.Debug}" DockPanel.Dock="Right" Padding="8,4" FontSize="10" Click="DebugBtn_Click"/>
+        </DockPanel>
+
+        <!-- Pool selector -->
+        <ListBox Grid.Row="2" x:Name="PoolList" SelectionChanged="PoolList_SelectionChanged"
+                 FontSize="11" Height="150" Margin="0,0,0,8"
+                 Background="{StaticResource BrushInput}" Foreground="{StaticResource BrushText}"
+                 BorderBrush="{StaticResource BrushBorder}"/>
+
+        <!-- Content grid -->
+        <DataGrid Grid.Row="3" x:Name="PoolDataGrid"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  Background="Transparent"
+                  Foreground="{StaticResource BrushText}"
+                  FontSize="11"
+                  BorderBrush="{StaticResource BrushBorder}"
+                  BorderThickness="1"
+                  RowBackground="Transparent"
+                  AlternatingRowBackground="#15FFFFFF">
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="Background" Value="{StaticResource BrushPanelAlt}"/>
+                    <Setter Property="Foreground" Value="{StaticResource BrushGold}"/>
+                    <Setter Property="Padding" Value="8,4"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource BrushBorder}"/>
+                    <Setter Property="BorderThickness" Value="0,0,1,1"/>
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
+            <DataGrid.Columns>
+                <DataGridTextColumn x:Name="ColList" Binding="{Binding ListName}" Width="250"/>
+                <DataGridTextColumn x:Name="ColSid" Binding="{Binding Sid}" Width="200"/>
+                <DataGridTextColumn x:Name="ColWeight" Binding="{Binding Weight}" Width="60"/>
+                <DataGridTextColumn x:Name="ColBiome" Binding="{Binding Biome}" Width="80"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</Window>
