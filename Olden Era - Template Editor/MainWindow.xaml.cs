@@ -710,6 +710,11 @@ namespace Olden_Era___Template_Editor
             if (TxtTemplateName.Text.Trim().Equals(L.Get("S.M.014"), StringComparison.OrdinalIgnoreCase))
                 warnings.Add(new ValidationMessage(L.Get("S.CB.V.DefaultName"), warnBrush));
 
+            // Experimental single-player: no official RMG template ships with one spawn, so warn that the
+            // resulting map must be tested in-game (it may or may not launch as a no-AI solo scenario).
+            if (players <= 1)
+                warnings.Add(new ValidationMessage(L.Get("S.Solo.ExpWarn"), warnBrush));
+
             int selectedMapSize = SelectedMapSize();
             int totalZones = players + neutral;
             var selectedTopology = CmbTopology.SelectedIndex >= 0 ? TopologyOptions[CmbTopology.SelectedIndex].Topology : MapTopology.Default;
@@ -1853,6 +1858,7 @@ namespace Olden_Era___Template_Editor
             NeutralHighCastleCount = (int)SldNeutralHighCastle.Value,
             MatchPlayerCastleFactions   = ChkMatchPlayerCastleFactions.IsChecked == true,
             PlayerStartsWithCastles     = ChkPlayerStartsWithCastles.IsChecked == true,
+            NeutralCastleFaction        = AdvCastleFactionToken(),
             MinNeutralZonesBetweenPlayers = (int)SldMinNeutralBetweenPlayers.Value,
             ExperimentalMapSizes  = ChkExperimentalMapSizes.IsChecked == true,
             PlayerZoneSize        = _advancedZoneSettings ? SldPlayerZoneSize.Value : 1.0,
@@ -1989,6 +1995,7 @@ namespace Olden_Era___Template_Editor
             SldStructureDensity.Value         = s.EffectiveStructureDensityPercent;
             SldNeutralStackStrength.Value     = s.NeutralStackStrengthPercent;
             SldBorderGuardStrength.Value      = s.BorderGuardStrengthPercent;
+            SetAdvCastleFactionFromToken(s.NeutralCastleFaction);
             int victoryIdx = Array.IndexOf(KnownValues.VictoryConditionIds, s.VictoryCondition);
             CmbVictory.SelectedIndex = victoryIdx >= 0 ? victoryIdx : 0;
             SldFactionLawsExp.Value = Math.Clamp(s.FactionLawsExpPercent, 20, 200);
@@ -2218,6 +2225,8 @@ namespace Olden_Era___Template_Editor
                 Rebind(CmbSimpleLength, [.. SimpleLengthKeys.Select(k => L.Get(k))]);
                 Rebind(CmbSimpleChaos,  [.. SimpleChaosKeys.Select(k => L.Get(k))]);
                 Rebind(CmbSimpleGuards, [.. SimpleGuardsKeys.Select(k => L.Get(k))]);
+                Rebind(CmbSimpleCastleFaction, [.. SimpleCastleFactionKeys.Select(k => L.Get(k))]);
+                Rebind(CmbAdvCastleFaction, [.. SimpleCastleFactionKeys.Select(k => L.Get(k))]);
                 // Same victory-condition set the Advanced tab exposes (the real in-game modes).
                 Rebind(CmbSimpleVictory, [.. KnownValues.VictoryConditionLabels.Select((_, i) => L.Get($"S.Victory.{i}"))]);
 
@@ -2242,11 +2251,27 @@ namespace Olden_Era___Template_Editor
 
         // ── Simple Mode / Quick Generate ──────────────────────────────────────────
 
-        private static readonly string[] SimpleTypeKeys   = ["S.Simple.Type.Duel", "S.Simple.Type.FFA", "S.Simple.Type.Pve", "S.Simple.Type.Team", "S.Simple.Type.Lanes"];
+        private static readonly string[] SimpleTypeKeys   = ["S.Simple.Type.Duel", "S.Simple.Type.FFA", "S.Simple.Type.Pve", "S.Simple.Type.Team", "S.Simple.Type.Lanes", "S.Simple.Type.Solo"];
         private static readonly string[] SimpleScaleKeys  = ["S.Simple.Scale.Small", "S.Simple.Scale.Medium", "S.Simple.Scale.Large", "S.Simple.Scale.Huge"];
         private static readonly string[] SimpleLengthKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];
         private static readonly string[] SimpleChaosKeys  = ["S.Simple.Chaos.Tame", "S.Simple.Chaos.Normal", "S.Simple.Chaos.Wild"];
         private static readonly string[] SimpleGuardsKeys = ["S.Simple.Guards.Weak", "S.Simple.Guards.Normal", "S.Simple.Guards.Strong", "S.Simple.Guards.Fortress", "S.Simple.Guards.Impassable"];
+        // Neutral-castle faction picker: index 0 = Random (engine default, "" token → byte-identical seed),
+        // 1..6 pin the captured town to a specific faction. Label keys and engine tokens are index-aligned.
+        private static readonly string[] SimpleCastleFactionKeys   = ["S.Simple.NCF.Random", "S.Simple.NCF.Human", "S.Simple.NCF.Undead", "S.Simple.NCF.Dungeon", "S.Simple.NCF.Nature", "S.Simple.NCF.Demon", "S.Simple.NCF.Unfrozen"];
+        private static readonly string[] SimpleCastleFactionTokens = ["", "Human", "Undead", "Dungeon", "Nature", "Demon", "Unfrozen"];
+
+        /// <summary>Advanced-tab neutral-castle faction combo → engine token ("" = Random). Reuses the Simple lists.</summary>
+        private string AdvCastleFactionToken() =>
+            SimpleCastleFactionTokens[Math.Clamp(CmbAdvCastleFaction.SelectedIndex, 0, SimpleCastleFactionTokens.Length - 1)];
+
+        /// <summary>Selects the Advanced-tab faction combo entry matching an engine token (unknown/empty → Random).</summary>
+        private void SetAdvCastleFactionFromToken(string? token)
+        {
+            if (CmbAdvCastleFaction.Items.Count == 0) return;
+            int idx = System.Array.IndexOf(SimpleCastleFactionTokens, token ?? "");
+            CmbAdvCastleFaction.SelectedIndex = idx >= 0 ? idx : 0;
+        }
 
         private GeneratorSettings? _lastQuickSettings;
 
@@ -2273,6 +2298,7 @@ namespace Olden_Era___Template_Editor
             SetCombo(CmbSimpleLength, st.Length);
             SetCombo(CmbSimpleChaos, st.Chaos);
             SetCombo(CmbSimpleGuards, st.Guards);
+            SetCombo(CmbSimpleCastleFaction, st.CastleFaction);
             SetCombo(CmbSimpleVictory, st.Victory);
             ChkSimpleWater.IsChecked = st.Water;
             ChkSimplePortals.IsChecked = st.Portals;
@@ -2288,6 +2314,7 @@ namespace Olden_Era___Template_Editor
             st.Length         = CmbSimpleLength.SelectedIndex;
             st.Chaos          = CmbSimpleChaos.SelectedIndex;
             st.Guards         = CmbSimpleGuards.SelectedIndex;
+            st.CastleFaction  = CmbSimpleCastleFaction.SelectedIndex;
             st.Victory        = CmbSimpleVictory.SelectedIndex;
             st.Water          = ChkSimpleWater.IsChecked == true;
             st.Portals        = ChkSimplePortals.IsChecked == true;
@@ -2340,11 +2367,12 @@ namespace Olden_Era___Template_Editor
         private QuickGenerateOptions BuildQuickOptions() => new()
         {
             PlayerCount    = (int)SldSimplePlayers.Value,
-            GameType       = (QuickGameType)Math.Clamp(CmbSimpleType.SelectedIndex, 0, 4),
+            GameType       = (QuickGameType)Math.Clamp(CmbSimpleType.SelectedIndex, 0, 5),
             Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 3),
             Length         = (QuickGameLength)Math.Clamp(CmbSimpleLength.SelectedIndex, 0, 2),
             Chaos          = (QuickChaos)Math.Clamp(CmbSimpleChaos.SelectedIndex, 0, 2),
             BorderGuards   = (QuickGuardLevel)Math.Clamp(CmbSimpleGuards.SelectedIndex, 0, 4),
+            NeutralCastleFaction = SimpleCastleFactionTokens[Math.Clamp(CmbSimpleCastleFaction.SelectedIndex, 0, SimpleCastleFactionTokens.Length - 1)],
             Water          = ChkSimpleWater.IsChecked == true,
             Portals        = ChkSimplePortals.IsChecked == true,
             StrongNeutrals = ChkSimpleStrong.IsChecked == true,
@@ -2463,7 +2491,12 @@ namespace Olden_Era___Template_Editor
             string topoLabel = topo.Label != null ? L.Get(topo.Label) : s.Topology.ToString();
             string lengthLabel = L.Get(SimpleLenLabelKeys[EstimateLengthIndex(s.MapSize, opts.Length)]);
 
-            string summary = L.Get("S.Simple.Sum.Length", lengthLabel)
+            // Solo / single-player maps are experimental: no RMG template has ever shipped with one spawn,
+            // so lead with a clear "test it in-game" warning.
+            string soloWarn = s.PlayerCount <= 1 ? L.Get("S.Solo.ExpWarn") + "\n\n" : "";
+
+            string summary = soloWarn
+                           + L.Get("S.Simple.Sum.Length", lengthLabel)
                            + "\n" + L.Get("S.Simple.Sum.Line", s.PlayerCount, s.MapSize, topoLabel);
 
             var extras = new System.Collections.Generic.List<string>();
@@ -2475,6 +2508,13 @@ namespace Olden_Era___Template_Editor
             // Surface the border-guard strength the player asked for, with the actual rolled % as feedback.
             summary += "\n" + L.Get("S.Simple.Sum.Guards",
                 L.Get(SimpleGuardsKeys[(int)opts.BorderGuards]), s.ZoneCfg.BorderGuardStrengthPercent);
+
+            // When the player pinned a faction for the capturable neutral castles, echo it back.
+            if (!string.IsNullOrEmpty(s.NeutralCastleFaction))
+            {
+                int fi = System.Array.IndexOf(SimpleCastleFactionTokens, s.NeutralCastleFaction);
+                if (fi > 0) summary += "\n" + L.Get("S.Simple.Sum.CastleFaction", L.Get(SimpleCastleFactionKeys[fi]));
+            }
 
             // Flag maps beyond the official 240×240 cap so the player knows it's an experimental large map.
             if (s.MapSize > KnownValues.MaxOfficialMapSize)
@@ -2534,6 +2574,7 @@ namespace Olden_Era___Template_Editor
                 SldStructureDensity.Value    = s.ZoneCfg.StructureDensityPercent;
                 SldNeutralStackStrength.Value = s.ZoneCfg.NeutralStackStrengthPercent;
                 SldBorderGuardStrength.Value = s.ZoneCfg.BorderGuardStrengthPercent;
+                SetAdvCastleFactionFromToken(s.NeutralCastleFaction);
                 SldDiplomacy.Value           = s.NeutralDiplomacyModifier * 100.0;
                 SldTerrainRoughness.Value    = s.TerrainRoughnessPercent;
                 SldLakeAmount.Value          = s.LakeAmountPercent;
@@ -2762,6 +2803,7 @@ namespace Olden_Era___Template_Editor
             MinNeutralZonesBetweenPlayers = _advancedZoneSettings ? (int)SldMinNeutralBetweenPlayers.Value : 0,
             MatchPlayerCastleFactions = ChkMatchPlayerCastleFactions.IsChecked == true,
             PlayerStartsWithCastles   = ChkPlayerStartsWithCastles.IsChecked == true,
+            NeutralCastleFaction      = AdvCastleFactionToken(),
             NoDirectPlayerConnections = ChkNoDirectPlayerConn.IsChecked == true,
             RandomPortals = ChkRandomPortals.IsChecked == true,
             MaxPortalConnections = (int)SldMaxPortals.Value,

@@ -706,6 +706,7 @@ namespace Olden_Era___Template_Editor.Models
             MinNeutralZonesBetweenPlayers = s.AdvancedMode ? s.MinNeutralZonesBetweenPlayers : 0,
             MatchPlayerCastleFactions = s.MatchPlayerCastleFactions,
             PlayerStartsWithCastles = s.PlayerStartsWithCastles,
+            NeutralCastleFaction = s.NeutralCastleFaction,
             NoDirectPlayerConnections = s.NoDirectPlayerConn,
             RandomPortals = s.RandomPortals,
             MaxPortalConnections = s.MaxPortalConnections,

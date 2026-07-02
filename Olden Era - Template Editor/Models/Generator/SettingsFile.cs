@@ -24,6 +24,8 @@ namespace Olden_Era___Template_Editor.Models
         [JsonPropertyName("neutralHighCastle")]     public int NeutralHighCastleCount     { get; set; } = 0;
         [JsonPropertyName("matchPlayerCastleFactions")] public bool MatchPlayerCastleFactions    { get; set; } = false;
         [JsonPropertyName("playerStartsWithCastles")]  public bool PlayerStartsWithCastles       { get; set; } = false;
+        /// <summary>Fixed faction for capturable neutral-zone castles ("" = engine random). See <see cref="GeneratorSettings.NeutralCastleFaction"/>.</summary>
+        [JsonPropertyName("neutralCastleFaction")]     public string NeutralCastleFaction        { get; set; } = "";
         [JsonPropertyName("minNeutralZonesBetweenPlayers")] public int MinNeutralZonesBetweenPlayers { get; set; } = 0;
         [JsonPropertyName("experimentalBalancedZonePlacement")] [System.Obsolete] public bool ExperimentalBalancedZonePlacement { get; set; } = false;
         [JsonPropertyName("experimentalMapSizes")] public bool ExperimentalMapSizes { get; set; } = false;

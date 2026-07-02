@@ -176,12 +176,13 @@ For players who **don't want to learn templates**. You set just a few clear opti
 | Option | What it sets |
 |---|---|
 | **Players** | How many players (starting castles) are on the map. |
-| **Game type** | Layout: **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Lanes (corridors)** *(parallel corridors converging on a central arena)*, **Team game** *(this mode isn't in the game yet)*. |
+| **Game type** | Layout: **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Lanes (corridors)** *(parallel corridors converging on a central arena)*, **Team game** *(this mode isn't in the game yet)*, or **Single player (RPG/PvE, experimental)** *(only your hero roams — no AI opponent; the goal is to capture a neutral city — see [special modes](#-victory-conditions--special-modes))*. |
 | **Map size** | Small / Medium / Large / **Huge (256–400)**. "Huge" goes past the official 240×240 cap (experimental), but the game engine supports it. |
 | **Game length** | Short / Medium / Long — affects size, zone count and guard strength. |
 | **Chaos level** | Tame / Normal / Wild — how wild and unpredictable the map gets. |
 | **Victory condition** | All the real in-game modes — classic, city/capital hold, final battle, tournament (see [Victory conditions](#-victory-conditions--special-modes)). |
-| **Border guards** | Strength of the monster guards on the passages between zones: **Weak / Normal / Strong / Fortress** — a "face-control" against early rushes (in Advanced mode it's the "Border/portal guards" slider). |
+| **Border guards** | Strength of the monster guards on the passages between zones: **Weak / Normal / Strong / Fortress / Impassable** — a "face-control" against early rushes (in Advanced mode it's the "Border/portal guards" slider). |
+| **Neutral castle faction** | Which faction the **capturable** castles in neutral zones belong to: **Random** or a specific one (Human/Undead/Dungeon/Nature/Demon/Unfrozen). A full town of the chosen faction — unowned until you capture it. Handy for co-op "lanes" maps where you take a town of a chosen faction along the way. |
 | **Extras** | Water, portals, stronger neutrals. |
 | **Seed** 🎲 📋 | The map's fingerprint: the same seed always yields the same map. **Share the seed** to play an identical map with friends. 🎲 = new random, 📋 = copy. |
 
@@ -205,7 +206,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.5]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG  [v1.6]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │
@@ -367,7 +368,8 @@ Base sliders (always available):
 | **Resource frequency** | Density of resources and mines *(20% – 400%, default 100%)*. |
 | **Structure frequency** | Density of structures/objects *(20% – 200%, default 100%)*. |
 | **Neutral army strength** | Strength of neutral armies in zones *(25% – 300%, default 100%)*. |
-| **Border/portal strength** | Guard strength on zone borders and portals *(25% – 300%, default 100%)*. |
+| **Border/portal guards** | Guard strength on zone borders and portals *(25% – 500%, default 100%)* — the same setting as "Border guards" in Simple mode. |
+| **Neutral castle faction** | Which faction the **capturable** castles in neutral zones belong to: **Random** or a specific one (Human/Undead/Dungeon/Nature/Demon/Unfrozen). A full town of the chosen faction — unowned until captured. Same as in Simple mode. |
 | **Generate roads** | Adds roads between connected zones *(on by default)*. |
 | **Create remote footholds** | Places remote footholds in every town zone *(on by default)*. |
 | **Create extra portals** | Adds portals between non-adjacent zones. Slider **"Max portal count"** *(1 – 32, default 32)*. |
@@ -494,6 +496,7 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 - **Portals, precisely.** Select an edge → **Type = Portal**: those exact zones get a portal (instead of random ones).
 - **Per-connection guard strength.** An edge has a **guard value**; a zone has a **guard multiplier**. You can do it like "Highway": a moderate entry into your own gold zone and a brutal breakthrough between two gold zones.
 - **Castle or outpost.** A castle zone has a **castle ↔ outpost** toggle: capturing an outpost grants the player their **native** town instead of a random castle.
+- **Capturable faction town.** The **"🏰 Make a capturable faction town"** button in the object inspector leaves the town **unowned** (empty "Owner") and pins it to a chosen faction — a full town of that faction that becomes yours **only once you capture it**. Empty "Owner" = neutral/capturable; a chosen "Owner" = the town belongs to that player from turn one.
 
 > The editor reuses the same layout as the preview, so the graph matches the generated map. Node positions are for clarity only (the `.rmg.json` stores no coordinates — the game computes them).
 
@@ -627,6 +630,16 @@ A competitive 1v1 mode with an isolated prep phase.
 - The order of zones in a cluster is **random but mirrored** — both players get the same layout.
 - Supports topologies: **Chain/Ring** (two mirrored chains), **Random** (two mirrored clusters), **Hub** (each gets a private hub).
 - Parameters: **first battle on day**, **days between battles**, **points to win**.
+
+### 🧭 Single player (RPG/PvE) `[EXPERIMENTAL]`
+
+For those who want to **roam a map solo** — RPG-campaign style: collecting, fighting monsters, but **without an enemy AI-controlled hero**.
+
+- In **Simple mode** — the **"Single player (RPG/PvE, experimental)"** game type; in **Advanced** — just set the **"Players" slider to 1**.
+- The map has **exactly one spawn** (only your hero(es)); everything else is neutral zones to explore.
+- The goal is to **capture and hold a neutral city** (*City Hold* mode, 1 day to hold → effectively "take the city and you win").
+- ⚠️ **Experimental:** no official template ever shipped a 1-player map, so **be sure to test that the game launches it**. Feedback is very welcome.
+- Winning "by a specific artifact" and a fully scripted playthrough aren't available in the engine — those are hand-authored-map features, not the generator.
 
 ---
 

@@ -334,8 +334,9 @@
                                            Margin="0,0,4,0" Style="{StaticResource ValueText}"/>
                             </DockPanel>
                             <Slider Grid.Row="0" Grid.Column="1" x:Name="SldPlayers"
-                                    Minimum="2" Maximum="8" Value="2"
+                                    Minimum="1" Maximum="8" Value="2"
                                     TickFrequency="1" IsSnapToTickEnabled="True"
+                                    ToolTip="{DynamicResource S.Solo.SliderTip}"
                                     ValueChanged="Slider_ValueChanged"/>
 
                             <!-- Вид карты (дублирует топологию из вкладки "Настройка зон") -->
@@ -779,6 +780,8 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="8"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <DockPanel Grid.Row="0" Grid.Column="0" x:Name="PnlSimpleNeutralCountLabel" Visibility="Collapsed">
@@ -874,6 +877,13 @@
                                     TickFrequency="5" IsSnapToTickEnabled="True"
                                     ToolTip="{DynamicResource S.Tip.BorderGuards}"
                                     ValueChanged="Slider_ValueChanged"/>
+
+                            <DockPanel Grid.Row="15" Grid.Column="0" ToolTip="{DynamicResource S.Simple.CastleFactionTip}">
+                                <Label Content="{DynamicResource S.Simple.CastleFaction}" DockPanel.Dock="Left"/>
+                            </DockPanel>
+                            <ComboBox Grid.Row="15" Grid.Column="1" x:Name="CmbAdvCastleFaction"
+                                      VerticalAlignment="Center"
+                                      ToolTip="{DynamicResource S.Simple.CastleFactionTip}"/>
                         </Grid>
                         <StackPanel x:Name="PnlAdvancedNeutralZones"
                                     Visibility="Collapsed"
@@ -3113,6 +3123,7 @@ ValueChanged="Slider_ValueChanged"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
                                 <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/><RowDefinition Height="8"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
@@ -3148,6 +3159,12 @@ ValueChanged="Slider_ValueChanged"/>
                             <!-- Border guard strength — the "face-control" on zone borders against early rushes -->
                             <Label Grid.Row="12" Grid.Column="0" Content="{DynamicResource S.Simple.Guards}" VerticalAlignment="Center"/>
                             <ComboBox Grid.Row="12" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CmbSimpleGuards"/>
+
+                            <!-- Faction of the capturable castles in neutral zones (co-op "lanes" towns) -->
+                            <Label Grid.Row="14" Grid.Column="0" Content="{DynamicResource S.Simple.CastleFaction}" VerticalAlignment="Center"
+                                   ToolTip="{DynamicResource S.Simple.CastleFactionTip}"/>
+                            <ComboBox Grid.Row="14" Grid.Column="1" Grid.ColumnSpan="2" x:Name="CmbSimpleCastleFaction"
+                                      ToolTip="{DynamicResource S.Simple.CastleFactionTip}"/>
                         </Grid>
 
                         <!-- Extras -->
@@ -3205,6 +3222,8 @@ ValueChanged="Slider_ValueChanged"/>
                                 <TextBlock Text="{DynamicResource S.Simple.Help.Victory}" TextWrapping="Wrap"
                                            Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
                                 <TextBlock Text="{DynamicResource S.Simple.Help.Guards}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
+                                <TextBlock Text="{DynamicResource S.Simple.Help.CastleFaction}" TextWrapping="Wrap"
                                            Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,5"/>
                                 <TextBlock Text="{DynamicResource S.Simple.Help.Extras}" TextWrapping="Wrap"
                                            Foreground="{StaticResource BrushTextDim}" FontSize="12" Margin="0,0,0,8"/>

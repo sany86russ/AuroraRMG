@@ -77,7 +77,8 @@ namespace Olden_Era___Template_Editor.Services
                 settings.EncounterHoles,
                 WaterWidthFor(settings.WaterLevel),
                 Biomes.WaterType(settings.Terrain),
-                settings.MatchSpawnTerrainToFaction);
+                settings.MatchSpawnTerrainToFaction,
+                settings.NeutralCastleFaction);
 
             string effectiveVictoryCondition = settings.GameEndConditions.VictoryCondition;
 
@@ -534,7 +535,8 @@ namespace Olden_Era___Template_Editor.Services
             bool EncounterHoles,
             int WaterWidth,
             string WaterType,
-            bool MatchSpawnTerrainToFaction);
+            bool MatchSpawnTerrainToFaction,
+            string? NeutralCastleFaction);
 
         /// <summary>Maps a <see cref="WaterLevel"/> to the engine's <c>border.waterWidth</c>.</summary>
         private static int WaterWidthFor(WaterLevel level) => level switch
@@ -2483,7 +2485,7 @@ namespace Olden_Era___Template_Editor.Services
                     GuardValue = ScaleNeutralGuardValue(isHoldCastleSlot ? Math.Max(25000, 20000) : 16000, tuning),
                     GuardWeeklyIncrement = 0.10,
                     BuildingsConstructionSid = isHoldCastleSlot ? "ultra_rich_buildings_construction" : "rich_buildings_construction",
-                    Faction = new TypedSelector { Type = "FromList", Args = [] },
+                    Faction = NeutralCityFaction(tuning),
                     Placement = isHoldCastleSlot ? "Center" : "Uniform",
                     PlacementArgs = isHoldCastleSlot ? [] : ["true", "0.8", "2"],
                     HoldCityWinCon = isHoldCastleSlot ? true : null
@@ -2896,6 +2898,18 @@ namespace Olden_Era___Template_Editor.Services
 
         // ── Neutral zone ─────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Faction selector for an unowned, capturable castle the generator drops into a neutral (or hub)
+        /// zone. When <see cref="GenerationTuning.NeutralCastleFaction"/> is set, the town is pinned to that
+        /// faction (a full town of that faction that stays neutral until captured); otherwise the engine
+        /// picks a random faction (<c>FromList []</c>, the historical behaviour → byte-identical maps).
+        /// </summary>
+        private static TypedSelector NeutralCityFaction(GenerationTuning tuning) => new()
+        {
+            Type = "FromList",
+            Args = string.IsNullOrWhiteSpace(tuning.NeutralCastleFaction) ? [] : [tuning.NeutralCastleFaction!]
+        };
+
         private static Zone BuildNeutralZone(NeutralZonePlan plan, string[] ringConns, double zoneSize, bool spawnFootholds, bool generateRoads, GenerationTuning tuning, bool isHoldCity = false)
         {
             string letter = plan.Letter;
@@ -2913,7 +2927,7 @@ namespace Olden_Era___Template_Editor.Services
                     GuardValue = ScaleNeutralGuardValue(isHoldCity ? Math.Max(profile.PrimaryCityGuardValue, 20000) : profile.PrimaryCityGuardValue, tuning),
                     GuardWeeklyIncrement = 0.10,
                     BuildingsConstructionSid = isHoldCity ? "ultra_rich_buildings_construction" : profile.PrimaryBuildingsConstructionSid,
-                    Faction = new TypedSelector { Type = "FromList", Args = [] },
+                    Faction = NeutralCityFaction(tuning),
                     Placement = isHoldCity ? "Center" : "Uniform",
                     PlacementArgs = isHoldCity ? [] : ["true", "0.8", "2"],
                     HoldCityWinCon = isHoldCity ? true : null
@@ -2929,7 +2943,7 @@ namespace Olden_Era___Template_Editor.Services
                     GuardValue = ScaleNeutralGuardValue(profile.ExtraCityGuardValue, tuning),
                     GuardWeeklyIncrement = 0.10,
                     BuildingsConstructionSid = profile.ExtraBuildingsConstructionSid,
-                    Faction = new TypedSelector { Type = "FromList", Args = [] },
+                    Faction = NeutralCityFaction(tuning),
                     Placement = "Uniform",
                     PlacementArgs = ["false", "-0.8", "3"]
                 });

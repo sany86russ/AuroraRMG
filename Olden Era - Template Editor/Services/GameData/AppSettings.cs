@@ -78,5 +78,6 @@ namespace Olden_Era___Template_Editor.Services.GameData
         [JsonPropertyName("portals")] public bool Portals { get; set; }
         [JsonPropertyName("strongNeutrals")] public bool StrongNeutrals { get; set; }
         [JsonPropertyName("guards")] public int Guards { get; set; } = 1;   // border-guard level: Normal
+        [JsonPropertyName("castleFaction")] public int CastleFaction { get; set; } // 0 = Random neutral-castle faction
     }
 }

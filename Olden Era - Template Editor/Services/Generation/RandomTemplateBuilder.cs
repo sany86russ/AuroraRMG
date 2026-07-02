@@ -35,18 +35,23 @@ namespace Olden_Era___Template_Editor.Services.Generation
             ArgumentNullException.ThrowIfNull(opts);
             var rng = new Random(opts.Seed);
 
+            bool solo = opts.GameType == QuickGameType.Solo;
             int playerCount = NormalisePlayerCount(opts.GameType, opts.PlayerCount);
-            string victory = ResolveVictory(opts.VictoryCondition);
+            // Solo forces the "capture & hold a neutral city" goal — the only RMG win condition that reads as
+            // an RPG objective ("take this city and you win"). Everything else stays as the player picked.
+            string victory = solo ? "win_condition_5" : ResolveVictory(opts.VictoryCondition);
             bool tournament = victory == "win_condition_6";
             if (tournament) playerCount = 2; // RMG tournament = two isolated 1v1 clusters
 
             int mapSize = PickMapSize(opts.Scale, opts.Length, playerCount, rng);
-            // The Lanes game type IS a topology choice, so it bypasses the random topology pool
-            // (no rng draw here for it). Every other type keeps its exact historical draw → their
-            // existing seeds stay byte-identical.
-            MapTopology topology = opts.GameType == QuickGameType.Lanes
-                ? MapTopology.Lanes
-                : PickTopology(opts.GameType, opts.Chaos, rng);
+            // Lanes and Solo ARE topology choices, so they bypass the random topology pool (no rng draw for
+            // them). Every other type keeps its exact historical draw → existing seeds stay byte-identical.
+            MapTopology topology = opts.GameType switch
+            {
+                QuickGameType.Lanes => MapTopology.Lanes,
+                QuickGameType.Solo  => MapTopology.Balanced, // concentric rings → the hold-city target sits central
+                _ => PickTopology(opts.GameType, opts.Chaos, rng),
+            };
 
             var settings = new GeneratorSettings
             {
@@ -75,8 +80,9 @@ namespace Olden_Era___Template_Editor.Services.Generation
                 LakeAmountPercent = opts.Water ? PickPercent(100, 200, opts.Chaos, rng) : PickPercent(60, 120, opts.Chaos, rng),
                 FactionLawsExpPercent = 100,
                 AstrologyExpPercent = 100,
-                GameEndConditions = new GameEndConditions { VictoryCondition = victory },
+                GameEndConditions = new GameEndConditions { VictoryCondition = victory, CityHoldDays = solo ? 1 : 6 },
                 TournamentRules = new TournamentRules { Enabled = tournament },
+                NeutralCastleFaction = ResolveNeutralCastleFaction(opts.NeutralCastleFaction),
             };
 
             ConfigureZones(settings, opts, playerCount, mapSize, victory, rng);
@@ -131,6 +137,7 @@ namespace Olden_Era___Template_Editor.Services.Generation
 
         private static int NormalisePlayerCount(QuickGameType type, int requested)
         {
+            if (type == QuickGameType.Solo) return 1; // experimental single-player: exactly one spawn, no AI
             int pc = Math.Clamp(requested, 2, 8);
             return type switch
             {
@@ -246,6 +253,21 @@ namespace Olden_Era___Template_Editor.Services.Generation
         private static string ResolveVictory(string? id) =>
             Array.IndexOf(KnownValues.VictoryConditionIds, id) >= 0 ? id! : "win_condition_1";
 
+        /// <summary>
+        /// Validates a requested neutral-castle faction token. Empty / "Random" / anything not in the
+        /// engine's faction list resolves to "" (the engine picks a random faction — historical behaviour,
+        /// so an unset value keeps a seed byte-identical). A real faction token is passed through verbatim.
+        /// </summary>
+        private static string ResolveNeutralCastleFaction(string? token)
+        {
+            if (string.IsNullOrWhiteSpace(token) || token.Equals("Random", StringComparison.OrdinalIgnoreCase))
+                return "";
+            foreach (var f in KnownValues.FromListFactionArgs)
+                if (f != "Random" && f.Equals(token, StringComparison.OrdinalIgnoreCase))
+                    return f;
+            return "";
+        }
+
         // ── Zones / neutrals / density ──────────────────────────────────────────────
 
         private static void ConfigureZones(GeneratorSettings settings, QuickGenerateOptions opts, int playerCount, int mapSize, string victory, Random rng)
@@ -277,6 +299,9 @@ namespace Olden_Era___Template_Editor.Services.Generation
             // Lanes want depth: ~2 tiered zones per player's corridor plus the one shared arena, so a
             // lane reads bronze→silver→gold rather than collapsing to a single mid zone (clamped by maxNeutrals).
             if (opts.GameType == QuickGameType.Lanes) target = Math.Max(target, playerCount * 2 + 1);
+            // Solo has a single player, so the default (players × factor ≈ 1) leaves almost nothing to explore.
+            // Give the lone hero a real world to roam: several tiered neutral zones (clamped by area below).
+            if (opts.GameType == QuickGameType.Solo) target = Math.Max(target, 6);
 
             // Some win conditions need a minimum number of neutral zones:
             //   City Hold (_5)   → a neutral hold city;   Tournament (_6) → neutrals to split per cluster.

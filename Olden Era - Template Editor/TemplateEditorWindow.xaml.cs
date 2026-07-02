@@ -1032,8 +1032,46 @@ namespace Olden_Era___Template_Editor
                 }
             };
 
+            // One-click "capturable faction town" — the exact shape two users asked for: a full town of a
+            // chosen faction that is NOT owned at start (empty owner) and is taken only after beating its
+            // guard. Sets Type=City, clears Owner, pins Faction=FromList[faction] and keeps a guard, then
+            // rebuilds the inspector so the faction can be fine-tuned in the (now visible) Faction args combo.
+            var capturableBtn = new System.Windows.Controls.Button
+            {
+                Content = L("S.EC.MakeCapturable"),
+                Margin = new Thickness(0, 0, 0, 6),
+                Padding = new Thickness(12, 6, 12, 6),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                ToolTip = L("S.EC.CapturableHelp"),
+            };
+            capturableBtn.Click += (_, _) =>
+            {
+                mo.Type = "City";
+                mo.Owner = null;                       // empty owner = neutral, capturable (NOT yours at start)
+                mo.RemoveGuardIfHasOwner = null;
+                if (mo.Faction is not { Type: "FromList", Args.Count: > 0 })
+                    mo.Faction = new TypedSelector { Type = "FromList", Args = [KnownValues.FromListFactionArgs[0]] };
+                if (mo.GuardValue is null or 0) { mo.GuardValue = 5000; mo.GuardChance ??= 1.0; }
+                mo.GuardWeeklyIncrement ??= 0.10;
+                mo.BuildingsConstructionSid ??= "default_buildings_construction";
+                mo.Placement ??= "Uniform";
+                MarkDirty();
+                RefreshNode(z);
+                BuildInspector();
+            };
+            var capturableHelp = new TextBlock
+            {
+                Text = L("S.EC.CapturableHelp"),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11,
+                Opacity = 0.75,
+                Margin = new Thickness(0, 0, 0, 8),
+            };
+
             // Add all controls to panel in order
             panel.Children.Add(typeCombo);
+            panel.Children.Add(capturableBtn);
+            panel.Children.Add(capturableHelp);
             panel.Children.Add(spawnPanel);
             foreach (var field in guardFields) panel.Children.Add(field);
             foreach (var field in factionFields) panel.Children.Add(field);

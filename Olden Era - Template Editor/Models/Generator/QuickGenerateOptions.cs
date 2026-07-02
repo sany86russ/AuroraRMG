@@ -12,7 +12,14 @@ namespace Olden_Era___Template_Editor.Models
         /// <summary>Even teams on a balanced layout.</summary>
         Team,
         /// <summary>Parallel non-crossing lanes (bronze→silver→gold) that meet only at a shared central arena.</summary>
-        Lanes
+        Lanes,
+        /// <summary>
+        /// Experimental solo PvE — exactly ONE player (only your hero(es) roam; no AI opponent), the rest of
+        /// the map is neutral to explore, and victory is capturing &amp; holding a specific neutral city. The
+        /// closest an RMG template gets to an RPG-style single-player scenario. The RMG format has never
+        /// shipped a 1-spawn template, so the game must be tested to confirm it launches such a map.
+        /// </summary>
+        Solo
     }
 
     /// <summary>Rough map size band; resolved to a concrete <see cref="GeneratorSettings.MapSize"/> within the band.</summary>
@@ -68,6 +75,15 @@ namespace Olden_Era___Template_Editor.Models
         /// (e.g. Tournament forces 2 players; City Hold guarantees a castle neutral). Default = classic.
         /// </summary>
         public string VictoryCondition { get; set; } = "win_condition_1";
+
+        /// <summary>
+        /// Optional fixed faction for the (unowned, capturable) castles placed in neutral zones. Empty
+        /// or "Random" = the engine's random faction (historical behaviour → byte-identical seeds). One of
+        /// Human/Undead/Dungeon/Nature/Demon/Unfrozen pins every neutral castle to that faction — a full
+        /// town of that faction that stays neutral until captured. Ideal for co-op "lanes" maps where
+        /// friends want the town they capture to be a chosen faction.
+        /// </summary>
+        public string NeutralCastleFaction { get; set; } = "";
 
         /// <summary>Deterministic seed driving every random choice. Assigned by the caller.</summary>
         public int Seed { get; set; }

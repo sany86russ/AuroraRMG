@@ -12,6 +12,39 @@ namespace Olden_Era___Template_Editor.Tests;
 
 public class TemplateGeneratorTests
 {
+    [Theory]
+    [InlineData(MapTopology.Default)]
+    [InlineData(MapTopology.Balanced)]
+    [InlineData(MapTopology.Chain)]
+    [InlineData(MapTopology.Random)]
+    [InlineData(MapTopology.SharedWeb)]
+    [InlineData(MapTopology.HubAndSpoke)]
+    [InlineData(MapTopology.Lanes)]
+    public void Generate_SinglePlayer_ProducesOneSpawn_AllTopologies(MapTopology topology)
+    {
+        // Part B (experimental solo PvE): a 1-player map must generate without throwing and emit
+        // exactly one Spawn (only the player's hero roams; no AI opponent spawn).
+        var settings = new GeneratorSettings
+        {
+            PlayerCount = 1,
+            Seed = 0x501,
+            Topology = topology,
+            GameEndConditions = new GameEndConditions { VictoryCondition = "win_condition_5", CityHoldDays = 1 },
+            ZoneCfg = new ZoneConfiguration
+            {
+                Advanced = new AdvancedSettings { NeutralLowCastleCount = 1, NeutralMediumCastleCount = 2 },
+                NeutralZoneCastles = 1,
+            },
+        };
+
+        Variant variant = SingleVariant(TemplateGenerator.Generate(settings));
+        var zones = RequiredZones(variant);
+
+        int spawns = zones.SelectMany(z => z.MainObjects ?? []).Count(o => o.Type == "Spawn");
+        Assert.Equal(1, spawns);
+        Assert.Contains(zones, z => z.Name.StartsWith("Neutral-", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Generate_UsesRequestedSettingsForTemplateAndGameRules()
     {
@@ -1269,6 +1302,138 @@ public class TemplateGeneratorTests
         Assert.InRange(Strength(QuickGuardLevel.Impassable), 300, 500);
     }
 
+    // ── Neutral-castle faction (#2/#3): capturable faction town ──────────────────────
+
+    private static List<MainObject> NeutralCities(Variant variant) =>
+        [.. RequiredZones(variant)
+            .Where(z => z.Name.StartsWith("Neutral-", StringComparison.Ordinal))
+            .SelectMany(z => z.MainObjects ?? [])
+            .Where(o => o.Type == "City")];
+
+    private static GeneratorSettings NeutralCastleFactionSettings(string faction) => new()
+    {
+        PlayerCount = 3,
+        Seed = 0xC0FFEE,
+        NeutralCastleFaction = faction,
+        Topology = MapTopology.Default,
+        ZoneCfg = new ZoneConfiguration
+        {
+            Advanced = new AdvancedSettings { NeutralMediumCastleCount = 3 },
+            NeutralZoneCastles = 1,
+        },
+    };
+
+    [Fact]
+    public void Generate_NeutralCastleFaction_PinsFactionAndStaysCapturable()
+    {
+        Variant variant = SingleVariant(TemplateGenerator.Generate(NeutralCastleFactionSettings("Nature")));
+        var cities = NeutralCities(variant);
+
+        Assert.NotEmpty(cities);
+        Assert.All(cities, o =>
+        {
+            Assert.Equal("FromList", o.Faction?.Type);
+            Assert.Equal(new[] { "Nature" }, o.Faction?.Args);
+            Assert.Null(o.Owner);   // unowned = neutral, captured only after beating the guard
+        });
+    }
+
+    [Fact]
+    public void Generate_NeutralCastleFaction_EmptyKeepsRandomFromList()
+    {
+        Variant variant = SingleVariant(TemplateGenerator.Generate(NeutralCastleFactionSettings("")));
+        var cities = NeutralCities(variant);
+
+        Assert.NotEmpty(cities);
+        Assert.All(cities, o =>
+        {
+            Assert.Equal("FromList", o.Faction?.Type);
+            Assert.NotNull(o.Faction?.Args);
+            Assert.Empty(o.Faction!.Args); // engine random = empty args
+        });
+    }
+
+    [Fact]
+    public void Generate_NeutralCastleFaction_IsPurelyAdditive_StructureUnchanged()
+    {
+        // Pinning a faction must ONLY set faction args — never perturb the map's structure. Same seed →
+        // identical zones/connections/city counts whether the faction is Random ("") or pinned.
+        Variant baseline = SingleVariant(TemplateGenerator.Generate(NeutralCastleFactionSettings("")));
+        Variant pinned   = SingleVariant(TemplateGenerator.Generate(NeutralCastleFactionSettings("Nature")));
+
+        Assert.Equal(
+            RequiredZones(baseline).Select(z => z.Name),
+            RequiredZones(pinned).Select(z => z.Name));
+        Assert.Equal(
+            RequiredZones(baseline).Select(z => z.MainObjects?.Count ?? 0),
+            RequiredZones(pinned).Select(z => z.MainObjects?.Count ?? 0));
+        Assert.Equal(
+            RequiredConnections(baseline).Select(c => c.Name),
+            RequiredConnections(pinned).Select(c => c.Name));
+    }
+
+    [Theory]
+    [InlineData("Human", "Human")]
+    [InlineData("Nature", "Nature")]
+    [InlineData("Unfrozen", "Unfrozen")]
+    [InlineData("Random", "")]      // "Random" is the UI's word for engine-random → "" token
+    [InlineData("", "")]
+    [InlineData("not_a_faction", "")]
+    public void QuickBuild_NeutralCastleFaction_ValidatesToken(string requested, string expected)
+    {
+        GeneratorSettings s = RandomTemplateBuilder.Build(new QuickGenerateOptions
+        {
+            Seed = 42, PlayerCount = 4, GameType = QuickGameType.Lanes,
+            NeutralCastleFaction = requested,
+        });
+        Assert.Equal(expected, s.NeutralCastleFaction);
+    }
+
+    [Fact]
+    public void QuickGenerate_NeutralCastleFaction_DefaultIsRandom_ByteIdentical()
+    {
+        // A default quick map (no faction chosen) must be byte-for-byte what it was before this feature.
+        QuickGenerateOptions Make() => new()
+        {
+            Seed = 0xABCDEF, PlayerCount = 5, GameType = QuickGameType.Lanes,
+            Scale = QuickMapScale.Medium, Length = QuickGameLength.Medium, Chaos = QuickChaos.Normal,
+        };
+        string withDefault = JsonSerializer.Serialize(TemplateGenerator.Generate(RandomTemplateBuilder.Build(Make())), JsonExport.Options);
+        var explicitRandom = Make(); explicitRandom.NeutralCastleFaction = "Random";
+        string withRandom  = JsonSerializer.Serialize(TemplateGenerator.Generate(RandomTemplateBuilder.Build(explicitRandom)), JsonExport.Options);
+        Assert.Equal(withDefault, withRandom);
+    }
+
+    [Theory]
+    [InlineData(QuickMapScale.Small)]
+    [InlineData(QuickMapScale.Medium)]
+    [InlineData(QuickMapScale.Large)]
+    public void QuickGenerate_Solo_OnePlayer_HoldCityGoal_AndExplorableNeutrals(QuickMapScale scale)
+    {
+        // Part B: the Solo game type must yield exactly one player (no AI opponent), the capture-a-neutral-
+        // city win condition, and a real world to explore (neutral zones incl. at least one castle target).
+        GeneratorSettings s = RandomTemplateBuilder.Build(new QuickGenerateOptions
+        {
+            Seed = 0x5010 + (int)scale, PlayerCount = 6, GameType = QuickGameType.Solo,
+            Scale = scale, Length = QuickGameLength.Medium, Chaos = QuickChaos.Normal,
+        });
+
+        Assert.Equal(1, s.PlayerCount);                                   // no AI opponent spawn
+        Assert.Equal("win_condition_5", s.GameEndConditions.VictoryCondition); // capture & hold a neutral city
+        Assert.Equal(1, s.GameEndConditions.CityHoldDays);               // hold 1 day → capture ≈ win
+
+        var adv = s.ZoneCfg.Advanced;
+        int neutralCastles = adv.NeutralLowCastleCount + adv.NeutralMediumCastleCount + adv.NeutralHighCastleCount;
+        Assert.True(s.ZoneCfg.NeutralZoneCount >= 1, "solo map should have neutral zones to explore");
+        Assert.True(neutralCastles >= 1, "solo map needs at least one castle for the hold-city goal");
+
+        RmgTemplate tpl = TemplateGenerator.Generate(s);
+        Variant variant = SingleVariant(tpl);
+        int spawns = RequiredZones(variant).SelectMany(z => z.MainObjects ?? []).Count(o => o.Type == "Spawn");
+        Assert.Equal(1, spawns);
+        Assert.Empty(ZoneGraphValidator.Validate(variant.Zones!, variant.Connections ?? []));
+    }
+
     [Fact]
     public void QuickGenerate_DuelForcesTwoPlayers_AndNameIsAscii()
     {
@@ -1341,7 +1506,8 @@ public class TemplateGeneratorTests
             // Advanced UI can also produce the experimental 256–512 sizes (the "large maps" checkbox),
             // so AllMapSizes — not just the official set — is the correct envelope. The Huge scale uses it.
             Assert.True(KnownValues.AllMapSizes.Contains(s.MapSize), $"{id}: map size {s.MapSize} not a known size");
-            Assert.InRange(s.PlayerCount, 2, 8);
+            // Solo is the deliberate exception to the ≥2 rule: exactly one player (experimental single-player).
+            Assert.InRange(s.PlayerCount, opts.GameType == QuickGameType.Solo ? 1 : 2, 8);
             Assert.InRange(z.ResourceDensityPercent, 20, 400);   // SldResourceDensity
             Assert.InRange(z.StructureDensityPercent, 20, 200);  // SldStructureDensity
             Assert.InRange(z.NeutralStackStrengthPercent, 25, 300); // SldNeutralStackStrength
@@ -1414,9 +1580,14 @@ public class TemplateGeneratorTests
             GeneratorSettings s = RandomTemplateBuilder.Build(opts);
             string id = $"{victory}/{type} seed={seed}";
 
-            Assert.Equal(victory, s.GameEndConditions.VictoryCondition);
-            if (victory == "win_condition_6") Assert.Equal(2, s.PlayerCount); // tournament = two 1v1 clusters
-            if (victory == "win_condition_5")
+            // Solo deliberately overrides the requested win condition with "capture a neutral city"
+            // (its RPG goal) — just as Tournament overrides the player count. Expect that for Solo.
+            string expectedVictory = type == QuickGameType.Solo ? "win_condition_5" : victory;
+
+            Assert.Equal(expectedVictory, s.GameEndConditions.VictoryCondition);
+            if (expectedVictory == "win_condition_6") Assert.Equal(2, s.PlayerCount); // tournament = two 1v1 clusters
+            if (type == QuickGameType.Solo) Assert.Equal(1, s.PlayerCount);           // solo = no AI opponent
+            if (expectedVictory == "win_condition_5")
             {
                 var a = s.ZoneCfg.Advanced;
                 Assert.True(a.NeutralLowCastleCount + a.NeutralMediumCastleCount + a.NeutralHighCastleCount > 0,
@@ -1427,7 +1598,7 @@ public class TemplateGeneratorTests
             Variant v = Assert.Single(tpl.Variants ?? []);
             List<string> issues = ZoneGraphValidator.Validate(v.Zones!, v.Connections ?? []);
             Assert.True(issues.Count == 0, $"{id}: {string.Join("; ", issues)}");
-            Assert.Equal(victory, tpl.DisplayWinCondition);
+            Assert.Equal(expectedVictory, tpl.DisplayWinCondition);
         }
     }
 

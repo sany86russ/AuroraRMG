@@ -93,6 +93,15 @@ namespace Olden_Era___Template_Editor.Models
         // player's faction. Default false keeps the Advanced behaviour (whole map follows the theme).
         public bool MatchSpawnTerrainToFaction { get; set; } = false;
         public bool PlayerStartsWithCastles { get; set; } = false;
+        /// <summary>
+        /// Optional fixed faction for the (unowned, capturable) castles the generator places in
+        /// neutral zones. Empty = the engine's default random faction (<c>FromList []</c>). Any of
+        /// <see cref="OldenEraTemplateEditor.Models.KnownValues.FromListFactionArgs"/> (e.g. "Human",
+        /// "Nature") pins every neutral castle to that faction — a full town of that faction that
+        /// stays neutral until a hero captures it. Useful for co-op "lanes" maps where friends want
+        /// to capture a town of a specific faction. Never changes ownership (no <c>owner</c> is set).
+        /// </summary>
+        public string NeutralCastleFaction { get; set; } = "";
         public int MinNeutralZonesBetweenPlayers { get; set; } = 0;
         public MapTopology Topology { get; set; } = MapTopology.Balanced;
         public ZoneConfiguration ZoneCfg { get; set; } = new ZoneConfiguration();
