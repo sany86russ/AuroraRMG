@@ -130,6 +130,17 @@ namespace Olden_Era___Template_Editor
                 ContentRendered += async (_, _) => await ShootEditorAsync(editorShotDir);
             }
 
+            // --shoot-tools <dir>: render the 4 new editor tool windows to PNGs (off-screen), then exit.
+            int shootToolsIdx = Array.FindIndex(cmdLine, a => a.Equals("--shoot-tools", StringComparison.OrdinalIgnoreCase));
+            if (shootToolsIdx >= 0 && shootToolsIdx + 1 < cmdLine.Length)
+            {
+                ShowActivated = false;
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = -5000; Top = 100;
+                string toolsShotDir = cmdLine[shootToolsIdx + 1];
+                ContentRendered += async (_, _) => await ShootToolsAsync(toolsShotDir);
+            }
+
             // --gen-readymaps <dir>: headless regen of the built-in presets to .rmg.json, then exit.
             int genIdx = Array.FindIndex(cmdLine, a => a.Equals("--gen-readymaps", StringComparison.OrdinalIgnoreCase));
             if (genIdx >= 0 && genIdx + 1 < cmdLine.Length)

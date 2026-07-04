@@ -23,12 +23,15 @@ namespace Olden_Era___Template_Editor.Services
                 else if (!names.Add(z.Name)) issues.Add(L("S.V.DupName", z.Name));
             }
 
+            var connNames = new HashSet<string>(System.StringComparer.Ordinal);
             foreach (var c in connections)
             {
                 if (!names.Contains(c.From)) issues.Add(L("S.V.Dangling", c.From));
                 if (!names.Contains(c.To))   issues.Add(L("S.V.Dangling", c.To));
                 if (string.Equals(c.From, c.To, System.StringComparison.Ordinal) && !string.IsNullOrEmpty(c.From))
                     issues.Add(L("S.V.SelfLoop", c.From));
+                if (!string.IsNullOrWhiteSpace(c.Name) && !connNames.Add(c.Name))
+                    issues.Add(L("S.V.DupConnName", c.Name));
             }
 
             if (zones.Count > 1)

@@ -17,33 +17,55 @@
         <!-- Toolbar -->
         <Border Grid.Row="0" Background="{StaticResource BrushPanelAlt}" Padding="10,7"
                 BorderBrush="{StaticResource BrushBorder}" BorderThickness="0,0,0,1">
-            <DockPanel LastChildFill="False">
+            <DockPanel LastChildFill="True">
                 <TextBlock Text="{DynamicResource S.Ed.001}" Foreground="{StaticResource BrushGold}"
                            FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"
                            Margin="0,0,16,0" DockPanel.Dock="Left"/>
-                <Button x:Name="BtnLoad" Content="{DynamicResource S.Ed.002}" DockPanel.Dock="Left"
-                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnLoad_Click"/>
-                <Button x:Name="BtnAddZone" Content="{DynamicResource S.Ed.003}" DockPanel.Dock="Left"
-                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnAddZone_Click"/>
-                <Button x:Name="BtnConnectMode" Content="{DynamicResource S.Ed.004}" DockPanel.Dock="Left"
-                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnConnectMode_Click"/>
-                <Button x:Name="BtnDelete" Content="{DynamicResource S.Ed.005}" DockPanel.Dock="Left"
-                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnDelete_Click"/>
-                <Button x:Name="BtnValidate" Content="{DynamicResource S.Ed.006}" DockPanel.Dock="Left"
-                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnValidate_Click"/>
-                <Button x:Name="BtnSave" Content="{DynamicResource S.Ed.007}" DockPanel.Dock="Left"
-                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnSave_Click"/>
-                <Button x:Name="BtnExportPng" Content="{DynamicResource S.Ed.ExportPng}" DockPanel.Dock="Left"
-                        Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnExportPng_Click"/>
 
-                <Button x:Name="BtnZoomReset" Content="{DynamicResource S.Ed.008}" DockPanel.Dock="Right"
-                        Style="{StaticResource ToolbarButton}" Click="BtnZoomReset_Click"/>
-                <Button x:Name="BtnRelayout" Content="{DynamicResource S.Ed.009}" DockPanel.Dock="Right" Margin="0,0,8,0"
-                        Style="{StaticResource ToolbarButton}" Click="BtnRelayout_Click"/>
-                <Button x:Name="BtnZoomIn" Content="+" Width="30" DockPanel.Dock="Right" Margin="0,0,4,0"
-                        Style="{StaticResource ToolbarButton}" Click="BtnZoomIn_Click" ToolTip="{DynamicResource S.Ed.ZoomIn}"/>
-                <Button x:Name="BtnZoomOut" Content="−" Width="30" DockPanel.Dock="Right" Margin="0,0,8,0"
-                        Style="{StaticResource ToolbarButton}" Click="BtnZoomOut_Click" ToolTip="{DynamicResource S.Ed.ZoomOut}"/>
+                <!-- Zoom controls stay pinned to the right and are never clipped by the action strip. -->
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Margin="8,0,0,0">
+                    <Button x:Name="BtnZoomOut" Content="−" Width="30" Margin="0,0,4,0"
+                            Style="{StaticResource ToolbarButton}" Click="BtnZoomOut_Click" ToolTip="{DynamicResource S.Ed.ZoomOut}"/>
+                    <Button x:Name="BtnZoomIn" Content="+" Width="30" Margin="0,0,8,0"
+                            Style="{StaticResource ToolbarButton}" Click="BtnZoomIn_Click" ToolTip="{DynamicResource S.Ed.ZoomIn}"/>
+                    <Button x:Name="BtnRelayout" Content="{DynamicResource S.Ed.009}" Margin="0,0,8,0"
+                            Style="{StaticResource ToolbarButton}" Click="BtnRelayout_Click"/>
+                    <Button x:Name="BtnZoomReset" Content="{DynamicResource S.Ed.008}"
+                            Style="{StaticResource ToolbarButton}" Click="BtnZoomReset_Click"/>
+                </StackPanel>
+
+                <!-- Action buttons fill the middle and scroll horizontally instead of clipping. -->
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                              Background="Transparent" Padding="0,0,4,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="BtnLoad" Content="{DynamicResource S.Ed.002}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnLoad_Click"/>
+                        <Button x:Name="BtnAddZone" Content="{DynamicResource S.Ed.003}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnAddZone_Click"/>
+                        <Button x:Name="BtnConnectMode" Content="{DynamicResource S.Ed.004}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnConnectMode_Click"/>
+                        <Button x:Name="BtnDelete" Content="{DynamicResource S.Ed.005}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnDelete_Click"/>
+                        <Button x:Name="BtnValidate" Content="{DynamicResource S.Ed.006}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnValidate_Click"/>
+                        <Button x:Name="BtnSave" Content="{DynamicResource S.Ed.007}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnSave_Click"/>
+                        <Button x:Name="BtnExportPng" Content="{DynamicResource S.Ed.ExportPng}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnExportPng_Click"/>
+                        <Button x:Name="BtnJson" Content="{DynamicResource S.Ed.Json}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnJson_Click"
+                                ToolTip="{DynamicResource S.Ed.JsonTip}"/>
+                        <Button x:Name="BtnConns" Content="{DynamicResource S.Ed.Conns}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnConns_Click"
+                                ToolTip="{DynamicResource S.Ed.ConnsTip}"/>
+                        <Button x:Name="BtnOrient" Content="{DynamicResource S.Ed.Orient}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnOrient_Click"
+                                ToolTip="{DynamicResource S.Ed.OrientTip}"/>
+                        <Button x:Name="BtnHelp" Content="{DynamicResource S.Ed.Help}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnHelp_Click"
+                                ToolTip="{DynamicResource S.Ed.HelpTip}"/>
+                    </StackPanel>
+                </ScrollViewer>
             </DockPanel>
         </Border>
 

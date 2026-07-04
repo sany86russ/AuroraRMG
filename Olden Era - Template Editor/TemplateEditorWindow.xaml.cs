@@ -98,6 +98,10 @@ namespace Olden_Era___Template_Editor
         private const double GridSize = 50.0; // Grid cell size in pixels
         private object? _selected; // Zone or Connection
 
+        // Zone copy/paste (Ctrl+C / Ctrl+V). Holds a deep clone so later edits don't leak in.
+        private Zone?  _zoneClipboard;
+        private string _zoneClipboardSource = "";
+
         public TemplateEditorWindow(RmgTemplate? template = null, MapTopology topology = MapTopology.Default)
         {
             InitializeComponent();
@@ -2339,6 +2343,16 @@ namespace Olden_Era___Template_Editor
                 BtnDelete_Click(this, new RoutedEventArgs());
                 e.Handled = true;
             }
+            else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                CopySelectedZone();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                PasteZone();
+                e.Handled = true;
+            }
             else if (e.Key == Key.Escape)
             {
                 if (_connectMode)
@@ -2465,6 +2479,121 @@ namespace Olden_Era___Template_Editor
             CanvasTranslate.X = (CanvasHost.ActualWidth  - (minX + maxX) * scale) / 2;
             CanvasTranslate.Y = (CanvasHost.ActualHeight - (minY + maxY) * scale) / 2;
             TxtZoomLabel.Text = $"{scale * 100:0}%";
+        }
+
+        // ── New tools: JSON preview, connection manager, orientation, help ───────────
+
+        /// <summary>Opens the raw-JSON preview/editor and swaps in the parsed template on Apply.</summary>
+        private void BtnJson_Click(object sender, RoutedEventArgs e)
+        {
+            Keyboard.ClearFocus(); // commit any pending inspector edit into the model first
+            var dlg = new JsonPreviewWindow(_template, JsonOptions) { Owner = this };
+            if (dlg.ShowDialog() == true && dlg.Result is not null)
+            {
+                _template = dlg.Result;
+                _selected = null; _connectFrom = null; _connectMode = false;
+                ComputePositions();
+                RebuildGraph();
+                FitToView();
+                BuildInspector();
+                MarkDirty();
+                UpdateStatus(L("S.JP.Applied"));
+            }
+        }
+
+        /// <summary>Opens the bulk connection manager (name/type/guard/road/escape).</summary>
+        private void BtnConns_Click(object sender, RoutedEventArgs e)
+        {
+            Keyboard.ClearFocus();
+            if (Connections.Count == 0) { UpdateStatus(L("S.CM.NoConns")); return; }
+            var dlg = new ConnectionManagerWindow(Connections) { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                MarkDirty();
+                RebuildGraph();
+                BuildInspector();
+                UpdateStatus(L("S.CM.Applied"));
+            }
+        }
+
+        /// <summary>Opens the orientation &amp; border editor for the active variant.</summary>
+        private void BtnOrient_Click(object sender, RoutedEventArgs e)
+        {
+            Keyboard.ClearFocus();
+            var dlg = new OrientationWindow(Variant, Zones.Select(z => z.Name)) { Owner = this };
+            if (dlg.ShowDialog() == true)
+            {
+                MarkDirty();
+                UpdateStatus(L("S.OR.Applied"));
+            }
+        }
+
+        /// <summary>Opens the read-only editor help/reference.</summary>
+        private void BtnHelp_Click(object sender, RoutedEventArgs e)
+        {
+            new EditorHelpWindow { Owner = this }.ShowDialog();
+        }
+
+        // ── Zone copy / paste ────────────────────────────────────────────────────────
+
+        /// <summary>Deep-clones the selected zone into the clipboard (Ctrl+C).</summary>
+        private void CopySelectedZone()
+        {
+            if (_selected is not Zone z) { UpdateStatus(L("S.EC.NothingToCopy")); return; }
+            _zoneClipboard = CloneZone(z);
+            _zoneClipboardSource = z.Name;
+            UpdateStatus(L("S.EC.ZoneCopied", z.Name));
+        }
+
+        /// <summary>
+        /// Pastes the clipboard zone (Ctrl+V) with a unique name and an owner-conflict guard:
+        /// any main-object owner already taken by another zone is cleared so the map stays valid.
+        /// </summary>
+        private void PasteZone()
+        {
+            if (_zoneClipboard is null) { UpdateStatus(L("S.EC.PasteNothing")); return; }
+
+            var clone = CloneZone(_zoneClipboard);
+            clone.Name = MakeUniqueZoneName(_zoneClipboardSource);
+
+            var takenOwners = new HashSet<string>(
+                Zones.SelectMany(zz => zz.MainObjects ?? Enumerable.Empty<MainObject>())
+                     .Select(m => m.Owner)
+                     .Where(o => !string.IsNullOrEmpty(o))
+                     .Select(o => o!),
+                StringComparer.Ordinal);
+
+            bool ownerCleared = false;
+            if (clone.MainObjects is not null)
+                foreach (var m in clone.MainObjects)
+                    if (!string.IsNullOrEmpty(m.Owner) && takenOwners.Contains(m.Owner!))
+                    {
+                        m.Owner = null;
+                        ownerCleared = true;
+                    }
+
+            Zones.Add(clone);
+            Point basePos = _positions.TryGetValue(_zoneClipboardSource, out var sp) ? sp : new Point(160, 160);
+            _positions[clone.Name] = new Point(basePos.X + 40, basePos.Y + 40);
+
+            MarkDirty();
+            RebuildGraph();
+            Select(clone);
+            UpdateStatus(ownerCleared ? L("S.EC.ZonePastedOwner", clone.Name) : L("S.EC.ZonePasted", clone.Name));
+        }
+
+        /// <summary>Deep-clones a zone via a JSON round-trip (same options as save).</summary>
+        private static Zone CloneZone(Zone z) =>
+            JsonSerializer.Deserialize<Zone>(JsonSerializer.Serialize(z, JsonOptions), JsonOptions)!;
+
+        /// <summary>Returns a zone name not already used, e.g. "Zone (copy)", "Zone (copy 2)".</summary>
+        private string MakeUniqueZoneName(string baseName)
+        {
+            var existing = new HashSet<string>(Zones.Select(z => z.Name), StringComparer.Ordinal);
+            string candidate = $"{baseName} (copy)";
+            int n = 2;
+            while (existing.Contains(candidate)) candidate = $"{baseName} (copy {n++})";
+            return candidate;
         }
 
         // ── Load / Save (Phase C round-trip) ─────────────────────────────────────────

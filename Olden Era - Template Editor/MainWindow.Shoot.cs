@@ -1,8 +1,11 @@
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using OldenEraTemplateEditor.Models;
 using Olden_Era___Template_Editor.Models;
 using Olden_Era___Template_Editor.Services;
 
@@ -210,6 +213,75 @@ namespace Olden_Era___Template_Editor
             {
                 Application.Current.Shutdown();
             }
+        }
+
+        /// <summary>
+        /// Documentation/verification screenshots for the four new editor tool windows
+        /// (<c>--shoot-tools &lt;dir&gt;</c>): JSON preview, connection manager, orientation/border,
+        /// and the editor help. Each is rendered off-screen via <see cref="RenderTargetBitmap"/>,
+        /// never activated, then the app exits.
+        /// </summary>
+        private async Task ShootToolsAsync(string dir)
+        {
+            try
+            {
+                Directory.CreateDirectory(dir);
+
+                var settings = new GeneratorSettings
+                {
+                    TemplateName = "Tools Demo",
+                    PlayerCount  = 4,
+                    MapSize      = 160,
+                    Topology     = MapTopology.HubAndSpoke,
+                    ZoneCfg = new ZoneConfiguration
+                    {
+                        HubZoneCastles = 0,
+                        Advanced = new AdvancedSettings { Enabled = true, NeutralMediumNoCastleCount = 4 },
+                    },
+                };
+                var template = TemplateGenerator.Generate(settings);
+                var variant  = template.Variants is { Count: > 0 } ? template.Variants[0] : new Variant();
+                var conns    = variant.Connections ?? new List<Connection>();
+                var zoneNames = (variant.Zones ?? new List<Zone>()).Select(z => z.Name).ToList();
+
+                await CaptureWindowAsync(new JsonPreviewWindow(template, JsonExport.Options), dir, "ui-tool-json");
+                await CaptureWindowAsync(new ConnectionManagerWindow(conns), dir, "ui-tool-connections");
+                await CaptureWindowAsync(new OrientationWindow(variant, zoneNames), dir, "ui-tool-orientation");
+                await CaptureWindowAsync(new EditorHelpWindow(), dir, "ui-tool-help");
+            }
+            catch { /* best effort */ }
+            finally
+            {
+                Application.Current.Shutdown();
+            }
+        }
+
+        /// <summary>Shows a window off-screen, waits for it to render, captures it, then closes it.</summary>
+        private async Task CaptureWindowAsync(Window win, string dir, string file)
+        {
+            win.ShowActivated = false;
+            win.WindowStartupLocation = WindowStartupLocation.Manual;
+            win.Left = -6000; win.Top = 120;
+
+            var done = new TaskCompletionSource();
+            win.ContentRendered += async (_, _) =>
+            {
+                try
+                {
+                    var root = (FrameworkElement)win.Content;
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+                    root.UpdateLayout();
+                    await Task.Delay(500);
+                    await Dispatcher.Yield(DispatcherPriority.Background);
+                    CaptureRoot(root, dir, file);
+                }
+                catch { /* best effort */ }
+                finally { done.TrySetResult(); }
+            };
+
+            win.Show();
+            await done.Task;
+            try { win.Close(); } catch { /* ignore */ }
         }
     }
 }

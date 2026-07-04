@@ -8,7 +8,7 @@ namespace Olden_Era___Template_Editor.Tests;
 public class ZoneGraphValidatorTests
 {
     private static Zone Z(string name, string? layout = null) => new() { Name = name, Layout = layout };
-    private static Connection C(string from, string to) => new() { From = from, To = to };
+    private static Connection C(string from, string to, string? name = null) => new() { From = from, To = to, Name = name };
 
     [Fact]
     public void ValidGraph_HasNoIssues()
@@ -56,5 +56,30 @@ public class ZoneGraphValidatorTests
     {
         var zones = new List<Zone> { Z("Solo") };
         Assert.Empty(ZoneGraphValidator.Validate(zones, new List<Connection>()));
+    }
+
+    [Fact]
+    public void DuplicateConnectionName_IsReported()
+    {
+        var zones = new List<Zone> { Z("A"), Z("B"), Z("C") };
+        var conns = new List<Connection> { C("A", "B", "Bridge"), C("B", "C", "Bridge") };
+        Assert.Contains(ZoneGraphValidator.Validate(zones, conns),
+            i => i.Contains("имя связи") && i.Contains("Bridge"));
+    }
+
+    [Fact]
+    public void UniqueConnectionNames_AreNotFlagged()
+    {
+        var zones = new List<Zone> { Z("A"), Z("B"), Z("C") };
+        var conns = new List<Connection> { C("A", "B", "Bridge-1"), C("B", "C", "Bridge-2") };
+        Assert.DoesNotContain(ZoneGraphValidator.Validate(zones, conns), i => i.Contains("имя связи"));
+    }
+
+    [Fact]
+    public void EmptyConnectionNames_AreNotFlaggedAsDuplicates()
+    {
+        var zones = new List<Zone> { Z("A"), Z("B"), Z("C") };
+        var conns = new List<Connection> { C("A", "B"), C("B", "C") };
+        Assert.DoesNotContain(ZoneGraphValidator.Validate(zones, conns), i => i.Contains("имя связи"));
     }
 }

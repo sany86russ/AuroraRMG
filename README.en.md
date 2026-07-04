@@ -206,7 +206,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.6]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG  [v1.7]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │
@@ -488,7 +488,9 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 - **Functions:** **➕ Zone** (or double-click the canvas), **🔗 Connect** (link two zones), **🗑 Delete** (or the `Del` key), **✓ Validate** (validation: dangling links, duplicate names, self-loops, isolated zones), **💾 Save .rmg.json** and **📂 Load**.
 - **📋 Pool contents / ➕ Pool creator** (the "Pools" tab): the viewer shows what each content pool actually holds (lists → objects, weights, biomes), and the creator assembles a custom pool from the game's real content lists. The data is read **on the fly from the installed game's `Core.zip`** — nothing is downloaded and nothing ships in the distribution.
 - **🖼 Export PNG** — save an image of the zone graph to share.
-- Keys: `Del` — delete the selection, `Esc` — cancel connecting / clear the selection.
+- **📄 JSON · 🔗 Connections · 🧭 Orientation · ❔ Help** (editor toolbar): **JSON** — preview and directly edit the current template as JSON (Apply / Reformat / Copy buttons); **Connections** — a table of all connections for bulk editing (name, type, guard, road, guard escape); **Orientation** — map orientation and border (water, obstacles, corner radius); **Help** — a built-in editor reference.
+- **Zone copy/paste:** `Ctrl+C` / `Ctrl+V` copy the selected zone (a new unique name + an owner-conflict guard — a matching object owner is cleared).
+- Keys: `Del` — delete the selection, `Ctrl+C`/`Ctrl+V` — copy/paste a zone, `Esc` — cancel connecting / clear the selection.
 
 **Full manual control of the graph** (override by hand what the auto-generator does for you):
 
@@ -850,6 +852,12 @@ What was added and reworked in AuroraRMG:
 - ⚙️ expanded environment options (terrain, aggression, water, diplomacy, lakes, holes) and zone fine-tuning;
 - 🦸 reworked hero-limit input (slider + −/+ buttons + field, max 12);
 - 🔄 a built-in **auto-update** system + a CI build with **provenance attestation**.
+
+### 🤝 Community contributors
+
+Special thanks to **[comm9896](https://github.com/comm9896/AuroraRMG-main)** — the author of a friendly fork. His detailed reports on the visual zone editor drove release **v1.5.0** (fixing lost inspector edits on save, the selected-value display in combo boxes, and the incomplete inspector). And his map-editing tooling ideas inspired the new editor windows: **JSON preview/edit**, the **connection manager** (bulk editing), the **orientation/border editor**, **editor help**, and **zone copy/paste** (Ctrl+C/Ctrl+V). Thanks for the high-quality feedback! 🙌
+
+See the full list in [CONTRIBUTORS.md](CONTRIBUTORS.md).
 
 ---
 
