@@ -492,6 +492,14 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 - **Zone copy/paste:** `Ctrl+C` / `Ctrl+V` copy the selected zone (a new unique name + an owner-conflict guard — a matching object owner is cleared).
 - Keys: `Del` — delete the selection, `Ctrl+C`/`Ctrl+V` — copy/paste a zone, `Esc` — cancel connecting / clear the selection.
 
+**New editor tools (v1.7):**
+
+| 📄 JSON preview & edit | 🔗 Connection manager |
+|:---:|:---:|
+| <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-json-en.png" width="100%"/> | <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-connections-en.png" width="100%"/> |
+| **🧭 Orientation & border** | **❔ Editor help** |
+| <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-orientation-en.png" width="100%"/> | <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-help-en.png" width="100%"/> |
+
 **Full manual control of the graph** (override by hand what the auto-generator does for you):
 
 - **Which zones connect — and which don't.** Delete unwanted edges and add your own. For example, build 4 independent bronze→silver→gold "corridors" that only meet in the centre, so players clash only at the end. **✓ Validate** confirms connectivity.

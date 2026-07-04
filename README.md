@@ -490,6 +490,14 @@ AuroraRMG умеет обновляться сам, без ручного ска
 - **Copy/Paste зон:** `Ctrl+C` / `Ctrl+V` копируют выбранную зону (новое уникальное имя + защита от конфликта владельцев — совпадающий владелец объекта очищается).
 - Клавиши: `Del` — удалить выбранное, `Ctrl+C`/`Ctrl+V` — копировать/вставить зону, `Esc` — отмена связывания / снять выделение.
 
+**Новые инструменты редактора (v1.7):**
+
+| 📄 JSON-предпросмотр и правка | 🔗 Менеджер связей |
+|:---:|:---:|
+| <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-json.png" width="100%"/> | <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-connections.png" width="100%"/> |
+| **🧭 Ориентация и границы** | **❔ Справка редактора** |
+| <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-orientation.png" width="100%"/> | <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-help.png" width="100%"/> |
+
 **Полный ручной контроль графа** (то, что авто-генератор делает сам, здесь можно переопределить вручную):
 
 - **Какие зоны соединять, а какие — нет.** Удаляйте лишние рёбра и добавляйте свои. Например, сделайте 4 независимых «коридора» bronze→silver→gold, которые сходятся только в центре — игроки встречаются лишь в конце. **✓ Проверить** подтвердит связность.
