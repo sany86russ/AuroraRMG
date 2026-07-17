@@ -206,7 +206,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.7]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG  [v1.8]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │
@@ -343,7 +343,7 @@ The window has three areas:
 | **Ring** | All zones in a circle, each linked to two neighbours. |
 | **Hub** | All zones connect to a shared central hub; players never border directly. |
 | **Chain** | Zones in a line from one end to the other, not closed. |
-| **Lanes** | Parallel non-crossing corridors: each player advances down their own path of **bronze → silver → gold** zones, and all corridors converge only on a single central contested "arena" at the end. Players meet only there; guards on the passages rise toward the centre. In Simple Mode this corresponds to the **"Lanes (corridors)"** game type. |
+| **Lanes** | Parallel non-crossing corridors: each player advances down their own path of **bronze → silver → gold** zones, and all corridors converge only on a single central contested "arena" at the end. Players meet only there; guards on the passages rise toward the centre. Neutral castles are dealt **evenly** across the corridors — nobody gets a "spare" castle on their path. In Simple Mode this corresponds to the **"Lanes (corridors)"** game type. |
 
 <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-simple-lanes-en.png" alt="Lanes topology" width="100%"/>
 
@@ -372,13 +372,13 @@ Base sliders (always available):
 | **Neutral castle faction** | Which faction the **capturable** castles in neutral zones belong to: **Random** or a specific one (Human/Undead/Dungeon/Nature/Demon/Unfrozen). A full town of the chosen faction — unowned until captured. Same as in Simple mode. |
 | **Generate roads** | Adds roads between connected zones *(on by default)*. |
 | **Create remote footholds** | Places remote footholds in every town zone *(on by default)*. |
-| **Create extra portals** | Adds portals between non-adjacent zones. Slider **"Max portal count"** *(1 – 32, default 32)*. |
+| **Create extra portals** | Adds portals between non-adjacent zones. Slider **"Max portal count"** *(1 – 48, default 48)*. |
 
 Advanced settings (the **"Advanced settings"** checkbox in the block header):
 
 | Setting | Description |
 |---|---|
-| **Per-tier neutral zones** | Fine layout of neutral zones: 6 sliders *(each 0 – 30)* — **weak / medium / strong**, each in a **without-town** and **with-town** variant. Replaces the simple "Extra neutral zones" slider. Up to 32 zones total. |
+| **Per-tier neutral zones** | Fine layout of neutral zones: 6 sliders *(each 0 – 30)* — **weak / medium / strong**, each in a **without-town** and **with-town** variant. Replaces the simple "Extra neutral zones" slider. Up to 48 zones total (matching the biggest stock template, Full Hire). |
 | **Min. neutrals between players** | Minimum neutral zones between players *(0 – 8, default 0)*. Works if topology, zone count and portals allow it. |
 | **Player zone size** `[EXP.]` | Relative weight of a player zone *(0.5× – 2×, default 1×)*. |
 | **Neutral zone size** `[EXP.]` | Relative weight of a neutral zone *(0.5× – 2×, default 1×)*. |
@@ -490,7 +490,9 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 - **🖼 Export PNG** — save an image of the zone graph to share.
 - **📄 JSON · 🔗 Connections · 🧭 Orientation · ❔ Help** (editor toolbar): **JSON** — preview and directly edit the current template as JSON (Apply / Reformat / Copy buttons); **Connections** — a table of all connections for bulk editing (name, type, guard, road, guard escape); **Orientation** — map orientation and border (water, obstacles, corner radius); **Help** — a built-in editor reference.
 - **Zone copy/paste:** `Ctrl+C` / `Ctrl+V` copy the selected zone (a new unique name + an owner-conflict guard — a matching object owner is cleared).
-- Keys: `Del` — delete the selection, `Ctrl+C`/`Ctrl+V` — copy/paste a zone, `Esc` — cancel connecting / clear the selection.
+- **↶ Undo / ↷ Redo:** `Ctrl+Z` / `Ctrl+Y` roll back and reapply any edit (up to 50 steps) — inspector fields, zone/connection add/delete, paste, JSON edits. Your manual node layout is preserved.
+- **Zone & connection counter** in the status bar; above **48 zones** it turns into a warning: the engine is verified up to 48 (the size of the biggest stock template, Full Hire) — beyond that at your own risk.
+- Keys: `Del` — delete the selection, `Ctrl+C`/`Ctrl+V` — copy/paste a zone, `Ctrl+Z`/`Ctrl+Y` — undo/redo, `Esc` — cancel connecting / clear the selection.
 
 **New editor tools (v1.7):**
 
@@ -507,6 +509,7 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 - **Per-connection guard strength.** An edge has a **guard value**; a zone has a **guard multiplier**. You can do it like "Highway": a moderate entry into your own gold zone and a brutal breakthrough between two gold zones.
 - **Castle or outpost.** A castle zone has a **castle ↔ outpost** toggle: capturing an outpost grants the player their **native** town instead of a random castle.
 - **Capturable faction town.** The **"🏰 Make a capturable faction town"** button in the object inspector leaves the town **unowned** (empty "Owner") and pins it to a chosen faction — a full town of that faction that becomes yours **only once you capture it**. Empty "Owner" = neutral/capturable; a chosen "Owner" = the town belongs to that player from turn one.
+- **Manual biomes (the "Biome" tab).** A zone has three biome fields — **zone biome** (terrain), **content biome** (the look of filler objects) and **meta-objects biome** (decorations). Each is a "type + args" rule: **MatchMainObject** `0` — biome follows the faction of the zone's town (the default for castle zones); **MatchZone** `zone name` — copy the named zone's biome; **FromList** `list of biomes` — a random one from the list (7 biomes: Grass, Snow, Lava, Sand, Dirt, Deathland, Autumn; an empty list = any). Example: to paint the zones next to a player in their faction's biome, set their "Zone biome" = `MatchZone` with the spawn zone's name (`Spawn-A`) — the stock game templates (Blitz) are built exactly like that.
 
 > The editor reuses the same layout as the preview, so the graph matches the generated map. Node positions are for clarity only (the `.rmg.json` stores no coordinates — the game computes them).
 
@@ -866,6 +869,12 @@ What was added and reworked in AuroraRMG:
 Special thanks to **[comm9896](https://github.com/comm9896/AuroraRMG-main)** — the author of a friendly fork. His detailed reports on the visual zone editor drove release **v1.5.0** (fixing lost inspector edits on save, the selected-value display in combo boxes, and the incomplete inspector). And his map-editing tooling ideas inspired the new editor windows: **JSON preview/edit**, the **connection manager** (bulk editing), the **orientation/border editor**, **editor help**, and **zone copy/paste** (Ctrl+C/Ctrl+V). Thanks for the high-quality feedback! 🙌
 
 See the full list in [CONTRIBUTORS.md](CONTRIBUTORS.md).
+
+---
+
+## 🧩 Author's other projects
+
+**[StabiLink Desktop](https://github.com/sany86russ/StabiLink-Desktop)** — if Discord or YouTube are unstable for you and you don't feel like fiddling with manual bypass settings: an access stabiliser + VPN for PC and phones (Android/iOS). A nice bonus — you don't need to switch it off for marketplace or banking apps.
 
 ---
 

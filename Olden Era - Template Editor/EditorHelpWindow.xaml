@@ -40,6 +40,8 @@
                 <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecCanvasBody}"/>
                 <TextBlock Style="{StaticResource Sec}"  Text="{DynamicResource S.HW.SecInspector}"/>
                 <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecInspectorBody}"/>
+                <TextBlock Style="{StaticResource Sec}"  Text="{DynamicResource S.HW.SecBiome}"/>
+                <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecBiomeBody}"/>
                 <TextBlock Style="{StaticResource Sec}"  Text="{DynamicResource S.HW.SecRoads}"/>
                 <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecRoadsBody}"/>
                 <TextBlock Style="{StaticResource Sec}"  Text="{DynamicResource S.HW.SecPools}"/>

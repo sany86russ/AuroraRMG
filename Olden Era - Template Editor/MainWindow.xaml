@@ -108,6 +108,8 @@
                         <Border Width="1" Background="{StaticResource BrushBorder}" Margin="0,4,8,4" VerticalAlignment="Stretch"/>
                         <Button x:Name="BtnLangRu" Content="RU" Width="34" Margin="0,0,2,0" Click="BtnLang_Click" Tag="ru" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.006}"/>
                         <Button x:Name="BtnLangEn" Content="EN" Width="34" Click="BtnLang_Click" Tag="en" Style="{StaticResource ToolbarButton}" ToolTip="English language"/>
+                        <Border Width="1" Background="{StaticResource BrushBorder}" Margin="8,4,8,4" VerticalAlignment="Stretch"/>
+                        <Button x:Name="BtnGitHub" Content="🐙 GitHub" Margin="0,0,4,0" Click="BtnGitHub_Click" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.GH.Tooltip}"/>
                     </StackPanel>
 
                     <Border Width="1" Background="{StaticResource BrushBorder}" Margin="8,11" VerticalAlignment="Stretch"/>
@@ -1023,11 +1025,11 @@
                                 </Grid.ColumnDefinitions>
                                 <DockPanel Grid.Column="0">
                                     <Label Content="{DynamicResource S.M.072}" DockPanel.Dock="Left"/>
-                                    <TextBlock x:Name="LblMaxPortals" Text="32" DockPanel.Dock="Right"
+                                    <TextBlock x:Name="LblMaxPortals" Text="48" DockPanel.Dock="Right"
                                                HorizontalAlignment="Right" VerticalAlignment="Center"
                                                Margin="0,0,4,0" Style="{StaticResource ValueText}"/>
                                 </DockPanel>
-                                <Slider Grid.Column="1" x:Name="SldMaxPortals" Minimum="1" Maximum="32" Value="32"
+                                <Slider Grid.Column="1" x:Name="SldMaxPortals" Minimum="1" Maximum="48" Value="48"
                                         TickFrequency="1" IsSnapToTickEnabled="True"
                                         ValueChanged="SldMaxPortals_ValueChanged"/>
                             </Grid>

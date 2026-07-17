@@ -21,13 +21,16 @@ namespace Olden_Era___Template_Editor.Services
         private const string TreasureLayoutName = "zone_layout_treasure_zone";
         private const string CenterLayoutName = "zone_layout_center";
 
-        // Labels used to name zones, up to the advanced-mode maximum of 32 total zones.
+        // Labels used to name zones, up to the advanced-mode maximum of 48 total zones
+        // (the engine handles at least that many — the stock "Full Hire" template has 48).
         public static readonly string[] ZoneLetters =
         [
             "A", "B", "C", "D", "E", "F", "G", "H",
             "I", "J", "K", "L", "M", "N", "O", "P",
             "Q", "R", "S", "T", "U", "V", "W", "X",
-            "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"
+            "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF",
+            "AG", "AH", "AI", "AJ", "AK", "AL", "AM", "AN",
+            "AO", "AP", "AQ", "AR", "AS", "AT", "AU", "AV"
         ];
         /// <summary>
         /// Per-generation RNG for all placement randomisation. Seeded from
@@ -154,7 +157,7 @@ namespace Olden_Era___Template_Editor.Services
             _ => topology.ToString()
         };
 
-        private sealed record NeutralZonePlan(string Letter, NeutralZoneQuality Quality, int CastleCount);
+        internal sealed record NeutralZonePlan(string Letter, NeutralZoneQuality Quality, int CastleCount);
 
         private sealed record NeutralZoneProfile(
             string Layout,
@@ -2437,12 +2440,15 @@ namespace Olden_Era___Template_Editor.Services
         /// <summary>
         /// Computes the Lanes layout from a neutral plan: the single shared central "arena" zone
         /// (highest quality, castle preferred) plus one ordered low→high lane of neutral letters per
-        /// player. Neutrals are dealt round-robin (lowest tier first) so every lane gets a balanced
-        /// bronze→silver→gold gradient. Shared by <see cref="BuildVariantLanes"/> and
-        /// <see cref="BuildTopologyAdjacency"/> so the graph used for hold-city / balance analysis
-        /// matches the one actually generated.
+        /// player. Neutrals are dealt lowest tier first with a castle-balancing greedy pick (shortest
+        /// lane wins; among equally short lanes a castle zone goes to the lane with the fewest castles),
+        /// so every lane gets both a bronze→silver→gold gradient AND an equal share of neutral castles —
+        /// no more "player 3 has two castle zones in their corridor, player 1 has none".
+        /// Deterministic (no RNG draws), so other topologies' seeds are untouched.
+        /// Shared by <see cref="BuildVariantLanes"/> and <see cref="BuildTopologyAdjacency"/> so the
+        /// graph used for hold-city / balance analysis matches the one actually generated.
         /// </summary>
-        private static (string Arena, List<List<string>> Lanes) BuildLanePlan(
+        internal static (string Arena, List<List<string>> Lanes) BuildLanePlan(
             List<string> playerLetters, List<NeutralZonePlan> neutralZones)
         {
             string arena = neutralZones
@@ -2451,17 +2457,33 @@ namespace Olden_Era___Template_Editor.Services
                 .ThenBy(z => z.Letter, StringComparer.Ordinal)
                 .First().Letter;
 
+            // Castle variants first within a tier so the castle balancer sees them while
+            // the lanes are still even.
             var laneNeutrals = neutralZones
                 .Where(z => z.Letter != arena)
                 .OrderBy(z => (int)z.Quality)
+                .ThenByDescending(z => z.CastleCount)
                 .ThenBy(z => z.Letter, StringComparer.Ordinal)
                 .ToList();
 
             int p = Math.Max(1, playerLetters.Count);
             var lanes = new List<List<string>>();
+            var laneCastles = new int[p];
             for (int i = 0; i < p; i++) lanes.Add(new List<string>());
-            for (int i = 0; i < laneNeutrals.Count; i++)
-                lanes[i % p].Add(laneNeutrals[i].Letter);
+
+            foreach (var z in laneNeutrals)
+            {
+                int best = 0;
+                for (int l = 1; l < p; l++)
+                {
+                    int byCount = lanes[l].Count.CompareTo(lanes[best].Count);
+                    if (byCount < 0 ||
+                        (byCount == 0 && z.CastleCount > 0 && laneCastles[l] < laneCastles[best]))
+                        best = l;
+                }
+                lanes[best].Add(z.Letter);
+                laneCastles[best] += z.CastleCount;
+            }
             return (arena, lanes);
         }
 
@@ -3175,7 +3197,7 @@ namespace Olden_Era___Template_Editor.Services
         /// that does NOT lead to its immediate ring neighbours.
         /// </summary>
         private static IEnumerable<Connection> BuildRandomPortalConnections(
-            List<string> playerLetters, List<string> orderedLetters, GenerationTuning tuning, int maxCount = 32)
+            List<string> playerLetters, List<string> orderedLetters, GenerationTuning tuning, int maxCount = 48)
         {
             int count = orderedLetters.Count;
             if (count < 2) yield break; // Need at least 2 zones for a portal.

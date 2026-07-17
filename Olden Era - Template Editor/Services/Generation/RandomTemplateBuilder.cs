@@ -282,8 +282,9 @@ namespace Olden_Era___Template_Editor.Services.Generation
             cfg.NeutralStackStrengthPercent = dense ? PickPercent(130, 220, opts.Chaos, rng) : PickPercent(80, 130, opts.Chaos, rng);
             cfg.BorderGuardStrengthPercent = PickBorderGuardStrength(opts.BorderGuards, opts.Chaos, rng);
 
-            // How many neutral zones can the map hold? Two hard limits the generator/UI respect:
-            //   - at most (32 - players) named zones are available;
+            // How many neutral zones can the map hold? Two hard limits quick maps respect:
+            //   - at most (32 - players) zones: a deliberate quick-map cap kept at 32 even though the
+            //     generator itself now names up to 48 — raising it would change every existing seed;
             //   - each zone needs ≥ 1024 map area, else the UI flags the template as overcrowded.
             int areaCap = (mapSize * mapSize) / 1024 - playerCount;
             int maxNeutrals = Math.Max(0, Math.Min(32 - playerCount, areaCap));

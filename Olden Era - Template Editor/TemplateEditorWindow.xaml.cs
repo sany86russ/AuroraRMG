@@ -102,6 +102,14 @@ namespace Olden_Era___Template_Editor
         private Zone?  _zoneClipboard;
         private string _zoneClipboardSource = "";
 
+        // Undo/redo: whole-template JSON snapshots. _undoBaseline always mirrors the current
+        // model state; every MarkDirty pushes the previous baseline, so one commit = one undo step.
+        private readonly List<string> _undoStack = [];
+        private readonly List<string> _redoStack = [];
+        private string _undoBaseline = "";
+        private bool _restoringHistory;
+        private const int MaxUndoDepth = 50;
+
         public TemplateEditorWindow(RmgTemplate? template = null, MapTopology topology = MapTopology.Default)
         {
             InitializeComponent();
@@ -113,7 +121,9 @@ namespace Olden_Era___Template_Editor
                 RebuildGraph();
                 FitToView();
                 UpdateTitle();
-                UpdateStatus(L("S.EC.Status0", Zones.Count, Connections.Count));
+                _undoBaseline = JsonSerializer.Serialize(_template, JsonOptions);
+                // Zone/connection counts now live in the permanent TxtZoneCount readout,
+                // so the transient status line keeps its localized "Ready" default.
             };
         }
 
@@ -197,6 +207,23 @@ namespace Olden_Era___Template_Editor
                     DrawNode(z, p);
 
             UpdateSelectionVisuals();
+            UpdateZoneCounter();
+        }
+
+        /// <summary>
+        /// Live "Zones: N · Connections: M" readout in the status bar. Above 48 zones the label
+        /// turns into a warning: the engine is only verified up to 48 (the stock "Full Hire" size).
+        /// </summary>
+        private void UpdateZoneCounter()
+        {
+            const int EngineVerifiedZones = 48;
+            bool over = Zones.Count > EngineVerifiedZones;
+            TxtZoneCount.Text = over
+                ? L("S.EC.ZoneCountWarn", Zones.Count, Connections.Count)
+                : L("S.EC.ZoneCount", Zones.Count, Connections.Count);
+            TxtZoneCount.Foreground = over
+                ? (TryFindResource("BrushWarnText") as Brush ?? Brushes.Orange)
+                : (TryFindResource("BrushTextDim") as Brush ?? Brushes.Gray);
         }
 
         /// <summary>Draws a subtle 50px reference grid that pans/zooms with the graph.</summary>
@@ -2353,6 +2380,17 @@ namespace Olden_Era___Template_Editor
                 PasteZone();
                 e.Handled = true;
             }
+            else if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                DoUndo();
+                e.Handled = true;
+            }
+            else if ((e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control) ||
+                     (e.Key == Key.Z && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)))
+            {
+                DoRedo();
+                e.Handled = true;
+            }
             else if (e.Key == Key.Escape)
             {
                 if (_connectMode)
@@ -2616,6 +2654,7 @@ namespace Olden_Era___Template_Editor
                 _topology = MapTopology.Default;
                 _currentPath = dlg.FileName;
                 _dirty = false;
+                ResetUndoHistory();
                 UpdateTitle();
                 _selected = null; _connectFrom = null; _connectMode = false;
                 ComputePositions();
@@ -2688,7 +2727,108 @@ namespace Olden_Era___Template_Editor
             if (z is not null) Select(z);
         }
 
-        private void MarkDirty() { _dirty = true; UpdateTitle(); }
+        private void MarkDirty()
+        {
+            _dirty = true;
+            UpdateTitle();
+            CaptureUndoSnapshot();
+        }
+
+        // ── Undo / Redo ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Pushes the pre-change state onto the undo stack. No-ops while restoring history and
+        /// when the model didn't actually change (e.g. a canvas-only zone move).
+        /// </summary>
+        private void CaptureUndoSnapshot()
+        {
+            if (_restoringHistory) return;
+            string now = JsonSerializer.Serialize(_template, JsonOptions);
+            if (string.Equals(now, _undoBaseline, StringComparison.Ordinal)) return;
+            _undoStack.Add(_undoBaseline);
+            if (_undoStack.Count > MaxUndoDepth) _undoStack.RemoveAt(0);
+            _redoStack.Clear();
+            _undoBaseline = now;
+            UpdateUndoButtons();
+        }
+
+        private void BtnUndo_Click(object sender, RoutedEventArgs e) => DoUndo();
+        private void BtnRedo_Click(object sender, RoutedEventArgs e) => DoRedo();
+
+        private void DoUndo()
+        {
+            Keyboard.ClearFocus(); // commit a pending inspector edit as its own undo step first
+            if (_undoStack.Count == 0) { UpdateStatus(L("S.EC.UndoEmpty")); return; }
+            string previous = _undoStack[^1];
+            _undoStack.RemoveAt(_undoStack.Count - 1);
+            _redoStack.Add(_undoBaseline);
+            RestoreSnapshot(previous);
+            UpdateStatus(L("S.EC.Undone"));
+        }
+
+        private void DoRedo()
+        {
+            Keyboard.ClearFocus();
+            if (_redoStack.Count == 0) { UpdateStatus(L("S.EC.RedoEmpty")); return; }
+            string next = _redoStack[^1];
+            _redoStack.RemoveAt(_redoStack.Count - 1);
+            _undoStack.Add(_undoBaseline);
+            RestoreSnapshot(next);
+            UpdateStatus(L("S.EC.Redone"));
+        }
+
+        private void RestoreSnapshot(string json)
+        {
+            _restoringHistory = true;
+            try
+            {
+                _template = JsonSerializer.Deserialize<RmgTemplate>(json, JsonOptions)!;
+                _undoBaseline = json;
+                _selected = null; _connectFrom = null; _connectMode = false;
+                BtnConnectMode.Background = null;
+                EnsurePositions();
+                RebuildGraph();
+                BuildInspector();
+                _dirty = true;
+                UpdateTitle();
+            }
+            finally { _restoringHistory = false; }
+            UpdateUndoButtons();
+        }
+
+        /// <summary>
+        /// Keeps the user's manual layout across undo/redo: drops positions of vanished zones and
+        /// only invents positions for zones that don't have one yet.
+        /// </summary>
+        private void EnsurePositions()
+        {
+            var names = new HashSet<string>(Zones.Select(z => z.Name), StringComparer.Ordinal);
+            foreach (var stale in _positions.Keys.Where(k => !names.Contains(k)).ToList())
+                _positions.Remove(stale);
+            if (_positions.Count == 0) { ComputePositions(); return; }
+            var c = ViewportCenterInCanvas();
+            int i = 0;
+            foreach (var z in Zones)
+                if (!_positions.ContainsKey(z.Name))
+                {
+                    i++;
+                    _positions[z.Name] = new Point(c.X + 40 * i, c.Y + 30 * i);
+                }
+        }
+
+        private void ResetUndoHistory()
+        {
+            _undoStack.Clear();
+            _redoStack.Clear();
+            _undoBaseline = JsonSerializer.Serialize(_template, JsonOptions);
+            UpdateUndoButtons();
+        }
+
+        private void UpdateUndoButtons()
+        {
+            BtnUndo.IsEnabled = _undoStack.Count > 0;
+            BtnRedo.IsEnabled = _redoStack.Count > 0;
+        }
 
         private void UpdateTitle()
         {

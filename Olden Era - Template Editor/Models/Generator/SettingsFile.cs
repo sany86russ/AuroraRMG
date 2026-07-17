@@ -48,7 +48,7 @@ namespace Olden_Era___Template_Editor.Models
         [JsonPropertyName("terrainRoughnessPercent")] public int TerrainRoughnessPercent { get; set; } = 100;
         [JsonPropertyName("lakeAmountPercent")] public int LakeAmountPercent           { get; set; } = 100;
         [JsonPropertyName("randomPortals")]     public bool    RandomPortals          { get; set; } = false;
-        [JsonPropertyName("maxPortalConns")]    public int     MaxPortalConnections   { get; set; } = 32;
+        [JsonPropertyName("maxPortalConns")]    public int     MaxPortalConnections   { get; set; } = 48;
         [JsonPropertyName("spawnFootholds")]    public bool    SpawnRemoteFootholds   { get; set; } = true;
         [JsonPropertyName("generateRoads")]     public bool    GenerateRoads          { get; set; } = true;
         [JsonPropertyName("isolateplayers")]    public bool    NoDirectPlayerConn     { get; set; } = false;

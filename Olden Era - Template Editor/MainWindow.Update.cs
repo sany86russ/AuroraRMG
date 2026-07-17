@@ -81,5 +81,19 @@ namespace Olden_Era___Template_Editor
         {
             UpdateBanner.Visibility = Visibility.Collapsed;
         }
+
+        private void BtnGitHub_Click(object sender, RoutedEventArgs e)
+        {
+            string url = $"https://github.com/{UpdateService.Owner}/{UpdateService.Repo}";
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = url, UseShellExecute = true });
+            }
+            catch
+            {
+                MessageBox.Show(this, url, L.Get("S.GH.Tooltip"),
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
     }
 }

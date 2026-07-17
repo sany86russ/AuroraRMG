@@ -84,7 +84,7 @@ namespace Olden_Era___Template_Editor.Models
         
         public bool NoDirectPlayerConnections { get; set; } = false;
         public bool RandomPortals { get; set; } = false;
-        public int MaxPortalConnections { get; set; } = 32;
+        public int MaxPortalConnections { get; set; } = 48;
         public bool SpawnRemoteFootholds { get; set; } = true;
         public bool GenerateRoads { get; set; } = true;
         public bool MatchPlayerCastleFactions { get; set; } = false;

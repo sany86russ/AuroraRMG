@@ -17,8 +17,10 @@ namespace Olden_Era___Template_Editor
 {
     public partial class MainWindow : Window
     {
+        // The engine handles ≥ 48 zones (stock "Full Hire" template). Simple zone settings stay at 32
+        // (single-slider path, no need for more); the per-tier advanced path allows the full 48.
         private const int SimpleModeMaxZones = 32;
-        private const int AdvancedModeMaxZones = 32;
+        private const int AdvancedModeMaxZones = 48;
 
         // Literal UTF-8 (no \uXXXX), UTF-8 no-BOM via File.WriteAllText. See Services.JsonExport.
         private static readonly JsonSerializerOptions JsonOptions = Services.JsonExport.Options;
@@ -1997,7 +1999,7 @@ namespace Olden_Era___Template_Editor
             SldTerrainRoughness.Value = Math.Clamp(s.TerrainRoughnessPercent, 0, 200);
             SldLakeAmount.Value = Math.Clamp(s.LakeAmountPercent, 0, 200);
             ChkRandomPortals.IsChecked        = s.RandomPortals;
-            SldMaxPortals.Value               = Math.Clamp(s.MaxPortalConnections, 1, 32);
+            SldMaxPortals.Value               = Math.Clamp(s.MaxPortalConnections, 1, 48);
             PnlMaxPortals.Visibility          = s.RandomPortals ? Visibility.Visible : Visibility.Collapsed;
             ChkSpawnFootholds.IsChecked       = s.SpawnRemoteFootholds;
             ChkGenerateRoads.IsChecked        = s.GenerateRoads;

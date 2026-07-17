@@ -40,6 +40,12 @@
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="BtnLoad" Content="{DynamicResource S.Ed.002}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnLoad_Click"/>
+                        <Button x:Name="BtnUndo" Content="↶" Width="30" IsEnabled="False"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,4,0" Click="BtnUndo_Click"
+                                ToolTip="{DynamicResource S.EC.UndoTip}"/>
+                        <Button x:Name="BtnRedo" Content="↷" Width="30" IsEnabled="False"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnRedo_Click"
+                                ToolTip="{DynamicResource S.EC.RedoTip}"/>
                         <Button x:Name="BtnAddZone" Content="{DynamicResource S.Ed.003}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnAddZone_Click"/>
                         <Button x:Name="BtnConnectMode" Content="{DynamicResource S.Ed.004}"
@@ -268,6 +274,9 @@
                 <TextBlock x:Name="TxtZoomLabel" DockPanel.Dock="Right"
                            Foreground="{StaticResource BrushTextDim}" FontSize="12"
                            Text="100%"/>
+                <TextBlock x:Name="TxtZoneCount" DockPanel.Dock="Right"
+                           Foreground="{StaticResource BrushTextDim}" FontSize="12"
+                           Margin="0,0,16,0"/>
             </DockPanel>
         </Border>
     </Grid>

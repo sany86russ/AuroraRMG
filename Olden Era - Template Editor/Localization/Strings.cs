@@ -457,6 +457,14 @@ namespace Olden_Era___Template_Editor.Localization
 
             // ── Zone editor (code-behind) ──
             ["S.EC.Status0"]       = "Зон: {0}, связей: {1}",
+            ["S.EC.ZoneCount"]     = "Зон: {0} · Связей: {1}",
+            ["S.EC.ZoneCountWarn"] = "Зон: {0} (⚠ больше 48 — движком не проверено) · Связей: {1}",
+            ["S.EC.UndoTip"]       = "Отменить (Ctrl+Z)",
+            ["S.EC.RedoTip"]       = "Вернуть (Ctrl+Y)",
+            ["S.EC.Undone"]        = "Действие отменено.",
+            ["S.EC.Redone"]        = "Действие возвращено.",
+            ["S.EC.UndoEmpty"]     = "Нечего отменять.",
+            ["S.EC.RedoEmpty"]     = "Нечего возвращать.",
             ["S.EC.NewTemplate"]   = "Новый шаблон",
             ["S.EC.Zone"]          = "Зона",
             ["S.EC.Name"]          = "Имя",
@@ -602,6 +610,8 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.JP.ParseError"] = "Ошибка разбора JSON:\n{0}",
             ["S.JP.Copied"]     = "JSON скопирован в буфер обмена.",
             ["S.JP.Reformatted"]= "JSON переформатирован.",
+            // ── GitHub link ──
+            ["S.GH.Tooltip"]      = "Проект на GitHub — исходники, релизы, сообщить об ошибке или предложить идею",
             // ── Editor help window ──
             ["S.HW.Title"]        = "Справка по редактору зон",
             ["S.HW.Heading"]      = "Визуальный редактор зон — краткий справочник",
@@ -610,12 +620,14 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.HW.SecCanvasBody"]= "• Тяните зону мышью, чтобы переместить её (привязка к сетке включается кнопкой ⌗).\n• Колесо мыши — масштаб; тяните пустое место — панорама.\n• «Связать» — режим соединения: кликните две зоны, чтобы создать связь. Esc — выйти из режима.\n• Delete — удалить выбранную зону/связь. «Пересобрать» — перестроить раскладку.",
             ["S.HW.SecInspector"] = "Инспектор (панель справа)",
             ["S.HW.SecInspectorBody"]= "Выберите зону или связь — появятся вкладки: Основные, Охрана, Пулы, Наполнение, Биом, Объекты. Здесь редактируются все сериализуемые поля модели. Изменения записываются при потере фокуса и принудительно — при сохранении/загрузке.",
+            ["S.HW.SecBiome"]     = "Биомы (вкладка «Биом»)",
+            ["S.HW.SecBiomeBody"] = "У зоны три биом-поля: «Биом зоны» (ландшафт), «Биом контента» (вид объектов наполнения) и «Биом мета-объектов» (декорации). Каждое — правило «тип + аргументы», задающее, откуда зона берёт биом:\n• MatchMainObject, аргумент 0 — биом по фракции главного объекта №0 зоны (её города). Так по умолчанию работают зоны с замком.\n• MatchZone, аргумент — имя зоны — скопировать биом у указанной зоны; без аргументов — следовать своей зоне.\n• FromList, аргументы — список биомов (Grass, Snow, Lava, Sand, Dirt, Deathland, Autumn) — случайный биом из списка; пустой список — любой из семи.\nПример: чтобы соседняя зона была в биоме фракции игрока, задайте ей «Биом зоны» = MatchZone с именем стартовой зоны (например, Spawn-A) — так делают и родные шаблоны игры (Blitz).",
             ["S.HW.SecRoads"]     = "Дороги",
             ["S.HW.SecRoadsBody"] = "На вкладке «Биом» у зоны есть список дорог (тип, откуда, куда). У связи флаг «Дорога» делает её грунтовой (жёлто-коричневая пунктирная линия на холсте).",
             ["S.HW.SecPools"]     = "Пулы контента",
             ["S.HW.SecPoolsBody"] = "На вкладке «Пулы» кнопки открывают просмотр пулов из Core.zip установленной игры и создание своих пулов (сохраняются в %LOCALAPPDATA%\\AuroraRMG). Копирайт-данные игры не поставляются с программой.",
             ["S.HW.SecTools"]     = "Инструменты (тулбар)",
-            ["S.HW.SecToolsBody"] = "• 📄 JSON — предпросмотр и прямое редактирование шаблона в JSON.\n• 🔗 Связи — таблица всех связей для массового редактирования (имя, тип, охрана, дорога).\n• 🧭 Ориентация — ориентация карты и границы (вода, препятствия, скругление).\n• Ctrl+C / Ctrl+V — копировать/вставить выбранную зону (владельцы объектов очищаются во избежание конфликта).",
+            ["S.HW.SecToolsBody"] = "• 📄 JSON — предпросмотр и прямое редактирование шаблона в JSON.\n• 🔗 Связи — таблица всех связей для массового редактирования (имя, тип, охрана, дорога).\n• 🧭 Ориентация — ориентация карты и границы (вода, препятствия, скругление).\n• Ctrl+C / Ctrl+V — копировать/вставить выбранную зону (владельцы объектов очищаются во избежание конфликта).\n• ↶ / ↷ (Ctrl+Z / Ctrl+Y) — отмена и возврат правок, до 50 шагов; счётчик зон и связей — в строке состояния.",
             ["S.HW.SecLegend"]    = "Цветовая легенда",
             ["S.HW.SecLegendBody"]= "Цвет зоны кодирует её роль (спавн, хаб, центр, сокровища и т.д.), а цвет линии — тип связи: золотая сплошная — Direct, серая — Default, синяя пунктирная — портал, зелёная точечная — Proximity, красная штрих-пунктир — арена гладиаторов, коричневая — дорога.",
             // ── Connection manager window ──
@@ -1147,6 +1159,14 @@ namespace Olden_Era___Template_Editor.Localization
 
             // ── Zone editor (code-behind) ──
             ["S.EC.Status0"]       = "Zones: {0}, connections: {1}",
+            ["S.EC.ZoneCount"]     = "Zones: {0} · Connections: {1}",
+            ["S.EC.ZoneCountWarn"] = "Zones: {0} (⚠ over 48 — untested by the engine) · Connections: {1}",
+            ["S.EC.UndoTip"]       = "Undo (Ctrl+Z)",
+            ["S.EC.RedoTip"]       = "Redo (Ctrl+Y)",
+            ["S.EC.Undone"]        = "Action undone.",
+            ["S.EC.Redone"]        = "Action redone.",
+            ["S.EC.UndoEmpty"]     = "Nothing to undo.",
+            ["S.EC.RedoEmpty"]     = "Nothing to redo.",
             ["S.EC.NewTemplate"]   = "New template",
             ["S.EC.Zone"]          = "Zone",
             ["S.EC.Name"]          = "Name",
@@ -1293,6 +1313,7 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.JP.Copied"]     = "JSON copied to clipboard.",
             ["S.JP.Reformatted"]= "JSON reformatted.",
             // ── Editor help window ──
+            ["S.GH.Tooltip"]      = "Project on GitHub — source code, releases, report a bug or suggest an idea",
             ["S.HW.Title"]        = "Zone editor help",
             ["S.HW.Heading"]      = "Visual zone editor — quick reference",
             ["S.HW.Close"]        = "Close",
@@ -1300,12 +1321,14 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.HW.SecCanvasBody"]= "• Drag a zone with the mouse to move it (snap-to-grid toggles with the ⌗ button).\n• Mouse wheel zooms; drag empty space to pan.\n• \"Connect\" enters link mode: click two zones to create a connection. Esc leaves the mode.\n• Delete removes the selected zone/connection. \"Relayout\" rebuilds the layout.",
             ["S.HW.SecInspector"] = "Inspector (right panel)",
             ["S.HW.SecInspectorBody"]= "Select a zone or connection to reveal the tabs: Main, Guard, Pools, Content, Biome, Objects. Every serializable model field is editable here. Edits commit on focus loss and are force-committed on save/load.",
+            ["S.HW.SecBiome"]     = "Biomes (the \"Biome\" tab)",
+            ["S.HW.SecBiomeBody"] = "A zone has three biome fields: \"Zone biome\" (terrain), \"Content biome\" (the look of filler objects) and \"Meta-objects biome\" (decorations). Each is a \"type + args\" rule telling the zone where to take its biome from:\n• MatchMainObject, arg 0 — biome follows the faction of the zone's main object #0 (its town). This is the default for zones with a castle.\n• MatchZone, arg — a zone name — copy the biome of the named zone; with no args — follow the own zone.\n• FromList, args — a list of biomes (Grass, Snow, Lava, Sand, Dirt, Deathland, Autumn) — a random biome from the list; an empty list means any of the seven.\nExample: to paint a neighbouring zone in the player's faction biome, set its \"Zone biome\" = MatchZone with the spawn zone's name (e.g. Spawn-A) — the stock game templates (Blitz) do exactly that.",
             ["S.HW.SecRoads"]     = "Roads",
             ["S.HW.SecRoadsBody"] = "A zone's \"Biome\" tab has a roads list (type, from, to). A connection's \"Road\" flag turns it into a dirt road (a yellow-brown dashed line on the canvas).",
             ["S.HW.SecPools"]     = "Content pools",
             ["S.HW.SecPoolsBody"] = "On the \"Pools\" tab the buttons open a viewer of pools from the installed game's Core.zip and a creator for your own pools (saved to %LOCALAPPDATA%\\AuroraRMG). No copyrighted game data ships with the app.",
             ["S.HW.SecTools"]     = "Tools (toolbar)",
-            ["S.HW.SecToolsBody"] = "• 📄 JSON — preview and directly edit the template as JSON.\n• 🔗 Connections — a table of all connections for bulk editing (name, type, guard, road).\n• 🧭 Orientation — map orientation and border (water, obstacles, corner radius).\n• Ctrl+C / Ctrl+V — copy/paste the selected zone (object owners are cleared to avoid a conflict).",
+            ["S.HW.SecToolsBody"] = "• 📄 JSON — preview and directly edit the template as JSON.\n• 🔗 Connections — a table of all connections for bulk editing (name, type, guard, road).\n• 🧭 Orientation — map orientation and border (water, obstacles, corner radius).\n• Ctrl+C / Ctrl+V — copy/paste the selected zone (object owners are cleared to avoid a conflict).\n• ↶ / ↷ (Ctrl+Z / Ctrl+Y) — undo and redo edits, up to 50 steps; the zone/connection counter lives in the status bar.",
             ["S.HW.SecLegend"]    = "Colour legend",
             ["S.HW.SecLegendBody"]= "A zone's colour encodes its role (spawn, hub, centre, treasure, etc.), and a line's colour its connection type: solid gold — Direct, grey — Default, blue dashed — portal, green dotted — Proximity, red dash-dot — gladiator arena, brown — road.",
             // ── Connection manager window ──

@@ -734,6 +734,67 @@ public class TemplateGeneratorTests
     }
 
     [Fact]
+    public void Generate_AdvancedModeCanCreateFortyEightTotalZones()
+    {
+        var settings = new GeneratorSettings
+        {
+            PlayerCount = 8,
+            ZoneCfg = new ZoneConfiguration
+            {
+                Advanced = new AdvancedSettings
+                {
+                    Enabled = true,
+                    NeutralLowNoCastleCount = 14,
+                    NeutralLowCastleCount = 13,
+                    NeutralMediumNoCastleCount = 13,
+                }
+            },
+            Topology = MapTopology.Default,
+            RandomPortals = true
+        };
+
+        Variant variant = SingleVariant(TemplateGenerator.Generate(settings));
+        var zones = RequiredZones(variant);
+        var zoneNames = zones.Select(zone => zone.Name).ToHashSet(StringComparer.Ordinal);
+
+        Assert.Equal(48, zones.Count);
+        Assert.Contains("Neutral-AV", zoneNames);
+        Assert.All(RequiredConnections(variant), connection =>
+        {
+            Assert.Contains(connection.From, zoneNames);
+            Assert.Contains(connection.To, zoneNames);
+        });
+    }
+
+    [Fact]
+    public void BuildLanePlan_SpreadsCastlesAndSizesEvenlyAcrossLanes()
+    {
+        var players = new List<string> { "A", "B", "C", "D" };
+        var neutrals = new List<TemplateGenerator.NeutralZonePlan>
+        {
+            new("E", NeutralZoneQuality.High, 1),   // arena: highest quality + castle
+            new("F", NeutralZoneQuality.Low, 1),
+            new("G", NeutralZoneQuality.Low, 0),
+            new("H", NeutralZoneQuality.Low, 0),
+            new("I", NeutralZoneQuality.Low, 1),
+            new("J", NeutralZoneQuality.Medium, 1),
+            new("K", NeutralZoneQuality.Medium, 0),
+            new("L", NeutralZoneQuality.Medium, 0),
+            new("M", NeutralZoneQuality.Medium, 1),
+        };
+
+        var (arena, lanes) = TemplateGenerator.BuildLanePlan(players, neutrals);
+
+        Assert.Equal("E", arena);
+        Assert.Equal(4, lanes.Count);
+        // 8 lane neutrals over 4 lanes → exactly 2 per lane.
+        Assert.All(lanes, lane => Assert.Equal(2, lane.Count));
+        // 4 castle zones over 4 lanes → exactly 1 castle per lane (the old round-robin gave 2/2/0/0).
+        var castleByLetter = neutrals.ToDictionary(n => n.Letter, n => n.CastleCount);
+        Assert.All(lanes, lane => Assert.Equal(1, lane.Sum(letter => castleByLetter[letter])));
+    }
+
+    [Fact]
     public void Generate_AppliesPlayerAndNeutralZoneSizes()
     {
         var settings = new GeneratorSettings
