@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/logo-wide.png" width="520" alt="AuroraRMG"/>
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/banner-en.png" width="100%" alt="AuroraRMG — visual random map template generator for Heroes of Might and Magic: Olden Era"/>
 
 ### Random map template generator for **Heroes of Might and Magic: Olden Era**
 
