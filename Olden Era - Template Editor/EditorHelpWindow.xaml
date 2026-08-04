@@ -48,6 +48,12 @@
                 <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecPoolsBody}"/>
                 <TextBlock Style="{StaticResource Sec}"  Text="{DynamicResource S.HW.SecTools}"/>
                 <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecToolsBody}"/>
+                <TextBlock Style="{StaticResource Sec}"  Text="{DynamicResource S.HW.SecMirror}"/>
+                <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecMirrorBody}"/>
+                <TextBlock Style="{StaticResource Sec}"  Text="{DynamicResource S.HW.SecImport}"/>
+                <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecImportBody}"/>
+                <TextBlock Style="{StaticResource Sec}"  Text="{DynamicResource S.HW.SecHotkeys}"/>
+                <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecHotkeysBody}"/>
                 <TextBlock Style="{StaticResource Sec}"  Text="{DynamicResource S.HW.SecLegend}"/>
                 <TextBlock Style="{StaticResource Body}" Text="{DynamicResource S.HW.SecLegendBody}"/>
             </StackPanel>

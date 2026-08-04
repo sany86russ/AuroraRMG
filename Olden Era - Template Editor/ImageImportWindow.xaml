@@ -1,0 +1,78 @@
+<Window x:Class="Olden_Era___Template_Editor.ImageImportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource S.IM.Title}"
+        Height="640" Width="960"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource BrushPanel}"
+        UseLayoutRounding="True">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="330"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="{DynamicResource S.IM.Hint}"
+                   Foreground="{StaticResource BrushTextDim}" FontSize="12"
+                   TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+        <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource BrushInput}"
+                BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="8"
+                Margin="0,0,12,0">
+            <Grid>
+                <TextBlock x:Name="TxtNoImage" Text="{DynamicResource S.IM.NoImage}"
+                           Foreground="{StaticResource BrushTextDim}" FontSize="13"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Image x:Name="ImgPreview" Margin="10" Stretch="Uniform"
+                       RenderOptions.BitmapScalingMode="HighQuality"/>
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="1" Grid.Column="1">
+            <Button Content="{DynamicResource S.IM.Pick}" Height="32" Margin="0,0,0,12"
+                    Style="{StaticResource ToolbarButton}" Click="BtnPick_Click"/>
+
+            <TextBlock Text="{DynamicResource S.IM.Legend}" Foreground="{StaticResource BrushText}"
+                       FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+            <DockPanel Margin="0,0,0,4">
+                <Label Content="{DynamicResource S.IM.MinArea}" DockPanel.Dock="Left"/>
+                <TextBlock x:Name="TxtMinArea" Text="0,3%" DockPanel.Dock="Right"
+                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                           Margin="0,0,6,0" Style="{StaticResource ValueText}"/>
+            </DockPanel>
+            <Slider x:Name="SldMinArea" Minimum="1" Maximum="50" Value="3"
+                    TickFrequency="1" IsSnapToTickEnabled="True" Margin="0,0,0,10"
+                    ValueChanged="Param_Changed"/>
+
+            <DockPanel Margin="0,0,0,4">
+                <Label Content="{DynamicResource S.IM.LinkRadius}" DockPanel.Dock="Left"/>
+                <TextBlock x:Name="TxtLinkRadius" Text="3" DockPanel.Dock="Right"
+                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                           Margin="0,0,6,0" Style="{StaticResource ValueText}"/>
+            </DockPanel>
+            <Slider x:Name="SldLinkRadius" Minimum="1" Maximum="12" Value="3"
+                    TickFrequency="1" IsSnapToTickEnabled="True" Margin="0,0,0,14"
+                    ValueChanged="Param_Changed"/>
+
+            <Border Background="{StaticResource BrushPanelAlt}" CornerRadius="8" Padding="10">
+                <TextBlock x:Name="TxtSummary" Foreground="{StaticResource BrushText}"
+                           FontSize="12" TextWrapping="Wrap"/>
+            </Border>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button x:Name="BtnImport" Content="{DynamicResource S.IM.Import}" Width="180" Height="30"
+                    Margin="0,0,8,0" IsEnabled="False"
+                    Style="{StaticResource GenerateButton}" Click="BtnImport_Click"/>
+            <Button Content="{DynamicResource S.IM.Cancel}" Width="110" Height="30"
+                    Style="{StaticResource ToolbarButton}" IsCancel="True" Click="BtnCancel_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

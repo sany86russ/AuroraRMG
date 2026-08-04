@@ -132,6 +132,17 @@ namespace Olden_Era___Template_Editor
                 ContentRendered += async (_, _) => await ShootEditorAsync(editorShotDir);
             }
 
+            // --shoot-mirror <dir>: verification pass for the editor's mirror mode (PNG + text report).
+            int shootMirrorIdx = Array.FindIndex(cmdLine, a => a.Equals("--shoot-mirror", StringComparison.OrdinalIgnoreCase));
+            if (shootMirrorIdx >= 0 && shootMirrorIdx + 1 < cmdLine.Length)
+            {
+                ShowActivated = false;
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = -5000; Top = 100;
+                string mirrorShotDir = cmdLine[shootMirrorIdx + 1];
+                ContentRendered += async (_, _) => await ShootMirrorAsync(mirrorShotDir);
+            }
+
             // --shoot-tools <dir>: render the 4 new editor tool windows to PNGs (off-screen), then exit.
             int shootToolsIdx = Array.FindIndex(cmdLine, a => a.Equals("--shoot-tools", StringComparison.OrdinalIgnoreCase));
             if (shootToolsIdx >= 0 && shootToolsIdx + 1 < cmdLine.Length)

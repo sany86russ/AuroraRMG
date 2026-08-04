@@ -216,6 +216,74 @@ namespace Olden_Era___Template_Editor
         }
 
         /// <summary>
+        /// Verification pass for mirror mode (<c>--shoot-mirror &lt;dir&gt;</c>): builds an asymmetric
+        /// chain template, turns mirror mode on with "make symmetric now", renders the editor to PNG and
+        /// writes a textual dump of the resulting graph (zones, twins, connections, validation) next to
+        /// it, so the outcome can be checked without driving the UI by hand.
+        /// </summary>
+        private async Task ShootMirrorAsync(string dir)
+        {
+            try
+            {
+                Directory.CreateDirectory(dir);
+
+                var settings = new GeneratorSettings
+                {
+                    TemplateName = "Mirror Demo",
+                    PlayerCount  = 2,
+                    MapSize      = 160,
+                    Seed         = 1234,
+                    Topology     = MapTopology.Chain,
+                    ZoneCfg = new ZoneConfiguration
+                    {
+                        Advanced = new AdvancedSettings { Enabled = true, NeutralMediumNoCastleCount = 3, NeutralHighCastleCount = 1 },
+                    },
+                };
+                var template = TemplateGenerator.Generate(settings);
+
+                var editor = new TemplateEditorWindow(template, settings.Topology)
+                {
+                    ShowActivated = false,
+                    WindowStartupLocation = WindowStartupLocation.Manual,
+                    Left = -6000, Top = 120, Width = 1160, Height = 800,
+                };
+
+                var done = new TaskCompletionSource();
+                editor.ContentRendered += async (_, _) =>
+                {
+                    try
+                    {
+                        var root = (FrameworkElement)editor.Content;
+                        await Dispatcher.Yield(DispatcherPriority.Background);
+                        root.UpdateLayout();
+                        await Task.Delay(800);
+
+                        string report = editor.DebugMirrorAndSymmetrize();
+                        File.WriteAllText(Path.Combine(dir, "mirror-report.txt"), report);
+
+                        root.UpdateLayout();
+                        await Task.Delay(200);
+                        await Dispatcher.Yield(DispatcherPriority.Background);
+                        CaptureRoot(root, dir, "ui-mirror");
+                    }
+                    catch (Exception ex)
+                    {
+                        try { File.WriteAllText(Path.Combine(dir, "mirror-error.txt"), ex.ToString()); } catch { }
+                    }
+                    finally { done.TrySetResult(); }
+                };
+
+                editor.Show();
+                await done.Task;
+            }
+            catch { /* best effort */ }
+            finally
+            {
+                Application.Current.Shutdown();
+            }
+        }
+
+        /// <summary>
         /// Documentation/verification screenshots for the four new editor tool windows
         /// (<c>--shoot-tools &lt;dir&gt;</c>): JSON preview, connection manager, orientation/border,
         /// and the editor help. Each is rendered off-screen via <see cref="RenderTargetBitmap"/>,
@@ -248,6 +316,9 @@ namespace Olden_Era___Template_Editor
                 await CaptureWindowAsync(new ConnectionManagerWindow(conns), dir, "ui-tool-connections");
                 await CaptureWindowAsync(new OrientationWindow(variant, zoneNames), dir, "ui-tool-orientation");
                 await CaptureWindowAsync(new EditorHelpWindow(), dir, "ui-tool-help");
+                await CaptureWindowAsync(new MirrorSettingsWindow(true, true), dir, "ui-tool-mirror-settings");
+                await CaptureWindowAsync(new HotkeySettingsWindow(), dir, "ui-tool-hotkeys");
+                await CaptureWindowAsync(new ImageImportWindow(), dir, "ui-tool-sketch");
             }
             catch { /* best effort */ }
             finally

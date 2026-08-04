@@ -133,6 +133,7 @@ namespace Olden_Era___Template_Editor
                 FitToView();
                 UpdateTitle();
                 _undoBaseline = JsonSerializer.Serialize(_template, SnapshotOptions);
+                ApplyHotkeyTooltips(); // show each button's (rebindable) shortcut in its tooltip
                 // Zone/connection counts now live in the permanent TxtZoneCount readout,
                 // so the transient status line keeps its localized "Ready" default.
             };
@@ -233,6 +234,7 @@ namespace Olden_Era___Template_Editor
 
             UpdateSelectionVisuals();
             UpdateZoneCounter();
+            RestoreMirrorAxisAfterRebuild(); // the canvas was cleared above
         }
 
         /// <summary>
@@ -2203,6 +2205,7 @@ namespace Olden_Era___Template_Editor
                 _positions[_dragZone.Name] = p;
                 _movedWhileDragging = true;
                 RepositionZone(_dragZone, p);
+                MirrorAfterZoneMoved(_dragZone, p);
                 return;
             }
             if (_isPanning && e.LeftButton == MouseButtonState.Pressed)
@@ -2290,6 +2293,7 @@ namespace Olden_Era___Template_Editor
             string autoName = MakeUniqueConnectionName($"{connType}-{_connectFrom.Name}-{z.Name}");
             var conn = new Connection { Name = autoName, From = _connectFrom.Name, To = z.Name, ConnectionType = connType };
             Connections.Add(conn);
+            MirrorAfterConnectionAdded(conn);
             UpdateStatus(L("S.EC.ConnAdded", conn.From, conn.To));
             _connectFrom = null;
             _connectMode = false;
@@ -2369,6 +2373,7 @@ namespace Olden_Era___Template_Editor
             };
             Zones.Add(z);
             _positions[name] = pos;
+            MirrorAfterZoneAdded(z, pos);
             MarkDirty();
             RebuildGraph();
             Select(z);
@@ -2400,33 +2405,8 @@ namespace Olden_Era___Template_Editor
             if (Keyboard.FocusedElement is System.Windows.Controls.TextBox or System.Windows.Controls.ComboBox)
                 return;
 
-            if (e.Key == Key.Delete)
-            {
-                BtnDelete_Click(this, new RoutedEventArgs());
-                e.Handled = true;
-            }
-            else if (e.Key == Key.C && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                CopySelectedZone();
-                e.Handled = true;
-            }
-            else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                PasteZone();
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control)
-            {
-                DoUndo();
-                e.Handled = true;
-            }
-            else if ((e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control) ||
-                     (e.Key == Key.Z && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)))
-            {
-                DoRedo();
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Escape)
+            // Escape is structural (leave connect mode / clear the selection) and stays fixed.
+            if (e.Key == Key.Escape)
             {
                 if (_connectMode)
                 {
@@ -2436,7 +2416,174 @@ namespace Olden_Era___Template_Editor
                 }
                 else Select(null);
                 e.Handled = true;
+                return;
             }
+
+            // Ctrl+Shift+Z is the second, universally expected redo gesture; everything else comes
+            // from the user's (rebindable) bindings.
+            if (e.Key == Key.Z && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+            {
+                DoRedo();
+                e.Handled = true;
+                return;
+            }
+
+            if (!EditorHotkeys.TryMatch(e.Key, Keyboard.Modifiers, out EditorAction action)) return;
+            InvokeEditorAction(action);
+            e.Handled = true;
+        }
+
+        /// <summary>Runs the command a hotkey (or the hotkey settings preview) resolved to.</summary>
+        private void InvokeEditorAction(EditorAction action)
+        {
+            var noArgs = new RoutedEventArgs();
+            switch (action)
+            {
+                case EditorAction.AddZone:     BtnAddZone_Click(this, noArgs); break;
+                case EditorAction.ConnectMode: BtnConnectMode_Click(this, noArgs); break;
+                case EditorAction.Delete:      BtnDelete_Click(this, noArgs); break;
+                case EditorAction.Validate:    BtnValidate_Click(this, noArgs); break;
+                case EditorAction.Save:        BtnSave_Click(this, noArgs); break;
+                case EditorAction.Load:        BtnLoad_Click(this, noArgs); break;
+                case EditorAction.Undo:        DoUndo(); break;
+                case EditorAction.Redo:        DoRedo(); break;
+                case EditorAction.CopyZone:    CopySelectedZone(); break;
+                case EditorAction.PasteZone:   PasteZone(); break;
+                case EditorAction.Mirror:      BtnMirror_Click(this, noArgs); break;
+                case EditorAction.JsonPreview: BtnJson_Click(this, noArgs); break;
+                case EditorAction.Connections: BtnConns_Click(this, noArgs); break;
+                case EditorAction.Orientation: BtnOrient_Click(this, noArgs); break;
+                case EditorAction.Help:        BtnHelp_Click(this, noArgs); break;
+                case EditorAction.ExportPng:   BtnExportPng_Click(this, noArgs); break;
+                case EditorAction.FitToView:   BtnZoomReset_Click(this, noArgs); break;
+                case EditorAction.AutoLayout:  BtnRelayout_Click(this, noArgs); break;
+                case EditorAction.GridSnap:    BtnGridSnap_Click(this, noArgs); break;
+            }
+        }
+
+        /// <summary>
+        /// Imports the structure of a HotA <c>.h3t</c> template into the editor. The result replaces
+        /// the current graph, so an unsaved template is confirmed first, and every assumption the
+        /// importer had to make is shown to the user.
+        /// </summary>
+        private void BtnImportH3T_Click(object sender, RoutedEventArgs e)
+        {
+            Keyboard.ClearFocus();
+
+            if (_dirty && MessageBox.Show(this, L("S.H3T.ConfirmReplace"), L("S.H3T.Title"),
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            var dlg = new OpenFileDialog { Title = L("S.H3T.Title"), Filter = L("S.H3T.Filter") };
+            if (dlg.ShowDialog(this) != true) return;
+
+            try
+            {
+                H3TImportResult result = H3TImporter.Parse(dlg.FileName);
+
+                _template = result.Template;
+                _topology = MapTopology.Default;
+                _currentPath = null;             // an import is a new template, not an edit of the .h3t
+                _dirty = true;
+                ResetUndoHistory();
+                UpdateTitle();
+                _selected = null; _connectFrom = null; _connectMode = false;
+                if (_mirrorMode) DisableMirrorMode();
+                ComputePositions();
+                RebuildGraph();
+                FitToView();
+                BuildInspector();
+
+                UpdateStatus(L("S.H3T.Imported", IOPath.GetFileName(dlg.FileName), result.ZoneCount, result.ConnectionCount));
+
+                var issues = Validate();
+                var notes = result.Warnings.Concat(issues).Take(14).ToList();
+                MessageBox.Show(this,
+                    L("S.H3T.Report", result.ZoneCount, result.ConnectionCount,
+                        notes.Count == 0 ? L("S.H3T.NoNotes") : string.Join("\n", notes)),
+                    L("S.H3T.Title"), MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, L("S.H3T.Failed", ex.Message), L("S.EC.Error"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Imports a hand-drawn sketch (coloured blobs = zones, touching blobs = connections) and drops
+        /// the resulting graph onto the canvas at the positions the drawing implied.
+        /// </summary>
+        private void BtnImportImage_Click(object sender, RoutedEventArgs e)
+        {
+            Keyboard.ClearFocus();
+
+            if (_dirty && MessageBox.Show(this, L("S.IM.ConfirmReplace"), L("S.IM.Title"),
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            var dlg = new ImageImportWindow { Owner = this };
+            if (dlg.ShowDialog() != true || dlg.Result is not { } result) return;
+
+            _template = result.Template;
+            _topology = MapTopology.Default;
+            _currentPath = null;
+            _dirty = true;
+            ResetUndoHistory();
+            UpdateTitle();
+            _selected = null; _connectFrom = null; _connectMode = false;
+            if (_mirrorMode) DisableMirrorMode();
+
+            // Keep the drawing's geometry: map the sketch's normalised centres onto the canvas.
+            _positions.Clear();
+            const double margin = 60.0;
+            double spanX = GraphCanvas.Width - margin * 2, spanY = GraphCanvas.Height - margin * 2;
+            foreach (var kv in result.Positions)
+                _positions[kv.Key] = new Point(margin + kv.Value.X * spanX, margin + kv.Value.Y * spanY);
+            PlaceMissingZones();
+
+            RebuildGraph();
+            FitToView();
+            BuildInspector();
+
+            var variant = _template.Variants![0];
+            UpdateStatus(L("S.IM.Imported", variant.Zones!.Count, variant.Connections!.Count));
+        }
+
+        /// <summary>Opens the hotkey editor and refreshes the toolbar tooltips with the new bindings.</summary>
+        private void BtnHotkeys_Click(object sender, RoutedEventArgs e)
+        {
+            Keyboard.ClearFocus();
+            var dlg = new HotkeySettingsWindow { Owner = this };
+            if (dlg.ShowDialog() != true) return;
+            ApplyHotkeyTooltips();
+            UpdateStatus(L("S.EC.HotkeysSaved"));
+        }
+
+        /// <summary>Appends the current shortcut to each toolbar button's tooltip, so it is discoverable.</summary>
+        private void ApplyHotkeyTooltips()
+        {
+            void Tip(System.Windows.Controls.Button button, EditorAction action, string labelKey)
+            {
+                string gesture = EditorHotkeys.Current.TryGetValue(action, out string? g) ? g : "";
+                button.ToolTip = gesture.Length > 0 ? $"{L(labelKey)}  ({gesture})" : L(labelKey);
+            }
+
+            Tip(BtnAddZone, EditorAction.AddZone, "S.HK.Act.AddZone");
+            Tip(BtnConnectMode, EditorAction.ConnectMode, "S.HK.Act.ConnectMode");
+            Tip(BtnMirror, EditorAction.Mirror, "S.Ed.MirrorTip");
+            Tip(BtnDelete, EditorAction.Delete, "S.HK.Act.Delete");
+            Tip(BtnValidate, EditorAction.Validate, "S.HK.Act.Validate");
+            Tip(BtnSave, EditorAction.Save, "S.HK.Act.Save");
+            Tip(BtnLoad, EditorAction.Load, "S.HK.Act.Load");
+            Tip(BtnUndo, EditorAction.Undo, "S.HK.Act.Undo");
+            Tip(BtnRedo, EditorAction.Redo, "S.HK.Act.Redo");
+            Tip(BtnExportPng, EditorAction.ExportPng, "S.HK.Act.ExportPng");
+            Tip(BtnJson, EditorAction.JsonPreview, "S.HK.Act.JsonPreview");
+            Tip(BtnConns, EditorAction.Connections, "S.HK.Act.Connections");
+            Tip(BtnOrient, EditorAction.Orientation, "S.HK.Act.Orientation");
+            Tip(BtnHelp, EditorAction.Help, "S.HK.Act.Help");
+            Tip(BtnGridSnap, EditorAction.GridSnap, "S.HK.Act.GridSnap");
         }
 
         /// <summary>Experimental: export the zone graph (at natural scale, with grid + labels) to a PNG.</summary>
@@ -2498,6 +2645,15 @@ namespace Olden_Era___Template_Editor
                 int removedConns = TemplateRefactor.RemoveZoneReferences(Variant, z.Name);
                 Zones.Remove(z);
                 _positions.Remove(z.Name);
+
+                // Mirror mode: the twin goes with it, otherwise the map stops being symmetric.
+                if (MirrorTwinToDelete(z) is { } twin)
+                {
+                    removedConns += TemplateRefactor.RemoveZoneReferences(Variant, twin.Name);
+                    Zones.Remove(twin);
+                    _positions.Remove(twin.Name);
+                }
+
                 MarkDirty();
                 RebuildGraph();
                 Select(null);
@@ -2787,6 +2943,9 @@ namespace Olden_Era___Template_Editor
 
         private void MarkDirty()
         {
+            // Mirror mode: an inspector edit on either half is copied to the twin BEFORE the undo
+            // snapshot, so both halves change together in a single undo step.
+            if (_selected is Zone selectedZone) MirrorZoneProperties(selectedZone);
             _dirty = true;
             UpdateTitle();
             CaptureUndoSnapshot();

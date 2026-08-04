@@ -50,6 +50,9 @@
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnAddZone_Click"/>
                         <Button x:Name="BtnConnectMode" Content="{DynamicResource S.Ed.004}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnConnectMode_Click"/>
+                        <Button x:Name="BtnMirror" Content="{DynamicResource S.Ed.Mirror}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnMirror_Click"
+                                ToolTip="{DynamicResource S.Ed.MirrorTip}"/>
                         <Button x:Name="BtnDelete" Content="{DynamicResource S.Ed.005}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnDelete_Click"/>
                         <Button x:Name="BtnValidate" Content="{DynamicResource S.Ed.006}"
@@ -70,6 +73,15 @@
                         <Button x:Name="BtnHelp" Content="{DynamicResource S.Ed.Help}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnHelp_Click"
                                 ToolTip="{DynamicResource S.Ed.HelpTip}"/>
+                        <Button x:Name="BtnImportH3T" Content="{DynamicResource S.Ed.ImportH3T}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnImportH3T_Click"
+                                ToolTip="{DynamicResource S.Ed.ImportH3TTip}"/>
+                        <Button x:Name="BtnImportImage" Content="{DynamicResource S.Ed.ImportImage}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnImportImage_Click"
+                                ToolTip="{DynamicResource S.Ed.ImportImageTip}"/>
+                        <Button x:Name="BtnHotkeys" Content="{DynamicResource S.Ed.Hotkeys}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,0" Click="BtnHotkeys_Click"
+                                ToolTip="{DynamicResource S.Ed.HotkeysTip}"/>
                     </StackPanel>
                 </ScrollViewer>
             </DockPanel>

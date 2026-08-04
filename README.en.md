@@ -206,7 +206,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.9]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG  [v1.10]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │
@@ -485,6 +485,10 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 - **Canvas:** zones are shown as nodes (🟢 player · 🔵 hub · 🟤/⚪/🟡 neutral by quality), connections as edges (gold = direct, dashed cyan = portal, dashed brown = road). There's a grid, a **legend** and a controls hint.
 - **Navigation:** wheel to zoom (or **−/+** buttons), drag the background to pan, **"Reset view"** and **"Auto-layout"**.
 - **Editing:** drag zones; the **inspector** on the right is grouped into tabs (**Main · Guard · Pools · Content · Biome · Objects**) and edits **every** serializable field of the selected zone (name, size, layout, diplomacy, guard cutoff/randomization/increment, guard reaction, encounter holes, content pools and their value, zone/content/meta-object biomes, roads, castle/outpost, main objects with faction/owner) or connection (name, from/to, type, guard strength and zone, increment, gate, length, road).
+- **⇄ Mirror mode:** edit one half of the map and the other half follows (zones, properties, connections). The vertical axis through the middle of the canvas is drawn dashed; zones on the axis count as the shared middle and are never duplicated. When switching the mode on you can rebuild the right half from the left in one step — starts on the new half take the next free player numbers. A symmetric 1v1 or 2v2 comes together in a couple of minutes.
+- **⬇ Import from .h3t (Heroes III / HotA templates):** reads zones and their roles, sizes, player starts, guarded connections and roads. The **structure** is carried over — content and balance use our own defaults and still need tuning.
+- **⬇ Import a sketch:** draw the map in any paint program as coloured blobs on a light background — a filled blob becomes a zone (colour picks the role: green = player start, blue = start zone, grey = treasure, gold = super treasure…) and touching blobs become a connection. Blob area sets the zone size, its centre sets the node's position on the canvas.
+- **⌨ Your own shortcuts:** every editor command can be rebound (defaults: Ctrl+N add zone, Ctrl+L connect, Del delete, F5 validate, Ctrl+M mirror, F1 help).
 - **The editor remembers your layout:** zone positions you arranged by hand are stored alongside the template (in `%LOCALAPPDATA%\AuroraRMG\editor-layouts\`) and restored the next time you open that file — the graph no longer snaps back to the auto-layout.
 - **Safe edits:** renaming a zone re-points every reference to it (a connection's guard zone, other zones' `MatchZone` biomes, the orientation anchor), and deleting a zone or a link removes the orphaned roads. On save, any missing layout definitions (`zoneLayouts`) are written into the file — without them the game could not shape that zone.
 - **Functions:** **➕ Zone** (or double-click the canvas), **🔗 Connect** (link two zones), **🗑 Delete** (or the `Del` key), **✓ Validate** (validation: dangling links, duplicate names, self-loops, isolated zones, a **split map** — some zones unreachable, the **player-start chain** — no Spawn / duplicate player / a missing Player2, **roads to nowhere** and a **self-referencing zone biome**), **💾 Save .rmg.json** and **📂 Load**.
