@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class GameRules
+    public class GameRules : RmgNode
     {
         [JsonPropertyName("heroCountMin")]
         public int? HeroCountMin { get; set; }
@@ -36,7 +36,7 @@ namespace OldenEraTemplateEditor.Models
         public WinConditions? WinConditions { get; set; }
     }
 
-    public class Bonus
+    public class Bonus : RmgNode
     {
         [JsonPropertyName("sid")]
         public string Sid { get; set; } = string.Empty;
@@ -51,7 +51,7 @@ namespace OldenEraTemplateEditor.Models
         public List<string>? Parameters { get; set; }
     }
 
-    public class WinConditions
+    public class WinConditions : RmgNode
     {
         [JsonPropertyName("classic")]
         public bool? Classic { get; set; }

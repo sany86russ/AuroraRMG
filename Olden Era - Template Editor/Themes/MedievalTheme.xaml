@@ -194,8 +194,26 @@
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Left"/>
 
+                        <!-- Editable mode: WPF drives the value through PART_EditableTextBox, and
+                             SelectionBoxItem (what ContentSite shows) stays EMPTY. Without a real,
+                             visible text box every IsEditable="True" combo rendered blank even when
+                             the model held a value — which is exactly what the zone editor's
+                             layout / pool / faction fields do. The IsEditable trigger below swaps
+                             the presenter for the text box. -->
                         <TextBox x:Name="PART_EditableTextBox"
-                                 Visibility="Hidden" IsReadOnly="True" Focusable="False"/>
+                                 Visibility="Hidden"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Height="Auto"
+                                 Padding="0"
+                                 Margin="10,0,30,0"
+                                 Foreground="{StaticResource BrushText}"
+                                 CaretBrush="{StaticResource BrushText}"
+                                 SelectionBrush="{StaticResource BrushGoldDim}"
+                                 VerticalAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 IsReadOnly="{TemplateBinding IsReadOnly}"
+                                 Focusable="True"/>
 
                         <Popup x:Name="PART_Popup"
                                Placement="Bottom"
@@ -216,6 +234,12 @@
                             </Border>
                         </Popup>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsEditable" Value="True">
+                            <Setter TargetName="ContentSite" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

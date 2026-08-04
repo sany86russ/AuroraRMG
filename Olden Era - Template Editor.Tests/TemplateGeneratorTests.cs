@@ -1658,6 +1658,10 @@ public class TemplateGeneratorTests
             RmgTemplate tpl = TemplateGenerator.Generate(s);
             Variant v = Assert.Single(tpl.Variants ?? []);
             List<string> issues = ZoneGraphValidator.Validate(v.Zones!, v.Connections ?? []);
+            // Tournament builds two deliberately isolated 1v1 clusters, so the validator's
+            // "the map is split" note is expected there and only there.
+            if (expectedVictory == "win_condition_6")
+                issues = issues.Where(i => !i.Contains("разорвана") && !i.Contains("is split")).ToList();
             Assert.True(issues.Count == 0, $"{id}: {string.Join("; ", issues)}");
             Assert.Equal(expectedVictory, tpl.DisplayWinCondition);
         }

@@ -26,6 +26,7 @@ namespace Olden_Era___Template_Editor
             ColTo.Header = L("S.CM.ColTo");
             ColType.Header = L("S.CM.ColType");
             ColGuard.Header = L("S.CM.ColGuard");
+            ColRandom.Header = L("S.CM.ColRandom");
             ColRoad.Header = L("S.CM.ColRoad");
             ColEscape.Header = L("S.CM.ColEscape");
 

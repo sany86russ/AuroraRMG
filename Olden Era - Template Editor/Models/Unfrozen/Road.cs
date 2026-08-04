@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class Road
+    public class Road : RmgNode
     {
         [JsonPropertyName("type")]
         public string? Type { get; set; }
@@ -15,7 +15,7 @@ namespace OldenEraTemplateEditor.Models
         public RoadEndpoint? To { get; set; }
     }
 
-    public class RoadEndpoint
+    public class RoadEndpoint : RmgNode
     {
         [JsonPropertyName("type")]
         public string? Type { get; set; }

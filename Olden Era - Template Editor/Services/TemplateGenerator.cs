@@ -385,11 +385,22 @@ namespace Olden_Era___Template_Editor.Services
 
         // ── Game rules ───────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// The UI's "Начальный лимит героев" is the limit a player actually has on day 1, while the
+        /// engine computes <c>limit = heroCountMin + heroCountIncrement × towns</c> — so the emitted
+        /// <c>heroCountMin</c> is the UI value minus one increment (a player starts with one town).
+        /// Stock templates confirm the model: "One for All" ships <c>min 0 / increment 1</c>.
+        /// Clamped at 0 because a negative <c>heroCountMin</c> is not a value the engine ever ships
+        /// (it happened whenever the increment exceeded the starting limit).
+        /// </summary>
+        internal static int EffectiveHeroCountMin(HeroSettings hero) =>
+            Math.Max(0, hero.HeroCountMin - hero.HeroCountIncrement);
+
         private static GameRules BuildGameRules(GeneratorSettings settings, string effectiveVictoryCondition) => new()
         {
-            HeroCountMin = settings.SingleHeroMode ? 1 : settings.HeroSettings.HeroCountMin - settings.HeroSettings.HeroCountIncrement,
-            HeroCountMax = settings.SingleHeroMode ? 1 : settings.HeroSettings.HeroCountMax,
-            HeroCountIncrement = settings.SingleHeroMode ? 1 : settings.HeroSettings.HeroCountIncrement,
+            HeroCountMin = settings.SingleHeroMode ? 1 : EffectiveHeroCountMin(settings.HeroSettings),
+            HeroCountMax = settings.SingleHeroMode ? 1 : Math.Max(settings.HeroSettings.HeroCountMax, EffectiveHeroCountMin(settings.HeroSettings)),
+            HeroCountIncrement = settings.SingleHeroMode ? 1 : Math.Max(0, settings.HeroSettings.HeroCountIncrement),
             HeroHireBan = settings.SingleHeroMode || settings.HeroSettings.HeroHireBan,
             EncounterHoles = settings.EncounterHoles,
             FactionLawsExpModifier = PercentToModifier(settings.FactionLawsExpPercent),
@@ -1060,7 +1071,8 @@ namespace Olden_Era___Template_Editor.Services
                 }
             }
 
-            return MakeVariant(playerLetters, playerLetters[0], totalZones, zones, connections, tuning);
+            // Tournament deliberately produces two disjoint clusters — never stitch them together.
+            return MakeVariant(playerLetters, playerLetters[0], totalZones, zones, connections, tuning, ensureConnected: false);
         }
 
         /// <summary>
@@ -1165,9 +1177,11 @@ namespace Olden_Era___Template_Editor.Services
             ringLetters.AddRange(orderedNeutrals.Select(neutral => neutral.Letter));
             int count = ringLetters.Count;
 
-            // One connection per adjacent pair in the ring (including wrap-around).
-            var connNames = new string[count];
-            for (int i = 0; i < count; i++)
+            // One connection per adjacent pair in the ring (including wrap-around). A cluster with no
+            // neutrals is a one-zone "ring" with no edges; a two-zone cluster closes on the same pair
+            // twice — RingEdgeCount collapses both so no road points at a connection that is never built.
+            var connNames = new string?[count];
+            for (int i = 0; i < RingEdgeCount(count); i++)
             {
                 int next = (i + 1) % count;
                 connNames[i] = $"TRing-{ringLetters[i]}-{ringLetters[next]}";
@@ -1178,7 +1192,8 @@ namespace Olden_Era___Template_Editor.Services
             {
                 string letter = ringLetters[i];
                 int prev = (i - 1 + count) % count;
-                var myConns = new[] { connNames[prev], connNames[i] }.Distinct().ToArray();
+                var myConns = new[] { connNames[prev], connNames[i] }
+                    .Where(c => c is not null).Select(c => c!).Distinct().ToArray();
 
                 if (i == 0)
                     zones.Add(BuildSpawnZone(letter, $"Player{playerIndex + 1}", myConns,
@@ -1190,7 +1205,7 @@ namespace Olden_Era___Template_Editor.Services
             }
 
             // Build connections (one per ring edge).
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < RingEdgeCount(count); i++)
             {
                 int next = (i + 1) % count;
                 string fromLetter = ringLetters[i];
@@ -1573,9 +1588,12 @@ namespace Olden_Era___Template_Editor.Services
 
             // Pre-compute ring connection names, but only for pairs that are actually connected.
             // A pair is skipped when isolation is on and both zones are player zones.
+            // A one-zone "ring" has no edge at all, and a two-zone ring closes on the SAME pair twice
+            // (i→i+1 and i+1→i) — RingEdgeCount keeps both degenerate cases in sync with
+            // BuildRingConnections so no zone is handed a road to a connection that is never emitted.
             var ringConnRight = new string[outerCount]; // name of the connection from i to i+1
             var ringConnLeft  = new string[outerCount]; // name of the connection from i-1 to i
-            for (int i = 0; i < outerCount; i++)
+            for (int i = 0; i < RingEdgeCount(outerCount); i++)
             {
                 int next = (i + 1) % outerCount;
                 bool bothPlayers = playerLetters.Contains(orderedLetters[i])
@@ -1678,7 +1696,9 @@ namespace Olden_Era___Template_Editor.Services
                 connections.AddRange(BuildRandomPortalConnections(playerLetters, allLetters, tuning, settings.MaxPortalConnections));
 
             if (isolate) EnsurePlayerZonesConnected(playerLetters, zones, connections, tuning);
-            EnsureFullConnectivity(playerLetters, allLetters, pos, zones, connections, tuning, neutralByLetter: null);
+            // Pass the neutral plan (Chain/Balanced already do): without it a repair edge always got the
+            // flat player↔player guard of 30 000 instead of the guard that matches the neutral's tier.
+            EnsureFullConnectivity(playerLetters, allLetters, pos, zones, connections, tuning, neutralByLetter);
             return MakeVariant(playerLetters, allLetters[0], count, zones, connections, tuning);
         }
 
@@ -2814,28 +2834,165 @@ namespace Olden_Era___Template_Editor.Services
 
         // ── Variant factory helper ────────────────────────────────────────────────
 
-        private static Variant MakeVariant(List<string> playerLetters, string firstLetter, int totalZones, List<Zone> zones, List<Connection> connections, GenerationTuning tuning) => new()
+        /// <summary>
+        /// Final assembly step shared by every topology builder. Before the variant is handed back it
+        /// runs three integrity passes so no builder can emit a structurally broken map:
+        /// <list type="number">
+        ///   <item><see cref="SanitizeConnections"/> — drops self-loops, dangling endpoints and duplicate names;</item>
+        ///   <item><see cref="EnsureGraphConnected"/> — stitches together zones that ended up in separate
+        ///         components (skipped for the Tournament layout, where isolation is the point);</item>
+        ///   <item><see cref="SanitizeRoads"/> — removes road endpoints pointing at connections that no
+        ///         longer exist (or never did, in degenerate one-zone rings).</item>
+        /// </list>
+        /// Healthy configurations are untouched by all three, so existing seeds stay byte-identical.
+        /// </summary>
+        private static Variant MakeVariant(List<string> playerLetters, string firstLetter, int totalZones,
+            List<Zone> zones, List<Connection> connections, GenerationTuning tuning,
+            bool ensureConnected = true)
         {
-            Orientation = new Orientation
+            SanitizeConnections(zones, connections);
+            if (ensureConnected) EnsureGraphConnected(playerLetters, zones, connections, tuning);
+            SanitizeRoads(zones, connections);
+
+            return new Variant
             {
-                ZeroAngleZone = playerLetters.Contains(firstLetter) ? $"Spawn-{firstLetter}" : $"Neutral-{firstLetter}",
-                BaseAngleMin = 45,
-                BaseAngleMax = 45,
-                RandomAngleAmplitude = 360,
-                RandomAngleStep = 360.0 / totalZones
-            },
-            Border = new Border
+                Orientation = new Orientation
+                {
+                    ZeroAngleZone = playerLetters.Contains(firstLetter) ? $"Spawn-{firstLetter}" : $"Neutral-{firstLetter}",
+                    BaseAngleMin = 45,
+                    BaseAngleMax = 45,
+                    RandomAngleAmplitude = 360,
+                    RandomAngleStep = 360.0 / Math.Max(1, totalZones)
+                },
+                Border = new Border
+                {
+                    CornerRadius = 0.0,
+                    ObstaclesWidth = 3,
+                    ObstaclesNoise = [new NoiseEntry { Amp = 1, Freq = 12 }],
+                    WaterWidth = tuning.WaterWidth,
+                    WaterNoise = [new NoiseEntry { Amp = 1, Freq = 12 }],
+                    WaterType = tuning.WaterType
+                },
+                Zones = zones,
+                Connections = connections
+            };
+        }
+
+        /// <summary>
+        /// Drops connections the engine cannot resolve: blank/duplicate names, endpoints that name a
+        /// zone which is not in this variant, and self-loops (produced by a degenerate one-zone "ring",
+        /// where <c>zone[i] ↔ zone[(i+1) % 1]</c> is the zone itself).
+        /// </summary>
+        private static void SanitizeConnections(List<Zone> zones, List<Connection> connections)
+        {
+            var zoneNames = new HashSet<string>(zones.Select(z => z.Name), StringComparer.Ordinal);
+            var seenNames = new HashSet<string>(StringComparer.Ordinal);
+            connections.RemoveAll(c =>
+                   string.IsNullOrWhiteSpace(c.Name)
+                || !zoneNames.Contains(c.From)
+                || !zoneNames.Contains(c.To)
+                || string.Equals(c.From, c.To, StringComparison.Ordinal)
+                || !seenNames.Add(c.Name!));
+        }
+
+        /// <summary>
+        /// Strips road endpoints that reference a connection name absent from the final connection list.
+        /// A road whose <c>Connection</c> endpoint dangles makes the engine's road builder fail, and the
+        /// zone builders hand out ring-connection names before the ring is known to exist.
+        /// </summary>
+        private static void SanitizeRoads(List<Zone> zones, List<Connection> connections)
+        {
+            var connNames = new HashSet<string>(
+                connections.Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n))!,
+                StringComparer.Ordinal);
+
+            static bool Dangles(RoadEndpoint? ep, HashSet<string> known) =>
+                ep is { Type: "Connection" } && (ep.Args is null or { Count: 0 } || !known.Contains(ep.Args[0]));
+
+            foreach (var zone in zones)
+                zone.Roads?.RemoveAll(r => Dangles(r.From, connNames) || Dangles(r.To, connNames));
+        }
+
+        /// <summary>
+        /// Guarantees the zone graph is a single connected component: a map where a player can never
+        /// reach part of the world (or any opponent) is unplayable. This happens when "isolate player
+        /// zones" removes every edge around a spawn, or when a topology's ordering puts two player
+        /// zones back-to-back with too few neutrals to separate them.
+        ///
+        /// Components are merged into the largest one with a minimal number of extra Direct links.
+        /// A link is preferred between zones that are NOT both player spawns, so isolation is honoured
+        /// whenever a neutral zone is available to bridge; only a fully player-only component falls back
+        /// to a direct player↔player link (better than an unreachable player).
+        /// No-ops when the graph is already connected, so healthy seeds are unchanged.
+        /// </summary>
+        private static void EnsureGraphConnected(
+            List<string> playerLetters, List<Zone> zones, List<Connection> connections, GenerationTuning tuning)
+        {
+            if (zones.Count < 2) return;
+
+            var index = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int i = 0; i < zones.Count; i++) index[zones[i].Name] = i;
+
+            var parent = Enumerable.Range(0, zones.Count).ToArray();
+            int Find(int x) { while (parent[x] != x) x = parent[x] = parent[parent[x]]; return x; }
+            void Union(int a, int b) { a = Find(a); b = Find(b); if (a != b) parent[b] = a; }
+
+            foreach (var c in connections)
+                if (index.TryGetValue(c.From, out int a) && index.TryGetValue(c.To, out int b))
+                    Union(a, b);
+
+            var components = Enumerable.Range(0, zones.Count)
+                .GroupBy(Find)
+                .Select(g => g.ToList())
+                .ToList();
+            if (components.Count < 2) return;
+
+            var playerZoneNames = new HashSet<string>(playerLetters.Select(l => $"Spawn-{l}"), StringComparer.Ordinal);
+            bool IsPlayerZone(int i) => playerZoneNames.Contains(zones[i].Name);
+
+            // Merge every other component into the biggest one; prefer neutral endpoints so that an
+            // "isolated starts" map keeps its player zones apart whenever a neutral can carry the link.
+            var ordered = components.OrderByDescending(c => c.Count).ToList();
+            var main = ordered[0];
+            var usedNames = new HashSet<string>(connections.Select(c => c.Name!), StringComparer.Ordinal);
+
+            for (int k = 1; k < ordered.Count; k++)
             {
-                CornerRadius = 0.0,
-                ObstaclesWidth = 3,
-                ObstaclesNoise = [new NoiseEntry { Amp = 1, Freq = 12 }],
-                WaterWidth = tuning.WaterWidth,
-                WaterNoise = [new NoiseEntry { Amp = 1, Freq = 12 }],
-                WaterType = tuning.WaterType
-            },
-            Zones = zones,
-            Connections = connections
-        };
+                int from = ordered[k].OrderBy(IsPlayerZone).ThenBy(i => i).First();
+                int to = main.OrderBy(IsPlayerZone).ThenBy(i => i).First();
+
+                string name = $"Link-{zones[from].Name}-{zones[to].Name}";
+                for (int n = 2; !usedNames.Add(name); n++) name = $"Link-{zones[from].Name}-{zones[to].Name}-{n}";
+
+                connections.Add(new Connection
+                {
+                    Name = name,
+                    From = zones[from].Name,
+                    To = zones[to].Name,
+                    ConnectionType = "Direct",
+                    GuardZone = zones[from].Name,
+                    GuardEscape = false,
+                    SimTurnSquad = true,
+                    GuardValue = ScaleBorderGuardValue(IsPlayerZone(from) && IsPlayerZone(to) ? 30000 : 20000, tuning),
+                    GuardWeeklyIncrement = 0.15,
+                    GuardMatchGroup = $"link_guard_{zones[from].Name}_{zones[to].Name}"
+                });
+
+                // Roads are cosmetic pathing: only extend zones that already carry roads (i.e. the map
+                // has roads enabled). A zone without main objects uses the connector idiom
+                // (Connection→Connection), matching BuildConnectorZoneRoads.
+                foreach (int zi in new[] { from, to })
+                {
+                    var zone = zones[zi];
+                    if (zone.Roads is not { Count: > 0 }) continue;
+                    zone.Roads.Add((zone.MainObjects?.Count ?? 0) > 0
+                        ? PlainRoad(MainObjectEndpoint("0"), ConnectionEndpoint(name))
+                        : PlainRoad(ConnectionEndpoint(name), ConnectionEndpoint(name)));
+                }
+
+                main.AddRange(ordered[k]);
+            }
+        }
 
         // ── Spawn zone ───────────────────────────────────────────────────────────
 
@@ -3156,14 +3313,25 @@ namespace Olden_Era___Template_Editor.Services
         /// arranged in a ring (zone[i] ↔ zone[i+1], wrapping around).
         /// When <paramref name="isolatePlayers"/> is true, player–player adjacent pairs are skipped.
         /// </summary>
+        /// <summary>
+        /// Number of distinct edges in a ring of <paramref name="zoneCount"/> zones: none for a single
+        /// zone, exactly one for two zones (i→i+1 and i+1→i are the same pair — emitting both would
+        /// double the border guards between the only two zones), and one per zone from three up.
+        /// </summary>
+        private static int RingEdgeCount(int zoneCount) => zoneCount switch
+        {
+            < 2 => 0,
+            2 => 1,
+            _ => zoneCount
+        };
+
         private static IEnumerable<Connection> BuildRingConnections(
             List<string> playerLetters, List<string> orderedLetters, GenerationTuning tuning, bool isolatePlayers = false,
             IReadOnlyDictionary<string, NeutralZonePlan>? neutralByLetter = null)
         {
             int count = orderedLetters.Count;
-            if (count < 2) yield break;
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < RingEdgeCount(count); i++)
             {
                 int next = (i + 1) % count;
                 string fromLetter = orderedLetters[i];
@@ -3374,6 +3542,43 @@ namespace Olden_Era___Template_Editor.Services
                 BuildZoneLayout(TreasureLayoutName, 0.50, 0.50, 0.45, 12, 0.12, 96, -0.30, 0.3, [12, 3, 1], obstacleScale, lakeScale),
                 BuildZoneLayout(CenterLayoutName, 0.56, 0.60, 0.30, 10, 0.128, 96, -0.25, 0.3, [12, 4, 1], obstacleScale, lakeScale)
             ];
+        }
+
+        /// <summary>
+        /// A neutral, generic <see cref="ZoneLayout"/> definition for a layout name that a zone
+        /// references but the template never defines (the "side" profile — the middle-of-the-road one).
+        /// </summary>
+        public static ZoneLayout DefaultZoneLayout(string name) =>
+            BuildZoneLayout(name, 0.36, 0.50, 0.25, 16, 0.128, 128, -0.30, 0.3, [20, 2, 1]);
+
+        /// <summary>
+        /// Makes a template self-contained before it is written to disk: every <c>layout</c> a zone
+        /// references must have a matching entry in the top-level <c>zoneLayouts</c> block, otherwise
+        /// the engine cannot shape that zone and map generation fails. All 1088 zones across the stock
+        /// templates honour this invariant, but the visual editor can break it — adding a zone (or
+        /// retyping its layout) inside a template that only defines its own layout names leaves a
+        /// dangling reference. Missing definitions get <see cref="DefaultZoneLayout"/>.
+        /// Returns the names that were added, so the caller can tell the user what happened.
+        /// </summary>
+        public static List<string> EnsureZoneLayoutsDefined(RmgTemplate template)
+        {
+            var added = new List<string>();
+            if (template.Variants is null) return added;
+
+            var defined = new HashSet<string>(
+                (template.ZoneLayouts ?? []).Select(l => l.Name).Where(n => !string.IsNullOrEmpty(n))!,
+                StringComparer.Ordinal);
+
+            foreach (var variant in template.Variants)
+            foreach (var zone in variant.Zones ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(zone.Layout) || !defined.Add(zone.Layout!)) continue;
+                template.ZoneLayouts ??= [];
+                template.ZoneLayouts.Add(DefaultZoneLayout(zone.Layout!));
+                added.Add(zone.Layout!);
+            }
+
+            return added;
         }
 
         /// <summary>Clamps a scaled 0..1 terrain-fill fraction into a safe, still-passable range.</summary>

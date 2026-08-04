@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class Zone
+    public class Zone : RmgNode
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
@@ -103,7 +103,7 @@ namespace OldenEraTemplateEditor.Models
         public List<Road>? Roads { get; set; }
     }
 
-    public class EncounterHolesSettings
+    public class EncounterHolesSettings : RmgNode
     {
         [JsonPropertyName("affectedEncounters")]
         public double? AffectedEncounters { get; set; }
@@ -112,7 +112,7 @@ namespace OldenEraTemplateEditor.Models
         public double? TwoHoleEncounters { get; set; }
     }
 
-    public class BiomeSelector
+    public class BiomeSelector : RmgNode
     {
         [JsonPropertyName("type")]
         public string? Type { get; set; }

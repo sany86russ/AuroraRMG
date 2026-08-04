@@ -233,8 +233,10 @@
 
                             <!-- Начальный лимит героев -->
                             <Label Grid.Row="0" Grid.Column="0" Content="{DynamicResource S.Lbl.HeroMin}"
+                                   ToolTip="{DynamicResource S.Tip.HeroMin}"
                                    Padding="5,2" VerticalAlignment="Center"/>
                             <Slider Grid.Row="0" Grid.Column="1" x:Name="SldHeroMin"
+                                    ToolTip="{DynamicResource S.Tip.HeroMin}"
                                     Minimum="1" Maximum="12" Value="4" VerticalAlignment="Center"
                                     Margin="0,0,6,0" TickFrequency="1" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
@@ -251,8 +253,10 @@
 
                             <!-- Прирост лимита за замок (между начальным и максимумом) -->
                             <Label Grid.Row="2" Grid.Column="0" Content="{DynamicResource S.Lbl.HeroIncrement}"
+                                   ToolTip="{DynamicResource S.Tip.HeroIncrement}"
                                    Padding="5,2" VerticalAlignment="Center"/>
                             <Slider Grid.Row="2" Grid.Column="1" x:Name="SldHeroIncrement"
+                                    ToolTip="{DynamicResource S.Tip.HeroIncrement}"
                                     Minimum="0" Maximum="20" Value="1" VerticalAlignment="Center"
                                     Margin="0,0,6,0" TickFrequency="1" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
@@ -269,8 +273,10 @@
 
                             <!-- Максимальный лимит героев (внизу) -->
                             <Label Grid.Row="4" Grid.Column="0" Content="{DynamicResource S.Lbl.HeroMax}"
+                                   ToolTip="{DynamicResource S.Tip.HeroMax}"
                                    Padding="5,2" VerticalAlignment="Center"/>
                             <Slider Grid.Row="4" Grid.Column="1" x:Name="SldHeroMax"
+                                    ToolTip="{DynamicResource S.Tip.HeroMax}"
                                     Minimum="1" Maximum="12" Value="8" VerticalAlignment="Center"
                                     Margin="0,0,6,0" TickFrequency="1" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
@@ -441,13 +447,14 @@
                                         TickFrequency="10" SmallChange="10" IsSnapToTickEnabled="True"
                                         ValueChanged="Slider_ValueChanged"/>
 
-                                <DockPanel Grid.Row="8" Grid.Column="0">
+                                <DockPanel Grid.Row="8" Grid.Column="0" ToolTip="{DynamicResource S.Tip.Diplomacy}">
                                     <Label Content="{DynamicResource S.M.038}" DockPanel.Dock="Left"/>
                                     <TextBlock x:Name="TxtDiplomacy" Text="-0.50" DockPanel.Dock="Right"
                                                HorizontalAlignment="Right" VerticalAlignment="Center"
                                                Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                                 </DockPanel>
                                 <Slider Grid.Row="8" Grid.Column="1" x:Name="SldDiplomacy"
+                                        ToolTip="{DynamicResource S.Tip.Diplomacy}"
                                         Minimum="-100" Maximum="100" Value="-50"
                                         TickFrequency="5" SmallChange="5" IsSnapToTickEnabled="True"
                                         ValueChanged="Slider_ValueChanged"/>
@@ -835,35 +842,35 @@
                                     TickFrequency="1" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
 
-                            <DockPanel Grid.Row="7" Grid.Column="0">
+                            <DockPanel Grid.Row="7" Grid.Column="0" ToolTip="{DynamicResource S.Tip.ResourceDensity}">
                                 <Label Content="{DynamicResource S.M.055}" DockPanel.Dock="Left"/>
                                 <TextBlock x:Name="TxtResourceDensity" Text="100%" DockPanel.Dock="Right"
                                            HorizontalAlignment="Right" VerticalAlignment="Center"
                                            Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                             </DockPanel>
-                            <Slider Grid.Row="7" Grid.Column="1" x:Name="SldResourceDensity"
+                            <Slider Grid.Row="7" Grid.Column="1" x:Name="SldResourceDensity" ToolTip="{DynamicResource S.Tip.ResourceDensity}"
                                     Minimum="20" Maximum="400" Value="100"
                                     TickFrequency="10" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
 
-                            <DockPanel Grid.Row="9" Grid.Column="0">
+                            <DockPanel Grid.Row="9" Grid.Column="0" ToolTip="{DynamicResource S.Tip.StructureDensity}">
                                 <Label Content="{DynamicResource S.M.056}" DockPanel.Dock="Left"/>
                                 <TextBlock x:Name="TxtStructureDensity" Text="100%" DockPanel.Dock="Right"
                                            HorizontalAlignment="Right" VerticalAlignment="Center"
                                            Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                             </DockPanel>
-                            <Slider Grid.Row="9" Grid.Column="1" x:Name="SldStructureDensity"
+                            <Slider Grid.Row="9" Grid.Column="1" x:Name="SldStructureDensity" ToolTip="{DynamicResource S.Tip.StructureDensity}"
                                     Minimum="20" Maximum="200" Value="100"
                                     TickFrequency="10" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
 
-                            <DockPanel Grid.Row="11" Grid.Column="0">
+                            <DockPanel Grid.Row="11" Grid.Column="0" ToolTip="{DynamicResource S.Tip.NeutralStrength}">
                                 <Label Content="{DynamicResource S.M.057}" DockPanel.Dock="Left"/>
                                 <TextBlock x:Name="TxtNeutralStackStrength" Text="100%" DockPanel.Dock="Right"
                                            HorizontalAlignment="Right" VerticalAlignment="Center"
                                            Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                             </DockPanel>
-                            <Slider Grid.Row="11" Grid.Column="1" x:Name="SldNeutralStackStrength"
+                            <Slider Grid.Row="11" Grid.Column="1" x:Name="SldNeutralStackStrength" ToolTip="{DynamicResource S.Tip.NeutralStrength}"
                                     Minimum="25" Maximum="300" Value="100"
                                     TickFrequency="5" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>

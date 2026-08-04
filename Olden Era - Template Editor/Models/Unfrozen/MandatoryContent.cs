@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class MandatoryContentGroup
+    public class MandatoryContentGroup : RmgNode
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
@@ -12,7 +12,7 @@ namespace OldenEraTemplateEditor.Models
         public List<ContentItem>? Content { get; set; }
     }
 
-    public class ContentItem
+    public class ContentItem : RmgNode
     {
         [JsonPropertyName("name")]
         public string? Name { get; set; }
@@ -39,7 +39,7 @@ namespace OldenEraTemplateEditor.Models
         public List<ContentPlacementRule>? Rules { get; set; }
     }
 
-    public class ContentPlacementRule
+    public class ContentPlacementRule : RmgNode
     {
         [JsonPropertyName("type")]
         public string? Type { get; set; }
@@ -57,7 +57,7 @@ namespace OldenEraTemplateEditor.Models
         public double? Weight { get; set; }
     }
 
-    public class ContentCountLimit
+    public class ContentCountLimit : RmgNode
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
@@ -72,7 +72,7 @@ namespace OldenEraTemplateEditor.Models
         public List<ContentSidLimit>? Limits { get; set; }
     }
 
-    public class ContentSidLimit
+    public class ContentSidLimit : RmgNode
     {
         [JsonPropertyName("sid")]
         public string Sid { get; set; } = string.Empty;

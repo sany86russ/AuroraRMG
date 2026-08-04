@@ -74,6 +74,15 @@ namespace Olden_Era___Template_Editor
         // Literal UTF-8 (no \uXXXX), UTF-8 no-BOM. See Services.JsonExport.
         private static readonly JsonSerializerOptions JsonOptions = Olden_Era___Template_Editor.Services.JsonExport.Options;
 
+        /// <summary>
+        /// Same converters and encoder as the save path, but without the pretty-printing whitespace.
+        /// Used for undo snapshots and deep clones, which are never read by a human: indentation is
+        /// well over half the bytes of a large template, and the editor keeps up to
+        /// <see cref="MaxUndoDepth"/> snapshots in memory at once.
+        /// </summary>
+        private static readonly JsonSerializerOptions SnapshotOptions =
+            new(Olden_Era___Template_Editor.Services.JsonExport.Options) { WriteIndented = false };
+
         private RmgTemplate _template;
         private MapTopology _topology;
         private string? _currentPath;
@@ -109,6 +118,8 @@ namespace Olden_Era___Template_Editor
         private string _undoBaseline = "";
         private bool _restoringHistory;
         private const int MaxUndoDepth = 50;
+        /// <summary>Memory ceiling for the undo history (~16 MB of UTF-16 chars), independent of depth.</summary>
+        private const long MaxUndoChars = 8_000_000;
 
         public TemplateEditorWindow(RmgTemplate? template = null, MapTopology topology = MapTopology.Default)
         {
@@ -121,7 +132,7 @@ namespace Olden_Era___Template_Editor
                 RebuildGraph();
                 FitToView();
                 UpdateTitle();
-                _undoBaseline = JsonSerializer.Serialize(_template, JsonOptions);
+                _undoBaseline = JsonSerializer.Serialize(_template, SnapshotOptions);
                 // Zone/connection counts now live in the permanent TxtZoneCount readout,
                 // so the transient status line keeps its localized "Ready" default.
             };
@@ -160,6 +171,20 @@ namespace Olden_Era___Template_Editor
                 _radius = Math.Max(16, TemplatePreviewPngWriter.GetLastZoneRadius());
             }
             catch { /* fall through to placement */ }
+
+            // A hand-arranged graph wins over the computed one: re-deriving positions on every load
+            // used to throw away the user's dragging the moment a template was saved and reopened.
+            if (_currentPath is not null)
+            {
+                var remembered = EditorLayoutStore.Load(_currentPath);
+                if (remembered is not null)
+                {
+                    var known = new HashSet<string>(Zones.Select(z => z.Name), StringComparer.Ordinal);
+                    foreach (var kv in remembered)
+                        if (known.Contains(kv.Key)) _positions[kv.Key] = kv.Value;
+                }
+            }
+
             PlaceMissingZones();
         }
 
@@ -1694,6 +1719,14 @@ namespace Olden_Era___Template_Editor
                 combo.SelectedItem = value;
             else
                 combo.Text = value ?? "";
+            // An editable ComboBox renders its value through a TextBox part that only exists once the
+            // control template is applied — assigning SelectedItem/Text beforehand can leave the field
+            // looking EMPTY even though the model holds a value. Re-assert it on Loaded.
+            combo.Loaded += (_, _) =>
+            {
+                if (!string.IsNullOrEmpty(value) && string.IsNullOrEmpty(combo.Text))
+                    combo.Text = value;
+            };
             combo.LostFocus += (_, _) => onCommit(combo.Text.Trim());
             combo.SelectionChanged += (_, _) =>
             {
@@ -2098,12 +2131,9 @@ namespace Olden_Era___Template_Editor
                 return;
             }
             string old = z.Name;
-            // Re-point connections + position map.
-            foreach (var c in Connections)
-            {
-                if (c.From == old) c.From = newName;
-                if (c.To == old)   c.To = newName;
-            }
+            // Re-point EVERY reference to the old name, not just the connection endpoints
+            // (guardZone, MatchZone biome selectors, the orientation anchor) — see TemplateRefactor.
+            TemplateRefactor.RenameZoneReferences(Variant, old, newName);
             if (_positions.Remove(old, out var pt)) _positions[newName] = pt;
             z.Name = newName;
             MarkDirty();
@@ -2255,7 +2285,9 @@ namespace Olden_Era___Template_Editor
                 return;
             }
             string connType = "Direct";
-            string autoName = $"{connType}-{_connectFrom.Name}-{z.Name}";
+            // Connecting the same pair twice used to produce two identically named connections, which
+            // the engine cannot tell apart (and the validator flags on save).
+            string autoName = MakeUniqueConnectionName($"{connType}-{_connectFrom.Name}-{z.Name}");
             var conn = new Connection { Name = autoName, From = _connectFrom.Name, To = z.Name, ConnectionType = connType };
             Connections.Add(conn);
             UpdateStatus(L("S.EC.ConnAdded", conn.From, conn.To));
@@ -2327,9 +2359,12 @@ namespace Olden_Era___Template_Editor
                 ResourcesValue = 3000,
                 ResourcesValuePerArea = 100,
                 MainObjects = [],
-                ZoneBiome = new BiomeSelector { Type = "MatchZone", Args = [name] },
-                ContentBiome = new BiomeSelector { Type = "MatchZone", Args = [name] },
-                MetaObjectsBiome = new BiomeSelector { Type = "MatchZone", Args = [name] },
+                // MatchZone with EMPTY args = "this zone's own terrain", the same default the generator
+                // writes for a castle-less zone. Passing the zone's own name instead makes the selector
+                // copy itself, which never resolves — see ZoneGraphValidator's S.V.BiomeSelf check.
+                ZoneBiome = new BiomeSelector { Type = "MatchZone", Args = [] },
+                ContentBiome = new BiomeSelector { Type = "MatchZone", Args = [] },
+                MetaObjectsBiome = new BiomeSelector { Type = "MatchZone", Args = [] },
                 CrossroadsPosition = 0,
             };
             Zones.Add(z);
@@ -2458,7 +2493,9 @@ namespace Olden_Era___Template_Editor
         {
             if (_selected is Zone z)
             {
-                int removedConns = Connections.RemoveAll(c => c.From == z.Name || c.To == z.Name);
+                // Also prunes the roads, biome selectors and orientation anchor that pointed at it —
+                // leaving those behind produces a template the engine cannot generate.
+                int removedConns = TemplateRefactor.RemoveZoneReferences(Variant, z.Name);
                 Zones.Remove(z);
                 _positions.Remove(z.Name);
                 MarkDirty();
@@ -2469,6 +2506,7 @@ namespace Olden_Era___Template_Editor
             else if (_selected is Connection c)
             {
                 Connections.Remove(c);
+                if (!string.IsNullOrEmpty(c.Name)) TemplateRefactor.RemoveRoadsFor(Variant, c.Name!);
                 MarkDirty();
                 RebuildGraph();
                 Select(null);
@@ -2622,7 +2660,18 @@ namespace Olden_Era___Template_Editor
 
         /// <summary>Deep-clones a zone via a JSON round-trip (same options as save).</summary>
         private static Zone CloneZone(Zone z) =>
-            JsonSerializer.Deserialize<Zone>(JsonSerializer.Serialize(z, JsonOptions), JsonOptions)!;
+            JsonSerializer.Deserialize<Zone>(JsonSerializer.Serialize(z, SnapshotOptions), SnapshotOptions)!;
+
+        /// <summary>Returns a connection name not already used, e.g. "Direct-A-B", "Direct-A-B-2".</summary>
+        private string MakeUniqueConnectionName(string baseName)
+        {
+            var existing = new HashSet<string>(
+                Connections.Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n))!,
+                StringComparer.Ordinal);
+            if (!existing.Contains(baseName)) return baseName;
+            for (int n = 2; ; n++)
+                if (!existing.Contains($"{baseName}-{n}")) return $"{baseName}-{n}";
+        }
 
         /// <summary>Returns a zone name not already used, e.g. "Zone (copy)", "Zone (copy 2)".</summary>
         private string MakeUniqueZoneName(string baseName)
@@ -2706,11 +2755,20 @@ namespace Olden_Era___Template_Editor
 
             try
             {
+                // A zone whose layout has no definition in the file makes the engine fail while
+                // generating the map, and the editor can easily create one (new zone, retyped layout).
+                var addedLayouts = TemplateGenerator.EnsureZoneLayoutsDefined(_template);
+
                 File.WriteAllText(dlg.FileName, JsonSerializer.Serialize(_template, JsonOptions));
+                // Remember the hand-arranged graph so reopening this template restores it (sidecar in
+                // %LOCALAPPDATA%, never next to the game's template file).
+                EditorLayoutStore.Save(dlg.FileName, _positions);
                 _currentPath = dlg.FileName;
                 _dirty = false;
                 UpdateTitle();
-                UpdateStatus(L("S.EC.Saved", IOPath.GetFileName(dlg.FileName)));
+                UpdateStatus(addedLayouts.Count > 0
+                    ? L("S.EC.SavedFixedLayouts", IOPath.GetFileName(dlg.FileName), string.Join(", ", addedLayouts))
+                    : L("S.EC.Saved", IOPath.GetFileName(dlg.FileName)));
             }
             catch (Exception ex)
             {
@@ -2743,10 +2801,19 @@ namespace Olden_Era___Template_Editor
         private void CaptureUndoSnapshot()
         {
             if (_restoringHistory) return;
-            string now = JsonSerializer.Serialize(_template, JsonOptions);
+            string now = JsonSerializer.Serialize(_template, SnapshotOptions);
             if (string.Equals(now, _undoBaseline, StringComparison.Ordinal)) return;
             _undoStack.Add(_undoBaseline);
             if (_undoStack.Count > MaxUndoDepth) _undoStack.RemoveAt(0);
+            // A 48-zone template serializes to a few hundred KB; a deep history of those adds up, so
+            // the depth limit is backed by a hard memory ceiling as well.
+            long chars = 0;
+            foreach (string snapshot in _undoStack) chars += snapshot.Length;
+            while (_undoStack.Count > 1 && chars > MaxUndoChars)
+            {
+                chars -= _undoStack[0].Length;
+                _undoStack.RemoveAt(0);
+            }
             _redoStack.Clear();
             _undoBaseline = now;
             UpdateUndoButtons();
@@ -2782,7 +2849,7 @@ namespace Olden_Era___Template_Editor
             _restoringHistory = true;
             try
             {
-                _template = JsonSerializer.Deserialize<RmgTemplate>(json, JsonOptions)!;
+                _template = JsonSerializer.Deserialize<RmgTemplate>(json, SnapshotOptions)!;
                 _undoBaseline = json;
                 _selected = null; _connectFrom = null; _connectMode = false;
                 BtnConnectMode.Background = null;
@@ -2820,7 +2887,7 @@ namespace Olden_Era___Template_Editor
         {
             _undoStack.Clear();
             _redoStack.Clear();
-            _undoBaseline = JsonSerializer.Serialize(_template, JsonOptions);
+            _undoBaseline = JsonSerializer.Serialize(_template, SnapshotOptions);
             UpdateUndoButtons();
         }
 

@@ -723,6 +723,13 @@ namespace Olden_Era___Template_Editor
             if (TxtTemplateName.Text.Trim().Equals(L.Get("S.M.014"), StringComparison.OrdinalIgnoreCase))
                 warnings.Add(new ValidationMessage(L.Get("S.CB.V.DefaultName"), warnBrush));
 
+            // The engine's limit is heroCountMin + increment × towns, so the template stores
+            // (starting limit − increment). When the increment exceeds the starting limit that value
+            // would go negative; it is clamped at 0, which quietly raises the real starting limit.
+            int heroIncrement = (int)SldHeroIncrement.Value;
+            if (ChkSingleHeroMode.IsChecked != true && heroIncrement > heroMin)
+                warnings.Add(new ValidationMessage(L.Get("S.CB.V.HeroIncrementHigh", heroMin, heroIncrement), warnBrush));
+
             // Experimental single-player: no official RMG template ships with one spawn, so warn that the
             // resulting map must be tested in-game (it may or may not launch as a no-AI solo scenario).
             if (players <= 1)

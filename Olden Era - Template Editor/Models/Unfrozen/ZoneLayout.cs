@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class ZoneLayout
+    public class ZoneLayout : RmgNode
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;
@@ -36,7 +36,7 @@ namespace OldenEraTemplateEditor.Models
         public AmbientPickupDistribution? AmbientPickupDistribution { get; set; }
     }
 
-    public class ElevationMode
+    public class ElevationMode : RmgNode
     {
         [JsonPropertyName("weight")]
         public int Weight { get; set; }
@@ -48,7 +48,7 @@ namespace OldenEraTemplateEditor.Models
         public double MaxElevatedFraction { get; set; }
     }
 
-    public class GuardedEncounterResourceFractions
+    public class GuardedEncounterResourceFractions : RmgNode
     {
         [JsonPropertyName("countBounds")]
         public List<double>? CountBounds { get; set; }
@@ -57,7 +57,7 @@ namespace OldenEraTemplateEditor.Models
         public List<double>? Fractions { get; set; }
     }
 
-    public class AmbientPickupDistribution
+    public class AmbientPickupDistribution : RmgNode
     {
         [JsonPropertyName("repulsion")]
         public double? Repulsion { get; set; }

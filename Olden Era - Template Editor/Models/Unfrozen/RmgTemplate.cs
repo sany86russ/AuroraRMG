@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class RmgTemplate
+    public class RmgTemplate : RmgNode
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;

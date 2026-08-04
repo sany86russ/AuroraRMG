@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class MainObject
+    public class MainObject : RmgNode
     {
         [JsonPropertyName("type")]
         public string Type { get; set; } = string.Empty;
@@ -38,11 +38,27 @@ namespace OldenEraTemplateEditor.Models
         [JsonPropertyName("placementArgs")]
         public List<string>? PlacementArgs { get; set; }
 
+        /// <summary>Per-object guard-strength jitter (engine <c>guardRandomization</c>).</summary>
+        [JsonPropertyName("guardRandomization")]
+        public double? GuardRandomization { get; set; }
+
+        /// <summary>Marks a town as the player's starting city (engine <c>isStartCity</c>).</summary>
+        [JsonPropertyName("isStartCity")]
+        public bool? IsStartCity { get; set; }
+
+        /// <summary>Building ban list applied to this town (engine <c>buildingsBanSid</c>).</summary>
+        [JsonPropertyName("buildingsBanSid")]
+        public string? BuildingsBanSid { get; set; }
+
+        /// <summary>Marks the object as a key objective (engine <c>isKeyObject</c>).</summary>
+        [JsonPropertyName("isKeyObject")]
+        public bool? IsKeyObject { get; set; }
+
         [JsonPropertyName("holdCityWinCon")]
         public bool? HoldCityWinCon { get; set; }
     }
 
-    public class TypedSelector
+    public class TypedSelector : RmgNode
     {
         [JsonPropertyName("type")]
         public string? Type { get; set; }

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class ValueOverride
+    public class ValueOverride : RmgNode
     {
         [JsonPropertyName("sid")]
         public string Sid { get; set; } = string.Empty;
@@ -15,7 +15,7 @@ namespace OldenEraTemplateEditor.Models
         public int? GuardValue { get; set; }
     }
 
-    public class GlobalBans
+    public class GlobalBans : RmgNode
     {
         [JsonPropertyName("items")]
         public List<string>? Items { get; set; }

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class Variant
+    public class Variant : RmgNode
     {
         [JsonPropertyName("orientation")]
         public Orientation? Orientation { get; set; }
@@ -18,7 +18,7 @@ namespace OldenEraTemplateEditor.Models
         public List<Connection>? Connections { get; set; }
     }
 
-    public class Orientation
+    public class Orientation : RmgNode
     {
         [JsonPropertyName("mode")]
         public string? Mode { get; set; }
@@ -39,7 +39,7 @@ namespace OldenEraTemplateEditor.Models
         public double? RandomAngleStep { get; set; }
     }
 
-    public class Border
+    public class Border : RmgNode
     {
         [JsonPropertyName("cornerRadius")]
         public double? CornerRadius { get; set; }
@@ -60,7 +60,7 @@ namespace OldenEraTemplateEditor.Models
         public string? WaterType { get; set; }
     }
 
-    public class NoiseEntry
+    public class NoiseEntry : RmgNode
     {
         [JsonPropertyName("amp")]
         public double Amp { get; set; }

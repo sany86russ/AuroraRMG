@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace OldenEraTemplateEditor.Models
 {
-    public class Connection
+    public class Connection : RmgNode
     {
         [JsonPropertyName("name")]
         public string? Name { get; set; }
@@ -43,8 +43,20 @@ namespace OldenEraTemplateEditor.Models
         [JsonPropertyName("road")]
         public bool? Road { get; set; }
 
+        /// <summary>
+        /// Per-connection guard-strength jitter (engine <c>guardRandomization</c>, e.g. <c>0.15</c>).
+        /// Used by 166 connections across the stock templates; the generator leaves it unset so the
+        /// zone-level randomization applies.
+        /// </summary>
+        [JsonPropertyName("guardRandomization")]
+        public double? GuardRandomization { get; set; }
+
         [JsonPropertyName("gatePlacement")]
         public string? GatePlacement { get; set; }
+
+        /// <summary>Arguments for <see cref="GatePlacement"/> (e.g. the zone a gate is placed near).</summary>
+        [JsonPropertyName("gatePlacementArgs")]
+        public List<string>? GatePlacementArgs { get; set; }
 
         [JsonPropertyName("length")]
         public double? Length { get; set; }
