@@ -101,15 +101,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.ver.outputs.tag }}"
+          NOTES="docs/release-notes-$TAG.md"
+          NOTE_ARGS=(--generate-notes)
+          if [ -f "$NOTES" ]; then
+            NOTE_ARGS=(--notes-file "$NOTES")
+          fi
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Релиз $TAG уже существует — обновляю ассет."
             gh release upload "$TAG" "$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+            if [ -f "$NOTES" ]; then
+              gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES"
+            fi
           else
             echo "Создаю релиз $TAG."
             gh release create "$TAG" "$ASSET" \
               --repo "$GITHUB_REPOSITORY" \
               --title "AuroraRMG $TAG" \
-              --generate-notes \
+              "${NOTE_ARGS[@]}" \
               --latest \
               --target "$GITHUB_SHA"
           fi

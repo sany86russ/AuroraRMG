@@ -16,6 +16,12 @@
 
 </div>
 
+## New in v1.11.0
+
+Border and portal guards up to **800%**, neutral-town faction rules without manual JSON editing, and fixes for mirrored references and undo/redo. Window layouts, RU/EN translations, file saving and automatic updates have also been improved.
+
+[Full RU/EN changelog](docs/release-notes-v1.11.0.md) · [Download v1.11.0](https://github.com/sany86russ/AuroraRMG/releases/tag/v1.11.0)
+
 ---
 
 > [!NOTE]
@@ -130,6 +136,8 @@ AuroraRMG can update itself, no manual downloading.
 
 The current version is always shown **in the window header**, in the badge next to `AuroraRMG`.
 
+Before installation, the app checks file size, Windows executable format and SHA-256 when provided by the release. Incomplete downloads are removed. Replacement keeps the previous executable (`.previous`); a failed replacement preserves the working version.
+
 > [!NOTE]
 > The update check is **skipped** if the app is started with the `--minimized` flag (see [Running without disturbing the game](#-running-without-disturbing-the-game)). If there's no internet or GitHub is unreachable, the app just keeps working.
 
@@ -181,10 +189,10 @@ For players who **don't want to learn templates**. You set just a few clear opti
 | **Game length** | Short / Medium / Long — affects size, zone count and guard strength. |
 | **Chaos level** | Tame / Normal / Wild — how wild and unpredictable the map gets. |
 | **Victory condition** | All the real in-game modes — classic, city/capital hold, final battle, tournament (see [Victory conditions](#-victory-conditions--special-modes)). |
-| **Border guards** | Strength of the monster guards on the passages between zones: **Weak / Normal / Strong / Fortress / Impassable** — a "face-control" against early rushes (in Advanced mode it's the "Border/portal guards" slider). |
+| **Border guards** | Strength of the monster guards on the passages between zones: **Weak / Normal / Strong / Fortress / Impassable / 800%**. The new **800%** option sets exactly 800% at any chaos level; existing levels are preserved (in Advanced mode it's the "Border/portal guards" slider). |
 | **Neutral castle faction** | Which faction the **capturable** castles in neutral zones belong to: **Random** or a specific one (Human/Undead/Dungeon/Nature/Demon/Unfrozen). A full town of the chosen faction — unowned until you capture it. Handy for co-op "lanes" maps where you take a town of a chosen faction along the way. |
 | **Extras** | Water, portals, stronger neutrals. |
-| **Seed** 🎲 📋 | The map's fingerprint: the same seed always yields the same map. **Share the seed** to play an identical map with friends. 🎲 = new random, 📋 = copy. |
+| **Seed** 🎲 📋 | The same seed, settings and generator version produce the same **template**. Share them together or send the `.rmg.json`; the game builds the actual world and object placement. 🎲 = new random, 📋 = copy. |
 
 Then: **"⚔ Create map"** → a **preview** and a short **summary** (including an estimated game length, a **balance score** and a **"what's inside"** breakdown — see [Map analysis](#-map-analysis-balance--contents)) appear on the right → **"💾 Save to game folder"** (asks for a name and drops the map straight into the game) or **"Save as…"**. A **hint for every option** sits at the bottom of the window. Any map can be **"Opened in Advanced mode"** and fine-tuned by hand.
 
@@ -206,7 +214,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.10]  —  file_name    🔄 📂 💾 💾… 🗺 RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG  [v1.11]  —  file_name    🔄 📂 💾 💾… RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │
@@ -368,7 +376,7 @@ Base sliders (always available):
 | **Resource frequency** | Density of resources and mines *(20% – 400%, default 100%)*. |
 | **Structure frequency** | Density of structures/objects *(20% – 200%, default 100%)*. |
 | **Neutral army strength** | Strength of neutral armies in zones *(25% – 300%, default 100%)*. |
-| **Border/portal guards** | Guard strength on zone borders and portals *(25% – 500%, default 100%)* — the same setting as "Border guards" in Simple mode. |
+| **Border/portal guards** | Guard strength on zone borders and portals *(25% – 800%, default 100%)* — the same setting as "Border guards" in Simple mode. **800%** gives eight times the guard budget of 100%, without changing neutral strength inside zones. Stronger guards do not guarantee protection from AI. |
 | **Neutral castle faction** | Which faction the **capturable** castles in neutral zones belong to: **Random** or a specific one (Human/Undead/Dungeon/Nature/Demon/Unfrozen). A full town of the chosen faction — unowned until captured. Same as in Simple mode. |
 | **Generate roads** | Adds roads between connected zones *(on by default)*. |
 | **Create remote footholds** | Places remote footholds in every town zone *(on by default)*. |
@@ -405,7 +413,7 @@ Advanced settings (the **"Advanced settings"** checkbox in the block header):
 ### Tab · "Extra Content [EXP.]"
 
 > [!WARNING]
-> Experimental section. It defines **mandatory content** — objects **guaranteed** to appear in every zone of the chosen type. Overdoing it can make a map unbalanced or unplayable.
+> Experimental section. It defines **mandatory content** — objects requested in every zone of the chosen type, subject to the space available to the game engine. Overdoing it can make a map unbalanced or unplayable.
 
 Content is configured separately for five zone types (sub-tabs):
 
@@ -459,7 +467,9 @@ The right column of the window:
 
 After generating (in **both** modes) AuroraRMG immediately shows a quick analysis of the resulting map — in the Simple-mode summary and in the Advanced right-hand panel. Everything is computed **locally** from the map graph; nothing is sent to the network.
 
-### ⚖ Balance score (0–100)
+### ⚖ Starting fairness (0–100)
+
+Passages and portals count as travel links; **Proximity** only controls placement. Disconnected player starts receive a score of **0** and a warning, except for intentional tournament islands.
 
 How equal the players' starting conditions are. For each player it considers: the zone's **starting wealth**, nearby **room to expand** (the value of adjacent zones), the **distance to the nearest opponent** and **access to neutral castles**. The smaller the spread between players, the higher the score. Plain-language notes appear alongside, e.g.:
 
@@ -478,7 +488,7 @@ The map's contents in one line: how many zones and of which kind (**players / ne
 
 ## 🗺 Visual zone editor
 
-The **"🗺 Editor"** header button opens an interactive **zone-graph canvas editor** — see and edit the template's structure by hand, in the spirit of community visual editors.
+The **"🗺 Editor"** button below Save in the right panel opens an interactive **zone-graph canvas editor** — see and edit the template's structure by hand, in the spirit of community visual editors.
 
 <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-editor-en.png" alt="Visual zone editor" width="100%"/>
 
@@ -487,7 +497,14 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 - **Editing:** drag zones; the **inspector** on the right is grouped into tabs (**Main · Guard · Pools · Content · Biome · Objects**) and edits **every** serializable field of the selected zone (name, size, layout, diplomacy, guard cutoff/randomization/increment, guard reaction, encounter holes, content pools and their value, zone/content/meta-object biomes, roads, castle/outpost, main objects with faction/owner) or connection (name, from/to, type, guard strength and zone, increment, gate, length, road).
 - **⇄ Mirror mode:** edit one half of the map and the other half follows (zones, properties, connections). The vertical axis through the middle of the canvas is drawn dashed; zones on the axis count as the shared middle and are never duplicated. When switching the mode on you can rebuild the right half from the left in one step — starts on the new half take the next free player numbers. A symmetric 1v1 or 2v2 comes together in a couple of minutes.
 - **⬇ Import from .h3t (Heroes III / HotA templates):** reads zones and their roles, sizes, player starts, guarded connections and roads. The **structure** is carried over — content and balance use our own defaults and still need tuning.
+- **Deletion and factions:** deleting a town updates object indices in faction references and roads. A `Match` to a removed source becomes a random faction; a `differentFrom` restriction on it is removed. Deleting a zone handles all its objects. Undo restores the rules and zone position. Mirrored copies reference sources on their own side of the map.
+- **Make town neutral:** this button keeps the faction rule, removes ownership and player-start flags, and enables guards if absent. Existing guard settings are preserved.
 - **⬇ Import a sketch:** draw the map in any paint program as coloured blobs on a light background — a filled blob becomes a zone (colour picks the role: green = player start, blue = start zone, grey = treasure, gold = super treasure…) and touching blobs become a connection. Blob area sets the zone size, its centre sets the node's position on the canvas.
+- **Images from HotA HTML descriptions:** lines between nodes and labels are not recognized as connections. Use `.h3t` import to transfer a HotA template's structure; sketch import expects colored regions that touch or lie close together. Review the result before applying.
+- **A neutral town matching a player's start:** select the zone → Main → the town, and leave its owner empty. In the faction section, choose a source object, such as `Spawn-A · object 0`, then click Same faction or Different faction. The first creates `Match` with `["0", "Spawn-A"]`; the second creates `FromList` with `["differentFrom: 0 Spawn-A"]`. The town stays neutral while its faction follows the selected start. Additional towns have the same controls. Arguments can also be edited directly: one per line, without quotes; object indices start at 0. Renaming a zone updates these references, and validation warns about missing sources or `Match` cycles.
+- **Window layout:** commands wrap to the available width, grid snapping does not cover the title, and the inspector has a draggable divider. Snapping and auto-layout affect only the diagram; Auto-layout recalculates positions and Fit map adjusts the zoom.
+- **Custom pools:** created pools are available in the inspector and embedded in the saved `.rmg.json`. Recipients do not need your local library; embedded definitions are available in the pool viewer.
+- **Numbers and search:** decimal fields accept a dot or comma. Item, spell and guard-value selections survive changes to the search query.
 - **⌨ Your own shortcuts:** every editor command can be rebound (defaults: Ctrl+N add zone, Ctrl+L connect, Del delete, F5 validate, Ctrl+M mirror, F1 help).
 - **The editor remembers your layout:** zone positions you arranged by hand are stored alongside the template (in `%LOCALAPPDATA%\AuroraRMG\editor-layouts\`) and restored the next time you open that file — the graph no longer snaps back to the auto-layout.
 - **Safe edits:** renaming a zone re-points every reference to it (a connection's guard zone, other zones' `MatchZone` biomes, the orientation anchor), and deleting a zone or a link removes the orphaned roads. On save, any missing layout definitions (`zoneLayouts`) are written into the file — without them the game could not shape that zone.
@@ -495,18 +512,28 @@ The **"🗺 Editor"** header button opens an interactive **zone-graph canvas edi
 - **📋 Pool contents / ➕ Pool creator** (the "Pools" tab): the viewer shows what each content pool actually holds (lists → objects, weights, biomes), and the creator assembles a custom pool from the game's real content lists. The data is read **on the fly from the installed game's `Core.zip`** — nothing is downloaded and nothing ships in the distribution.
 - **🖼 Export PNG** — save an image of the zone graph to share.
 - **📄 JSON · 🔗 Connections · 🧭 Orientation · ❔ Help** (editor toolbar): **JSON** — preview and directly edit the current template as JSON (Apply / Reformat / Copy buttons); **Connections** — a table of all connections for bulk editing (name, type, guard, road, guard escape); **Orientation** — map orientation and border (water, obstacles, corner radius); **Help** — a built-in editor reference.
-- **Zone copy/paste:** `Ctrl+C` / `Ctrl+V` copy the selected zone (a new unique name + an owner-conflict guard — a matching object owner is cleared).
+- **Zone copy/paste:** `Ctrl+C` / `Ctrl+V` create a uniquely named copy. A copied player start becomes a neutral town; duplicate player spawns and roads pointing to the original connections are removed.
 - **↶ Undo / ↷ Redo:** `Ctrl+Z` / `Ctrl+Y` roll back and reapply any edit (up to 50 steps) — inspector fields, zone/connection add/delete, paste, JSON edits. Your manual node layout is preserved.
 - **Zone & connection counter** in the status bar; above **48 zones** it turns into a warning: the engine is verified up to 48 (the size of the biggest stock template, Full Hire) — beyond that at your own risk.
 - Keys: `Del` — delete the selection, `Ctrl+C`/`Ctrl+V` — copy/paste a zone, `Ctrl+Z`/`Ctrl+Y` — undo/redo, `Esc` — cancel connecting / clear the selection.
 
 **New editor tools (v1.7):**
 
+Each editor window owns a separate copy of the template. Changes do not silently alter the generator result or another window; save the edited template from the editor.
+
+The connection manager commits edits only when you click **Apply**. Closing cancels them; renaming a connection updates road references. Validation also detects circular biome dependencies and invalid road anchors.
+
 | 📄 JSON preview & edit | 🔗 Connection manager |
 |:---:|:---:|
 | <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-json-en.png" width="100%"/> | <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-connections-en.png" width="100%"/> |
 | **🧭 Orientation & border** | **❔ Editor help** |
 | <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-orientation-en.png" width="100%"/> | <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-help-en.png" width="100%"/> |
+| **Mirror settings** | **Keyboard shortcuts** |
+| <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-mirror-settings-en.png" alt="Mirror mode settings" width="100%"/> | <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-hotkeys-en.png" alt="Keyboard shortcut settings" width="100%"/> |
+
+**Import a map sketch:**
+
+<img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-tool-sketch-en.png" alt="Import coloured zones from an image" width="100%"/>
 
 **Full manual control of the graph** (override by hand what the auto-generator does for you):
 
@@ -527,7 +554,8 @@ AuroraRMG is **fully bilingual** — Russian and English.
 
 - The **RU / EN** switch in the window header changes the language **instantly, with no restart**.
 - On first launch the language is chosen from the Windows locale (Russian system → RU, otherwise EN) and then remembered.
-- **Everything** is translated: tabs, buttons, labels, tooltips, descriptions, dropdown values, game-content names, preset names/descriptions, dialogs, messages and the zone editor. Logic values (SIDs, modes, tokens) are never translated — generation stays stable.
+- Tabs, buttons, labels, tooltips, descriptions, built-in content and preset names, messages and the editor legend are translated. Open forms refresh their text when the language changes, preserving selections and entered values. Names from the connected game's hero catalog use the selected language.
+- Game SIDs, JSON fields and user-defined names remain unchanged. System file pickers and standard message-box buttons follow the Windows language.
 
 ---
 
@@ -668,10 +696,12 @@ Tell the two file types apart:
 
 | File | What it is | How to create |
 |---|---|---|
-| **`.oetgs`** (settings) | The full editor state — to continue tuning later | 💾 / 💾… in the header (`Ctrl+S` / `Ctrl+Shift+S`) |
+| **`.oetgs`** (settings) | Advanced-mode settings — to continue tuning later | 💾 / 💾… in the header (`Ctrl+S` / `Ctrl+Shift+S`) |
 | **`.rmg.json`** (template) | A finished game map template | **"Create template" → "Save"** |
 
 Open previously saved settings — 📂 (`Ctrl+O`). Reset everything to defaults — 🔄 (`Ctrl+N`).
+
+Saving writes a complete temporary file before replacing the destination: a failed write does not truncate the previous template or settings. “Save to game folder” asks before replacing an existing template.
 
 ---
 
@@ -764,7 +794,7 @@ Tips based on how the generator and the Olden Era engine work — they help you 
 **Simple** — pick a few basic options and hit "Create map"; everything else is chosen automatically (great for a quick game). **Advanced** — full manual control over every parameter across four tabs. The toggle is in the header, next to the language; it opens in Simple by default. A Simple-mode map can be "Opened in Advanced" and refined. More: [Working modes](#-working-modes-simple-and-advanced).
 
 **What is the "seed" in Simple Mode?**
-It's the map's fingerprint. The same seed always yields the same map, so it's handy to share: a friend enters the same seed and plays an identical map. The 🎲 button rolls a new random seed, 📋 copies the current one.
+The same seed, settings and generator version produce the same template. Share them together or send the `.rmg.json` file. The game builds the actual world and object placement. The 🎲 button rolls a new random seed, 📋 copies the current one.
 
 **Can I create maps bigger than 240×240?**
 Yes. In **Simple Mode** pick the **"Huge (256–400)"** size; in **Advanced** tick **"🗺 Large maps: 256×256 … 512×512"** right under the size picker — the larger sizes (up to 512×512) appear in the list. Official templates stop at 240×240, but the game engine handles larger maps (which is why the option is marked experimental).
