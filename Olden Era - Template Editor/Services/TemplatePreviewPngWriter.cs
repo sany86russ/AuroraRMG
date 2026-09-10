@@ -1527,11 +1527,13 @@ namespace Olden_Era___Template_Editor.Services
 
             int p = lanes.Count;
             double sinA = p > 1 ? Math.Sin(Math.PI / p) : 1.0;
-            double radialStep = canvasHalf / maxDepth;
-            double byRadial = (radialStep - minGap) / 2.0;
-            double byAngular = (canvasHalf * sinA - minGap) / 2.0;
+            // Reserve the node radius at the rim before spacing the lane centres.
+            // The innermost ring also needs room between neighbouring spokes.
+            double byRadial = (canvasHalf - maxDepth * minGap) / (2.0 * maxDepth + 1);
+            double byAngular = (canvasHalf * sinA - maxDepth * minGap / 2.0) / (maxDepth + sinA);
             double zoneRadius = Math.Max(6.0, Math.Min(ZoneRadiusMax, Math.Min(byRadial, byAngular)));
             _zoneRadius = zoneRadius;
+            double outerRadius = canvasHalf - zoneRadius;
 
             positions[arena] = center;
             for (int i = 0; i < p; i++)
@@ -1543,7 +1545,7 @@ namespace Olden_Era___Template_Editor.Services
                 {
                     // k = 0 (spawn) → rim; deeper tiers sit closer to the arena, aligned across lanes
                     // via the shared maxDepth grid.
-                    double r = canvasHalf * (maxDepth - k) / maxDepth;
+                    double r = outerRadius * (maxDepth - k) / maxDepth;
                     positions[lane[k]] = new Point(center.X + dx * r, center.Y + dy * r);
                 }
             }

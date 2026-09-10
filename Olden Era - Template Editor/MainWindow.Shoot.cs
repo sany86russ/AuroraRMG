@@ -37,8 +37,24 @@ namespace Olden_Era___Template_Editor
             int h = (int)Math.Ceiling(root.ActualHeight);
             if (w <= 0 || h <= 0) return;
 
-            var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
-            rtb.Render(root);
+            // Render in local coordinates: Render(root) retains its parent offset,
+            // clipping the right/bottom of dialog content that has a Margin.
+            const int padding = 16;
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.DrawRectangle(Window.GetWindow(root)?.Background ?? Brushes.Transparent,
+                    null, new Rect(0, 0, w + padding * 2, h + padding * 2));
+                var brush = new VisualBrush(root)
+                {
+                    ViewboxUnits = BrushMappingMode.Absolute,
+                    Viewbox = new Rect((Point)VisualTreeHelper.GetOffset(root), new Size(w, h)),
+                    Stretch = Stretch.Fill,
+                };
+                dc.DrawRectangle(brush, null, new Rect(padding, padding, w, h));
+            }
+            var rtb = new RenderTargetBitmap(w + padding * 2, h + padding * 2, 96, 96, PixelFormats.Pbgra32);
+            rtb.Render(visual);
             var encoder = new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(rtb));
             using var fs = new FileStream(Path.Combine(dir, file + ".png"), FileMode.Create, FileAccess.Write);
@@ -88,9 +104,13 @@ namespace Olden_Era___Template_Editor
 
                 // ── Simple Mode (the default landing view) ──
                 SetMode(advanced: false, persist: false);
+                CmbSimpleType.SelectedIndex = 1;
+                SldSimplePlayers.Value = 4;
+                TxtSimpleSeed.Text = "1234ABCD";
                 try { BtnSimpleGenerate_Click(this, new RoutedEventArgs()); } catch { /* preview is best-effort */ }
                 // Reveal the (default-hidden) preview so the docs screenshot shows the full feature.
-                try { if (SimplePreviewBox != null) { SimplePreviewBox.Visibility = Visibility.Visible; UpdateSimplePreviewToggle(); } } catch { }
+                if (SimplePreviewBox.Visibility != Visibility.Visible)
+                    BtnSimpleTogglePreview_Click(this, new RoutedEventArgs());
                 await Dispatcher.Yield(DispatcherPriority.Background);
                 root.UpdateLayout();
                 await Task.Delay(550);
@@ -114,7 +134,9 @@ namespace Olden_Era___Template_Editor
                 catch { /* showcase shot is best-effort */ }
 
                 // ── Advanced Mode tabs ──
+                if (_lastQuickSettings != null) SyncAdvancedFromSettings(_lastQuickSettings);
                 SetMode(advanced: true, persist: false);
+                BtnPreview_Click(this, new RoutedEventArgs());
                 await Dispatcher.Yield(DispatcherPriority.Background);
                 root.UpdateLayout();
                 await Task.Delay(300);
@@ -189,17 +211,7 @@ namespace Olden_Era___Template_Editor
                         await Task.Delay(150);
                         await Dispatcher.Yield(DispatcherPriority.Background);
 
-                        int w = (int)System.Math.Ceiling(root.ActualWidth);
-                        int h = (int)System.Math.Ceiling(root.ActualHeight);
-                        if (w > 0 && h > 0)
-                        {
-                            var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
-                            rtb.Render(root);
-                            var encoder = new PngBitmapEncoder();
-                            encoder.Frames.Add(BitmapFrame.Create(rtb));
-                            using var fs = new FileStream(Path.Combine(dir, "ui-editor.png"), FileMode.Create, FileAccess.Write);
-                            encoder.Save(fs);
-                        }
+                        CaptureRoot(root, dir, "ui-editor");
                     }
                     catch { /* best effort */ }
                     finally { done.TrySetResult(); }
@@ -265,6 +277,7 @@ namespace Olden_Era___Template_Editor
                         await Task.Delay(200);
                         await Dispatcher.Yield(DispatcherPriority.Background);
                         CaptureRoot(root, dir, "ui-mirror");
+                        editor.DebugDiscardAndClose();
                     }
                     catch (Exception ex)
                     {
