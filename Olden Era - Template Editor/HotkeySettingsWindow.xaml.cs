@@ -28,6 +28,7 @@ namespace Olden_Era___Template_Editor
             InitializeComponent();
             _bindings = new Dictionary<EditorAction, string>(EditorHotkeys.Current);
             BuildRows();
+            LocalizationManager.Observe(this, () => { BuildRows(); if (_capturing is { } action) _buttons[action].Content = L("S.HK.PressKey"); });
             PreviewKeyDown += OnPreviewKeyDown;
         }
 

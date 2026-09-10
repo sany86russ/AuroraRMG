@@ -12,6 +12,30 @@ namespace Olden_Era___Template_Editor.Tests;
 
 public class TemplateGeneratorTests
 {
+    [Fact]
+    public void BasicNeutralCount_WorksWithoutTierOverrides()
+    {
+        var settings = new GeneratorSettings { PlayerCount = 2, Topology = MapTopology.Chain,
+            ZoneCfg = new ZoneConfiguration { NeutralZoneCount = 3, NeutralZoneCastles = 0 } };
+        var map = TemplateGenerator.Generate(settings);
+        Assert.Equal(5, map.Variants![0].Zones!.Count);
+        Assert.Empty(map.Variants[0].Zones!.Where(z => z.Name.StartsWith("Neutral-")).SelectMany(z => z.MainObjects ?? []));
+        settings.ZoneCfg.Advanced.NeutralHighCastleCount = 1;
+        Assert.Equal(3, TemplateGenerator.Generate(settings).Variants![0].Zones!.Count);
+    }
+    [Theory]
+    [InlineData(1, 1, true)]
+    [InlineData(1, 2, false)]
+    [InlineData(4, 2, true)]
+    [InlineData(4, 3, false)]
+    [InlineData(9, 5, true)]
+    [InlineData(9, 6, false)]
+    public void Lanes_SeparationGuaranteeMatchesTwoShortestCorridors(int neutrals, int separation, bool expected)
+    {
+        var settings = new GeneratorSettings { PlayerCount = 4, Topology = MapTopology.Lanes,
+            MinNeutralZonesBetweenPlayers = separation };
+        Assert.Equal(expected, TemplateGenerator.CanHonorNeutralSeparation(settings, neutrals));
+    }
     [Theory]
     [InlineData(MapTopology.Default)]
     [InlineData(MapTopology.Balanced)]
@@ -478,8 +502,12 @@ public class TemplateGeneratorTests
         Assert.All(RequiredConnections(variant), connection => Assert.Equal(20000, connection.GuardValue));
     }
 
-    [Fact]
-    public void Generate_AppliesBorderGuardStrengthToDirectAndPortalConnectionsOnly()
+    [Theory]
+    [InlineData(50)]
+    [InlineData(100)]
+    [InlineData(500)]
+    [InlineData(800)]
+    public void Generate_AppliesBorderGuardStrengthToDirectAndPortalConnectionsOnly(int percent)
     {
         var settings = new GeneratorSettings
         {
@@ -491,7 +519,7 @@ public class TemplateGeneratorTests
                     NeutralMediumCastleCount = 2
                 },
                 NeutralStackStrengthPercent = 100,
-                BorderGuardStrengthPercent = 50
+                BorderGuardStrengthPercent = percent
             },
             MapSize = 160,
             RandomPortals = true,
@@ -510,8 +538,10 @@ public class TemplateGeneratorTests
 
         Assert.Equal(1.0, spawnZone.GuardMultiplier);
         Assert.Equal(5000, Assert.Single(spawnZone.MainObjects ?? []).GuardValue);
-        Assert.All(directConnections, connection => Assert.Equal(10000, connection.GuardValue));
-        Assert.All(portalConnections, connection => Assert.Equal(12500, connection.GuardValue));
+        Assert.NotEmpty(directConnections);
+        Assert.NotEmpty(portalConnections);
+        Assert.All(directConnections, connection => Assert.Equal(20000 * percent / 100, connection.GuardValue));
+        Assert.All(portalConnections, connection => Assert.Equal(25000 * percent / 100, connection.GuardValue));
     }
 
     [Fact]
@@ -1361,6 +1391,48 @@ public class TemplateGeneratorTests
         Assert.InRange(Strength(QuickGuardLevel.Strong),     150, 220);
         Assert.InRange(Strength(QuickGuardLevel.Fortress),   230, 300);
         Assert.InRange(Strength(QuickGuardLevel.Impassable), 300, 500);
+        Assert.Equal(800, Strength(QuickGuardLevel.Extreme));
+    }
+
+    [Theory]
+    [InlineData(QuickChaos.Tame)]
+    [InlineData(QuickChaos.Normal)]
+    [InlineData(QuickChaos.Wild)]
+    public void QuickGenerate_ExtremeGuards_AreExactly800WithoutChangingOtherSettings(QuickChaos chaos)
+    {
+        for (int seed = 0; seed < 30; seed++)
+        {
+            var options = new QuickGenerateOptions { Seed = seed, Chaos = chaos, Portals = true };
+            var normal = RandomTemplateBuilder.Build(options);
+            options.BorderGuards = QuickGuardLevel.Extreme;
+            var extreme = RandomTemplateBuilder.Build(options);
+
+            Assert.Equal(800, extreme.ZoneCfg.BorderGuardStrengthPercent);
+            extreme.ZoneCfg.BorderGuardStrengthPercent = normal.ZoneCfg.BorderGuardStrengthPercent;
+            Assert.Equal(JsonSerializer.Serialize(normal, JsonExport.Options),
+                         JsonSerializer.Serialize(extreme, JsonExport.Options));
+        }
+    }
+
+    [Fact]
+    public void Settings_RoundTrip_Preserves800PercentAndExistingGuardLevels()
+    {
+        var file = new SettingsFile { BorderGuardStrengthPercent = 800 };
+        var restored = JsonSerializer.Deserialize<SettingsFile>(JsonSerializer.Serialize(file))!;
+        Assert.Equal(800, restored.BorderGuardStrengthPercent);
+        Assert.Equal(800, Presets.ToGeneratorSettings(restored).ZoneCfg.BorderGuardStrengthPercent);
+
+        // Simple preferences store indices: append the new level without renumbering old choices.
+        QuickGuardLevel[] expected = [QuickGuardLevel.Weak, QuickGuardLevel.Normal, QuickGuardLevel.Strong,
+            QuickGuardLevel.Fortress, QuickGuardLevel.Impassable, QuickGuardLevel.Extreme];
+        for (int i = 0; i < expected.Length; i++)
+        {
+            Assert.Equal(i, (int)expected[i]);
+            var state = new Olden_Era___Template_Editor.Services.GameData.SimpleModeState { Guards = i };
+            var copy = JsonSerializer.Deserialize<Olden_Era___Template_Editor.Services.GameData.SimpleModeState>(
+                JsonSerializer.Serialize(state))!;
+            Assert.Equal(expected[i], (QuickGuardLevel)copy.Guards);
+        }
     }
 
     // ── Neutral-castle faction (#2/#3): capturable faction town ──────────────────────
@@ -1547,7 +1619,7 @@ public class TemplateGeneratorTests
                     GameType = type, Scale = scale, Length = length, Chaos = chaos,
                     Water = pick.NextDouble() < 0.5, Portals = pick.NextDouble() < 0.4,
                     StrongNeutrals = pick.NextDouble() < 0.4,
-                    BorderGuards = (QuickGuardLevel)pick.Next(0, 5),
+                    BorderGuards = (QuickGuardLevel)pick.Next(0, Enum.GetValues<QuickGuardLevel>().Length),
                 };
         }
     }
@@ -1572,7 +1644,10 @@ public class TemplateGeneratorTests
             Assert.InRange(z.ResourceDensityPercent, 20, 400);   // SldResourceDensity
             Assert.InRange(z.StructureDensityPercent, 20, 200);  // SldStructureDensity
             Assert.InRange(z.NeutralStackStrengthPercent, 25, 300); // SldNeutralStackStrength
-            Assert.InRange(z.BorderGuardStrengthPercent, 20, 540); // Impassable (300–500) widened by Wild chaos → up to 540
+            if (opts.BorderGuards == QuickGuardLevel.Extreme)
+                Assert.Equal(800, z.BorderGuardStrengthPercent);
+            else
+                Assert.InRange(z.BorderGuardStrengthPercent, 20, 540); // Historical bands, including Wild chaos.
             Assert.InRange(s.TerrainRoughnessPercent, 20, 400);
             Assert.InRange(s.LakeAmountPercent, 20, 400);
             Assert.InRange(s.NeutralDiplomacyModifier, -1.0, 0.5);

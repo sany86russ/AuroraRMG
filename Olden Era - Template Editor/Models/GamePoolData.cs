@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Olden_Era___Template_Editor.Services.GameData;
 using Olden_Era___Template_Editor.Services.Localization;
 
@@ -11,30 +12,40 @@ namespace OldenEraTemplateEditor.Models
 {
     // ── Pool / content-list data model (mirrors the game's generator JSON) ─────────
 
-    public class PoolGroup
+    public class PoolGroup : RmgNode
     {
+        [JsonPropertyName("weight")]
         public int Weight { get; set; }
+        [JsonPropertyName("includeLists")]
         public List<string> IncludeLists { get; set; } = new();
+        [JsonPropertyName("content")]
         public List<PoolContentItem>? Content { get; set; }
     }
 
-    public class PoolContentItem
+    public class PoolContentItem : RmgNode
     {
+        [JsonPropertyName("sid")]
         public string Sid { get; set; } = "";
+        [JsonPropertyName("weight")]
         public int Weight { get; set; }
+        [JsonPropertyName("biome")]
         public string? Biome { get; set; }
     }
 
-    public class GamePool
+    public class GamePool : RmgNode
     {
+        [JsonPropertyName("name")]
         public string Name { get; set; } = "";
+        [JsonPropertyName("groups")]
         public List<PoolGroup> Groups { get; set; } = new();
         public override string ToString() => Name;
     }
 
-    public class ContentListEntry
+    public class ContentListEntry : RmgNode
     {
+        [JsonPropertyName("name")]
         public string Name { get; set; } = "";
+        [JsonPropertyName("content")]
         public List<PoolContentItem> Content { get; set; } = new();
         public override string ToString() => Name;
     }
@@ -62,9 +73,11 @@ namespace OldenEraTemplateEditor.Models
         private static List<ContentListEntry>? _allContentLists;
         private static List<GamePool> _customPools = new();
         private static bool _loaded;
-        private static string _status = "";
+        private static string _statusKey = "";
+        private static object[] _statusArgs = [];
+        private static void SetStatus(string key, params object[] args) { _statusKey = key; _statusArgs = args; }
 
-        public static string Status => _status;
+        public static string Status => LocalizationManager.T(_statusKey, _statusArgs);
 
         private static string CustomPoolsPath =>
             Path.Combine(
@@ -91,7 +104,7 @@ namespace OldenEraTemplateEditor.Models
                 var core = GameCatalogService.Instance.LocateCoreZip();
                 if (core is null || !File.Exists(core))
                 {
-                    _status = LocalizationManager.T("S.PV.StatusGameNotFound");
+                    SetStatus("S.PV.StatusGameNotFound");
                 }
                 else
                 {
@@ -113,15 +126,17 @@ namespace OldenEraTemplateEditor.Models
                         }
                     }
 
-                    LoadCustomPools();
-                    _status = LocalizationManager.T("S.PV.StatusLoaded",
+                    SetStatus("S.PV.StatusLoaded",
                         _allPools.Count, _customPools.Count, _allContentLists.Count);
                 }
             }
             catch (Exception ex)
             {
-                _status = LocalizationManager.T("S.PV.StatusError", ex.Message);
+                SetStatus("S.PV.StatusError", ex.Message);
             }
+            LoadCustomPools(); // local definitions remain available even when the game is not installed
+            if (_allContentLists.Count > 0)
+                SetStatus("S.PV.StatusLoaded", _allPools.Count, _customPools.Count, _allContentLists.Count);
         }
 
         private static T? DeserializeEntry<T>(ZipArchiveEntry entry) where T : class
@@ -142,6 +157,8 @@ namespace OldenEraTemplateEditor.Models
         {
             Load();
             _allPools ??= new List<GamePool>();
+            if (_allPools.Any(p => p.Name == pool.Name))
+                throw new InvalidOperationException(LocalizationManager.T("S.PC.Duplicate"));
             _allPools.Add(pool);
             _customPools.Add(pool);
             SaveCustomPools();
@@ -170,7 +187,7 @@ namespace OldenEraTemplateEditor.Models
             {
                 var path = CustomPoolsPath;
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                File.WriteAllText(path, JsonSerializer.Serialize(_customPools, Olden_Era___Template_Editor.Services.JsonExport.Options));
+                Olden_Era___Template_Editor.Services.AtomicFile.WriteAllText(path, JsonSerializer.Serialize(_customPools, Olden_Era___Template_Editor.Services.JsonExport.Options));
             }
             catch { /* best effort */ }
         }

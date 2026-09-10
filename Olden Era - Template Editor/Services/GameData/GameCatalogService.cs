@@ -38,9 +38,11 @@ namespace Olden_Era___Template_Editor.Services.GameData
         /// Returns the catalog for <paramref name="language"/>. Uses an in-memory copy, then a fresh
         /// on-disk cache, then builds from the game files. Never throws — returns an empty catalog on failure.
         /// </summary>
-        public async Task<GameCatalog> GetCatalogAsync(string language = "russian")
+        public async Task<GameCatalog> GetCatalogAsync(string? language = null)
         {
-            language = string.IsNullOrWhiteSpace(language) ? "russian" : language.ToLowerInvariant();
+            language = string.IsNullOrWhiteSpace(language)
+                ? (Localization.LocalizationManager.Instance.CurrentLanguage == Localization.AppLanguage.En ? "english" : "russian")
+                : language.ToLowerInvariant();
 
             if (_memory.TryGetValue(language, out var cached))
                 return cached;
@@ -71,10 +73,12 @@ namespace Olden_Era___Template_Editor.Services.GameData
         /// Non-blocking lookup of a hero's localized name + faction from an already-loaded catalog.
         /// Returns false if the catalog for that language is not in memory yet, or the hero is unknown.
         /// </summary>
-        public bool TryResolveHero(string sid, out string name, out string faction, out string iconSid, string language = "russian")
+        public bool TryResolveHero(string sid, out string name, out string faction, out string iconSid, string? language = null)
         {
             name = ""; faction = ""; iconSid = "";
-            language = string.IsNullOrWhiteSpace(language) ? "russian" : language.ToLowerInvariant();
+            language = string.IsNullOrWhiteSpace(language)
+                ? (Localization.LocalizationManager.Instance.CurrentLanguage == Localization.AppLanguage.En ? "english" : "russian")
+                : language.ToLowerInvariant();
             if (!_memory.TryGetValue(language, out var cat)) return false;
             foreach (var h in cat.Heroes)
             {

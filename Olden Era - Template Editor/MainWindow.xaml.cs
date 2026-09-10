@@ -191,6 +191,7 @@ namespace Olden_Era___Template_Editor
             CmbWaterLevel.SelectedIndex = 0; // None
             BuildPresetMenu();
             Services.Localization.LocalizationManager.Instance.LanguageChanged += OnLanguageChanged;
+            Closed += (_, _) => Services.Localization.LocalizationManager.Instance.LanguageChanged -= OnLanguageChanged;
             UpdateValueLabels();
             UpdateAdvancedZoneSettingsVisibility();
             UpdatePlayerCastleFactionVisibility();
@@ -701,6 +702,12 @@ namespace Olden_Era___Template_Editor
 
         private bool Validate()
         {
+            if (_bonuses.Any(b => !b.HasValidParameters()))
+            {
+                SetValidationError(L.Get("S.Bonus.InvalidNumber"));
+                BtnPreview.IsEnabled = false;
+                return false;
+            }
             int heroMin = (int)SldHeroMin.Value;
             int heroMax = (int)SldHeroMax.Value;
             int players = (int)SldPlayers.Value;
@@ -1050,7 +1057,7 @@ namespace Olden_Era___Template_Editor
         {
             var entries = KnownValues.BannableItems
                 .Select(b => new BanEntry { Id = b.Id, DisplayName = b.DisplayName, Category = b.Category });
-            var picker = new ItemPickerWindow(entries, _bannedItems.Select(b => b.Id), L.Get("S.CB.BanItems")) { Owner = this };
+            var picker = new ItemPickerWindow(entries, _bannedItems.Select(b => b.Id), "S.CB.BanItems") { Owner = this };
             if (picker.ShowDialog() == true)
             {
                 foreach (var id in picker.SelectedIds)
@@ -1105,7 +1112,7 @@ namespace Olden_Era___Template_Editor
                   })
                 : KnownValues.BannableHeroes.Select(h => new BanEntry { Id = h.Id, DisplayName = h.DisplayName, Category = h.Category });
 
-            var picker = new ItemPickerWindow(entries, _bannedHeroes.Select(b => b.Id), L.Get("S.CB.BanHeroes")) { Owner = this };
+            var picker = new ItemPickerWindow(entries, _bannedHeroes.Select(b => b.Id), "S.CB.BanHeroes") { Owner = this };
             if (picker.ShowDialog() == true)
             {
                 foreach (var id in picker.SelectedIds)
@@ -2068,7 +2075,7 @@ namespace Olden_Era___Template_Editor
             try
             {
                 var json = JsonSerializer.Serialize(GatherSettings(), JsonOptions);
-                File.WriteAllText(path, json);
+                AtomicFile.WriteAllText(path, json);
                 _currentSettingsPath = path;
                 _isDirty = false;
                 UpdateTitle();
@@ -2113,6 +2120,7 @@ namespace Olden_Era___Template_Editor
             // Clear the result panel + collapse the optional preview.
             _generatedTemplate = null;
             _lastQuickSettings = null;
+            _lastQuickOptions = null;
             if (ImgSimplePreview   != null) ImgSimplePreview.Source = null;
             if (TxtSimpleNoPreview != null) TxtSimpleNoPreview.Visibility = Visibility.Visible;
             if (SimplePreviewBox   != null) SimplePreviewBox.Visibility   = Visibility.Collapsed;
@@ -2139,6 +2147,7 @@ namespace Olden_Era___Template_Editor
                 var s = JsonSerializer.Deserialize<SettingsFile>(json, JsonOptions);
                 if (s is null) throw new InvalidDataException(L.Get("S.D.FileEmpty"));
                 ApplySettings(s);
+                SetMode(true); // .oetgs contains Advanced settings; show the controls that were loaded
                 _currentSettingsPath = dlg.FileName;
                 _isDirty = false;
                 UpdateTitle();
@@ -2185,6 +2194,11 @@ namespace Olden_Era___Template_Editor
             _generatedTemplate = TemplateGenerator.Generate(settings);
             _generatedTopology = settings.Topology;
             _templateOutdated = false;
+            _lastQuickSettings = null;
+            _lastQuickOptions = null;
+            ImgSimplePreview.Source = null;
+            TxtSimpleSummary.Text = L.Get("S.Simple.NoPreview");
+            BtnSimpleSaveToGame.IsEnabled = BtnSimpleSave.IsEnabled = BtnSimpleOpenAdvanced.IsEnabled = BtnSimpleTogglePreview.IsEnabled = false;
             ImgPreview.Source = TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology);
             lblNoPreview.Content = "?";
             BtnSaveGenerated.Visibility = Visibility.Visible;
@@ -2224,9 +2238,17 @@ namespace Olden_Era___Template_Editor
                 foreach (var item in grp.AllItems) item.RefreshDisplayName();
             BuildPresetMenu();          // submenu group names + preset display names
             RefreshBannedHeroNames();   // ban rows re-resolve names
+            if (Services.GameData.AppSettings.Current.UseGameAssets) _ = PrimeGameCatalogAsync();
+            foreach (var bonus in _bonuses) bonus.RefreshLanguage();
+            foreach (var entry in _bannedItems.Concat(_bannedMagics)) entry.RefreshLanguage();
             UpdateLanguageButtons();
             UpdateSimplePreviewToggle();   // Simple-mode preview toggle caption (code-set, re-localize here)
+            if (_lastQuickSettings is not null && _lastQuickOptions is not null)
+                TxtSimpleSummary.Text = BuildSimpleSummary(_lastQuickSettings, _lastQuickOptions);
+            UpdateBalanceReport();
             if (TxtWipWarning != null) TxtWipWarning.Text = L.Get("S.CB.Wip");
+            if (_pendingUpdate is not null) ShowUpdateBanner(_pendingUpdate);
+            BtnMaximize.ToolTip = L.Get(WindowState == WindowState.Maximized ? "S.CB.Restore" : "S.CB.Maximize");
             if (IsInitialized) { Validate(); UpdateTitle(); }  // refresh validation hints in the new language
         }
 
@@ -2286,7 +2308,7 @@ namespace Olden_Era___Template_Editor
         private static readonly string[] SimpleScaleKeys  = ["S.Simple.Scale.Small", "S.Simple.Scale.Medium", "S.Simple.Scale.Large", "S.Simple.Scale.Huge"];
         private static readonly string[] SimpleLengthKeys = ["S.Simple.Len.Short", "S.Simple.Len.Medium", "S.Simple.Len.Long"];
         private static readonly string[] SimpleChaosKeys  = ["S.Simple.Chaos.Tame", "S.Simple.Chaos.Normal", "S.Simple.Chaos.Wild"];
-        private static readonly string[] SimpleGuardsKeys = ["S.Simple.Guards.Weak", "S.Simple.Guards.Normal", "S.Simple.Guards.Strong", "S.Simple.Guards.Fortress", "S.Simple.Guards.Impassable"];
+        private static readonly string[] SimpleGuardsKeys = ["S.Simple.Guards.Weak", "S.Simple.Guards.Normal", "S.Simple.Guards.Strong", "S.Simple.Guards.Fortress", "S.Simple.Guards.Impassable", "S.Simple.Guards.Extreme"];
         // Neutral-castle faction picker: index 0 = Random (engine default, "" token → byte-identical seed),
         // 1..6 pin the captured town to a specific faction. Label keys and engine tokens are index-aligned.
         private static readonly string[] SimpleCastleFactionKeys   = ["S.Simple.NCF.Random", "S.Simple.NCF.Human", "S.Simple.NCF.Undead", "S.Simple.NCF.Dungeon", "S.Simple.NCF.Nature", "S.Simple.NCF.Demon", "S.Simple.NCF.Unfrozen"];
@@ -2305,6 +2327,7 @@ namespace Olden_Era___Template_Editor
         }
 
         private GeneratorSettings? _lastQuickSettings;
+        private QuickGenerateOptions? _lastQuickOptions;
 
         /// <summary>Sets sensible defaults for the simple-mode combos + seed and applies the saved mode.</summary>
         private void InitSimpleMode()
@@ -2402,7 +2425,7 @@ namespace Olden_Era___Template_Editor
             Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 3),
             Length         = (QuickGameLength)Math.Clamp(CmbSimpleLength.SelectedIndex, 0, 2),
             Chaos          = (QuickChaos)Math.Clamp(CmbSimpleChaos.SelectedIndex, 0, 2),
-            BorderGuards   = (QuickGuardLevel)Math.Clamp(CmbSimpleGuards.SelectedIndex, 0, 4),
+            BorderGuards   = (QuickGuardLevel)Math.Clamp(CmbSimpleGuards.SelectedIndex, 0, SimpleGuardsKeys.Length - 1),
             NeutralCastleFaction = SimpleCastleFactionTokens[Math.Clamp(CmbSimpleCastleFaction.SelectedIndex, 0, SimpleCastleFactionTokens.Length - 1)],
             Water          = ChkSimpleWater.IsChecked == true,
             Portals        = ChkSimplePortals.IsChecked == true,
@@ -2423,9 +2446,12 @@ namespace Olden_Era___Template_Editor
             _generatedTopology = settings.Topology;
             _templateOutdated  = false;
             _lastQuickSettings = settings;
+            _lastQuickOptions = opts;
             TxtTemplateName.Text = settings.TemplateName; // so the Save dialog uses the generated name
 
-            ImgSimplePreview.Source = TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology);
+            // The layout is intentionally hidden until requested; defer its bitmap allocation too.
+            ImgSimplePreview.Source = SimplePreviewBox.Visibility == Visibility.Visible
+                ? TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology) : null;
             TxtSimpleNoPreview.Visibility = Visibility.Collapsed;
             TxtSimpleSummary.Text = BuildSimpleSummary(settings, opts);
             BtnSimpleSaveToGame.IsEnabled = true;
@@ -2443,6 +2469,8 @@ namespace Olden_Era___Template_Editor
         {
             if (SimplePreviewBox == null) return;
             bool show = SimplePreviewBox.Visibility != Visibility.Visible;
+            if (show && ImgSimplePreview.Source is null && _generatedTemplate is not null)
+                ImgSimplePreview.Source = TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology);
             SimplePreviewBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             UpdateSimplePreviewToggle();
         }
@@ -2537,8 +2565,10 @@ namespace Olden_Era___Template_Editor
             if (extras.Count > 0) summary += "\n" + L.Get("S.Simple.SumExtras", string.Join(", ", extras));
 
             // Surface the border-guard strength the player asked for, with the actual rolled % as feedback.
-            summary += "\n" + L.Get("S.Simple.Sum.Guards",
-                L.Get(SimpleGuardsKeys[(int)opts.BorderGuards]), s.ZoneCfg.BorderGuardStrengthPercent);
+            summary += "\n" + (opts.BorderGuards == QuickGuardLevel.Extreme
+                ? L.Get("S.Simple.Sum.GuardsExact", s.ZoneCfg.BorderGuardStrengthPercent)
+                : L.Get("S.Simple.Sum.Guards",
+                    L.Get(SimpleGuardsKeys[(int)opts.BorderGuards]), s.ZoneCfg.BorderGuardStrengthPercent));
 
             // When the player pinned a faction for the capturable neutral castles, echo it back.
             if (!string.IsNullOrEmpty(s.NeutralCastleFaction))
@@ -2676,16 +2706,20 @@ namespace Olden_Era___Template_Editor
             if (prompt.ShowDialog() != true) return;
             string chosen = prompt.MapName;
 
-            _generatedTemplate.Name = chosen;  // in-game template name
-            TxtTemplateName.Text = chosen;     // keep the rest of the UI in sync
-
             string fileName = chosen;
             foreach (char c in Path.GetInvalidFileNameChars()) fileName = fileName.Replace(c, '_');
             string path = Path.Combine(gameDir, fileName + ".rmg.json");
 
+            if (File.Exists(path) && MessageBox.Show(this, L.Get("S.D.OverwriteTemplate", path),
+                L.Get("S.D.SaveTplTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question,
+                MessageBoxResult.No) != MessageBoxResult.Yes) return;
+
+            _generatedTemplate.Name = chosen;
+            TxtTemplateName.Text = chosen;
+
             try
             {
-                File.WriteAllText(path, JsonSerializer.Serialize(_generatedTemplate, JsonOptions));
+                AtomicFile.WriteAllText(path, JsonSerializer.Serialize(_generatedTemplate, JsonOptions));
                 try { TemplatePreviewPngWriter.Save(_generatedTemplate, TemplatePreviewPngWriter.GetSidecarPath(path), _generatedTopology); }
                 catch { /* preview sidecar is best-effort */ }
                 MessageBox.Show(L.Get("S.Simple.SavedToGame", path), L.Get("S.D.SavedTitle"),
@@ -2742,8 +2776,16 @@ namespace Olden_Era___Template_Editor
                 if (mismatchResult != MessageBoxResult.Yes) return;
             }
 
-            string json = JsonSerializer.Serialize(_generatedTemplate, JsonOptions);
-            File.WriteAllText(dlg.FileName, json);
+            try
+            {
+                string json = JsonSerializer.Serialize(_generatedTemplate, JsonOptions);
+                AtomicFile.WriteAllText(dlg.FileName, json);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, L.Get("S.D.SaveErrTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
 
             string previewPath = TemplatePreviewPngWriter.GetSidecarPath(dlg.FileName);
             string? previewError = null;

@@ -1,5 +1,9 @@
 using System.Collections.Generic;
 using System.Windows.Media;
+using System.ComponentModel;
+using System.Globalization;
+using Olden_Era___Template_Editor.Services;
+using Olden_Era___Template_Editor.Services.Localization;
 
 namespace OldenEraTemplateEditor.Models
 {
@@ -19,7 +23,7 @@ namespace OldenEraTemplateEditor.Models
     }
 
     /// <summary>UI view-model for a single configurable game-start bonus.</summary>
-    public class BonusEntry
+    public class BonusEntry : INotifyPropertyChanged
     {
         public BonusPresetType PresetType     { get; set; } = BonusPresetType.TownPortalFree;
         /// <summary>"start_hero" or "all_heroes"</summary>
@@ -29,7 +33,13 @@ namespace OldenEraTemplateEditor.Models
         /// <summary>For Spell: "1" = free, "0" = normal. Unused for other types.</summary>
         public string          Param2         { get; set; } = "0";
 
-        public string ReceiverLabel  => ReceiverFilter == "start_hero" ? "start hero" : "all heroes";
+        public string ReceiverLabel => LocalizationManager.T(ReceiverFilter == "start_hero" ? "S.Bonus.014" : "S.Bonus.015");
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public void RefreshLanguage()
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(ReceiverLabel)));
+        }
 
         public bool ShowReceiverLabel => PresetType is not (
             BonusPresetType.StartingGold or
@@ -41,25 +51,24 @@ namespace OldenEraTemplateEditor.Models
 
         public string DisplayName => PresetType switch
         {
-            BonusPresetType.TownPortalFree                  => "Town Portal (free)",
-            BonusPresetType.Spell when Param2 == "1"        => $"Spell (free): {SpellLabel(Param)}",
-            BonusPresetType.Spell                           => $"Spell: {SpellLabel(Param)}",
-            BonusPresetType.UnitMultiplier                  => $"Unit multiplier ×{Param}",
-            BonusPresetType.MovementBonus                   => $"Movement bonus +{Param}",
-            BonusPresetType.StartingItem                    => $"Starting item: {Param}",
-            BonusPresetType.StartingGold                    => $"Starting gold: {Param}",
-            BonusPresetType.StartingGems                    => $"Starting gems: {Param}",
-            BonusPresetType.StartingCrystals                => $"Starting crystals: {Param}",
-            BonusPresetType.StartingMercury                 => $"Starting mercury: {Param}",
-            BonusPresetType.StartingWood                    => $"Starting wood: {Param}",
-            BonusPresetType.StartingOre                     => $"Starting ore: {Param}",
+            BonusPresetType.TownPortalFree                  => LocalizationManager.T("S.Bonus.TownPortalFree"),
+            BonusPresetType.Spell when Param2 == "1"        => LocalizationManager.T("S.Bonus.FreeSpell", SpellLabel(Param)),
+            BonusPresetType.Spell                           => $"{LocalizationManager.T("S.Bonus.003")}: {SpellLabel(Param)}",
+            BonusPresetType.UnitMultiplier                  => $"{LocalizationManager.T("S.Bonus.004")} ×{Param}",
+            BonusPresetType.MovementBonus                   => $"{LocalizationManager.T("S.Bonus.005")} +{Param}",
+            BonusPresetType.StartingItem                    => $"{LocalizationManager.T("S.Bonus.006")}: {GameLabels.Name(Param)}",
+            BonusPresetType.StartingGold                    => $"{LocalizationManager.T("S.Bonus.007")}: {Param}",
+            BonusPresetType.StartingGems                    => $"{LocalizationManager.T("S.Bonus.008")}: {Param}",
+            BonusPresetType.StartingCrystals                => $"{LocalizationManager.T("S.Bonus.009")}: {Param}",
+            BonusPresetType.StartingMercury                 => $"{LocalizationManager.T("S.Bonus.010")}: {Param}",
+            BonusPresetType.StartingWood                    => $"{LocalizationManager.T("S.Bonus.011")}: {Param}",
+            BonusPresetType.StartingOre                     => $"{LocalizationManager.T("S.Bonus.012")}: {Param}",
             _                                               => PresetType.ToString(),
         };
 
         private static string SpellLabel(string sid)
         {
-            var known = System.Array.Find(KnownValues.KnownSpells, s => s.Id == sid);
-            return known?.Name ?? sid;
+            return GameLabels.Name(sid);
         }
 
         private static readonly Brush MagicDotBrush    = CreateFrozenBrush(Color.FromRgb(147, 112, 219));
@@ -105,7 +114,9 @@ namespace OldenEraTemplateEditor.Models
                         list.Add(new Bonus { Sid = "add_bonus_hero_stat", ReceiverSide = -1, ReceiverFilter = ReceiverFilter, Parameters = ["magicCostSidSet", Param, "-999", "0"] });
                     break;
                 case BonusPresetType.UnitMultiplier:
-                    list.Add(new Bonus { Sid = "add_bonus_hero_unit_multipler", ReceiverSide = -1, ReceiverFilter = ReceiverFilter, Parameters = [Param] });
+                    string multiplier = NumericInput.TryDouble(Param, out double factor)
+                        ? factor.ToString(CultureInfo.InvariantCulture) : Param;
+                    list.Add(new Bonus { Sid = "add_bonus_hero_unit_multipler", ReceiverSide = -1, ReceiverFilter = ReceiverFilter, Parameters = [multiplier] });
                     break;
                 case BonusPresetType.MovementBonus:
                     list.Add(new Bonus { Sid = "add_bonus_hero_stat", ReceiverSide = -1, ReceiverFilter = ReceiverFilter, Parameters = ["movementBonus", Param] });
@@ -134,6 +145,14 @@ namespace OldenEraTemplateEditor.Models
             }
             return list;
         }
+
+        public bool HasValidParameters() => PresetType switch
+        {
+            BonusPresetType.TownPortalFree => true,
+            BonusPresetType.Spell or BonusPresetType.StartingItem => !string.IsNullOrWhiteSpace(Param),
+            BonusPresetType.UnitMultiplier => NumericInput.TryDouble(Param, out var value) && value > 0,
+            _ => System.Enum.IsDefined(PresetType) && NumericInput.TryOptionalInt(Param, out var amount) && amount is >= 0,
+        };
 
         // ── Serialization ─────────────────────────────────────────────────────────
 

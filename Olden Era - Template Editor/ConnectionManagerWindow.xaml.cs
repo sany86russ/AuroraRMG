@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Text.Json;
+using Olden_Era___Template_Editor.Services;
 using System.Windows;
 using System.Windows.Controls;
 using OldenEraTemplateEditor.Models;
@@ -7,19 +9,30 @@ using Olden_Era___Template_Editor.Services.Localization;
 namespace Olden_Era___Template_Editor
 {
     /// <summary>
-    /// Bulk editor for all connections in the template. Binds a <see cref="DataGrid"/> directly to
-    /// the live connection list so name/type/guard/road/escape edits apply in place; From/To stay
-    /// read-only (topology is changed on the canvas). "Apply" closes with <see cref="Window.DialogResult"/>
-    /// <c>true</c> so the editor can refresh the graph.
+    /// Edits an independent draft; closing without Apply leaves the template unchanged.
+    /// From/To stay read-only. The parent commits the draft and updates road references together.
     /// </summary>
     public partial class ConnectionManagerWindow : Window
     {
+        public List<Connection> EditedConnections { get; }
         private static string L(string key, params object[] args) => LocalizationManager.T(key, args);
 
         public ConnectionManagerWindow(List<Connection> connections)
         {
             InitializeComponent();
 
+
+            EditedConnections = JsonSerializer.Deserialize<List<Connection>>(
+                JsonSerializer.Serialize(connections, JsonExport.Options), JsonExport.Options)!;
+            Grid.ItemsSource = EditedConnections;
+            RefreshLanguage();
+            LocalizationManager.Observe(this, RefreshLanguage);
+        }
+
+        private void RefreshLanguage()
+        {
+            if (Grid.CommitEdit(DataGridEditingUnit.Cell, true) && Grid.CommitEdit(DataGridEditingUnit.Row, true)
+                && Grid.ItemsSource is not null) Grid.Items.Refresh();
             // Localised headers — DataGrid columns live outside the visual tree, so set in code.
             ColName.Header = L("S.CM.ColName");
             ColFrom.Header = L("S.CM.ColFrom");
@@ -30,16 +43,18 @@ namespace Olden_Era___Template_Editor
             ColRoad.Header = L("S.CM.ColRoad");
             ColEscape.Header = L("S.CM.ColEscape");
 
-            ColType.ItemsSource = KnownValues.ConnectionTypes;
-
-            Grid.ItemsSource = connections;
-            TxtCount.Text = L("S.CM.Count", connections.Count);
+            TxtCount.Text = L("S.CM.Count", EditedConnections.Count);
         }
 
         private void BtnApply_Click(object sender, RoutedEventArgs e)
         {
-            Grid.CommitEdit(DataGridEditingUnit.Cell, true);
-            Grid.CommitEdit(DataGridEditingUnit.Row, true);
+            if (!Grid.CommitEdit(DataGridEditingUnit.Cell, true) || !Grid.CommitEdit(DataGridEditingUnit.Row, true)) return;
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            if (EditedConnections.Any(c => string.IsNullOrWhiteSpace(c.Name) || !names.Add(c.Name)))
+            {
+                MessageBox.Show(this, L("S.CM.InvalidName"), L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             DialogResult = true;
             Close();
         }

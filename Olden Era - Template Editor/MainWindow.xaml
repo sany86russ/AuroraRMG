@@ -8,7 +8,7 @@
         Title="AuroraRMG"
         Icon="pack://application:,,,/favicon.ico"
         Height="820" Width="1240"
-        MinHeight="780" MinWidth="1160"
+        MinHeight="620" MinWidth="1000"
         WindowStyle="None"
         ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
@@ -56,8 +56,9 @@
 
             <!-- ════════ COMMAND HEADER BAR ══════════════════════════════ -->
             <Grid Grid.Row="0" Background="#12151D">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <!-- Brand + title (drag region) -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
+                <StackPanel ClipToBounds="True" Orientation="Horizontal" VerticalAlignment="Center" Margin="14,0,0,0"
                             HorizontalAlignment="Left"
                             MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                     <Image Source="pack://application:,,,/favicon.ico" Width="22" Height="22"
@@ -90,14 +91,14 @@
                 </StackPanel>
 
                 <!-- File actions · links · window buttons (right) -->
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Stretch">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Stretch">
 
                     <!-- File actions (relocated from the old toolbar) -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0"
                                 WindowChrome.IsHitTestVisibleInChrome="True">
-                        <Button Content="🔄" Width="38" Margin="0,0,4,0" Click="BtnNew_Click"    Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.001}"/>
-                        <Button Content="📂" Width="38" Margin="0,0,4,0" Click="BtnOpen_Click"   Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.002}"/>
-                        <Button Content="💾" Width="38" Margin="0,0,4,0" Click="BtnSave_Click"   Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.003}"/>
+                        <Button Padding="0" Content="🔄" Width="38" Margin="0,0,4,0" Click="BtnNew_Click"    Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.001}"/>
+                        <Button Padding="0" Content="📂" Width="38" Margin="0,0,4,0" Click="BtnOpen_Click"   Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.002}"/>
+                        <Button Padding="0" Content="💾" Width="38" Margin="0,0,4,0" Click="BtnSave_Click"   Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.003}"/>
                         <Button Content="💾…" Width="44" Margin="0,0,8,0" Click="BtnSaveAs_Click" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.004}"/>
                         <Border Width="1" Background="{StaticResource BrushBorder}" Margin="0,4,8,4" VerticalAlignment="Stretch"/>
                         <!-- Simple / Advanced mode toggle -->
@@ -106,8 +107,8 @@
                         <Button x:Name="BtnModeAdvanced" Content="{DynamicResource S.Mode.Advanced}" Tag="advanced"
                                 Margin="0,0,8,0" Click="BtnMode_Click" Style="{StaticResource ToolbarButton}"/>
                         <Border Width="1" Background="{StaticResource BrushBorder}" Margin="0,4,8,4" VerticalAlignment="Stretch"/>
-                        <Button x:Name="BtnLangRu" Content="RU" Width="34" Margin="0,0,2,0" Click="BtnLang_Click" Tag="ru" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.006}"/>
-                        <Button x:Name="BtnLangEn" Content="EN" Width="34" Click="BtnLang_Click" Tag="en" Style="{StaticResource ToolbarButton}" ToolTip="English language"/>
+                        <Button Padding="0" x:Name="BtnLangRu" Content="RU" Width="34" Margin="0,0,2,0" Click="BtnLang_Click" Tag="ru" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.M.006}"/>
+                        <Button Padding="0" x:Name="BtnLangEn" Content="EN" Width="34" Click="BtnLang_Click" Tag="en" Style="{StaticResource ToolbarButton}" ToolTip="English language"/>
                         <Border Width="1" Background="{StaticResource BrushBorder}" Margin="8,4,8,4" VerticalAlignment="Stretch"/>
                         <Button x:Name="BtnGitHub" Content="🐙 GitHub" Margin="0,0,4,0" Click="BtnGitHub_Click" Style="{StaticResource ToolbarButton}" ToolTip="{DynamicResource S.GH.Tooltip}"/>
                     </StackPanel>
@@ -198,6 +199,7 @@
                         KeyboardNavigation.TabNavigation="Cycle"
                         VerticalContentAlignment="Stretch">
                 <TabItem Header="{DynamicResource S.Tab.Rules}" Tag="{StaticResource BrushTabRules}">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <Grid Margin="0,8,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="0.9*"/>
@@ -241,13 +243,13 @@
                                     Margin="0,0,6,0" TickFrequency="1" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
                             <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Content="−" Width="22" Style="{StaticResource ToolbarButton}"
+                                <Button Padding="0" Content="−" Width="22" Style="{StaticResource ToolbarButton}"
                                         Tag="-SldHeroMin" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.016}"/>
                                 <TextBox x:Name="TxtHeroMin" Text="4" Width="34" MaxLength="3"
                                          TextAlignment="Center" VerticalContentAlignment="Center" Margin="2,0"
                                          ToolTip="{DynamicResource S.M.017}"
                                          LostFocus="HeroBox_LostFocus" KeyDown="HeroBox_KeyDown"/>
-                                <Button Content="+" Width="22" Style="{StaticResource ToolbarButton}"
+                                <Button Padding="0" Content="+" Width="22" Style="{StaticResource ToolbarButton}"
                                         Tag="+SldHeroMin" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.018}"/>
                             </StackPanel>
 
@@ -261,13 +263,13 @@
                                     Margin="0,0,6,0" TickFrequency="1" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
                             <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Content="−" Width="22" Style="{StaticResource ToolbarButton}"
+                                <Button Padding="0" Content="−" Width="22" Style="{StaticResource ToolbarButton}"
                                         Tag="-SldHeroIncrement" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.016}"/>
                                 <TextBox x:Name="TxtHeroIncrement" Text="1" Width="34" MaxLength="3"
                                          TextAlignment="Center" VerticalContentAlignment="Center" Margin="2,0"
                                          ToolTip="{DynamicResource S.M.017}"
                                          LostFocus="HeroBox_LostFocus" KeyDown="HeroBox_KeyDown"/>
-                                <Button Content="+" Width="22" Style="{StaticResource ToolbarButton}"
+                                <Button Padding="0" Content="+" Width="22" Style="{StaticResource ToolbarButton}"
                                         Tag="+SldHeroIncrement" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.018}"/>
                             </StackPanel>
 
@@ -281,13 +283,13 @@
                                     Margin="0,0,6,0" TickFrequency="1" IsSnapToTickEnabled="True"
                                     ValueChanged="Slider_ValueChanged"/>
                             <StackPanel Grid.Row="4" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                                <Button Content="−" Width="22" Style="{StaticResource ToolbarButton}"
+                                <Button Padding="0" Content="−" Width="22" Style="{StaticResource ToolbarButton}"
                                         Tag="-SldHeroMax" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.016}"/>
                                 <TextBox x:Name="TxtHeroMax" Text="8" Width="34" MaxLength="3"
                                          TextAlignment="Center" VerticalContentAlignment="Center" Margin="2,0"
                                          ToolTip="{DynamicResource S.M.017}"
                                          LostFocus="HeroBox_LostFocus" KeyDown="HeroBox_KeyDown"/>
-                                <Button Content="+" Width="22" Style="{StaticResource ToolbarButton}"
+                                <Button Padding="0" Content="+" Width="22" Style="{StaticResource ToolbarButton}"
                                         Tag="+SldHeroMax" Click="HeroStep_Click" ToolTip="{DynamicResource S.M.018}"/>
                             </StackPanel>
                         </Grid>
@@ -373,7 +375,7 @@
                             <!-- Пресет (+ кнопка случайного подбора под число игроков) -->
                             <Label Grid.Row="8" Grid.Column="0" Content="{DynamicResource S.Lbl.Preset}" VerticalAlignment="Center"/>
                             <DockPanel Grid.Row="8" Grid.Column="1">
-                                <Button x:Name="BtnRandomPreset" DockPanel.Dock="Right" Content="🎲"
+                                <Button Padding="0" x:Name="BtnRandomPreset" DockPanel.Dock="Right" Content="🎲"
                                         Width="34" Margin="6,0,0,0" Click="BtnRandomPreset_Click"
                                         Style="{StaticResource ToolbarButton}"
                                         ToolTip="{DynamicResource S.Tip.Random}"/>
@@ -679,6 +681,7 @@
                                    </DockPanel>
                                 </Border>
                     </Grid>
+                </ScrollViewer>
                 </TabItem>           
 
             <TabItem Header="{DynamicResource S.Tab.MapZones}" Tag="{StaticResource BrushTabZones}">
@@ -882,7 +885,7 @@
                                            Margin="0,0,10,0" Style="{StaticResource ValueText}"/>
                             </DockPanel>
                             <Slider Grid.Row="13" Grid.Column="1" x:Name="SldBorderGuardStrength"
-                                    Minimum="25" Maximum="500" Value="100"
+                                    Minimum="25" Maximum="800" Value="100"
                                     TickFrequency="5" IsSnapToTickEnabled="True"
                                     ToolTip="{DynamicResource S.Tip.BorderGuards}"
                                     ValueChanged="Slider_ValueChanged"/>
@@ -1121,7 +1124,16 @@ ValueChanged="Slider_ValueChanged"/>
                                    FontSize="11"
                                    TextWrapping="Wrap"/>
                     </Border>
-                    <TabControl>
+                    <TabControl x:Name="ContentZoneTabs">
+                        <TabControl.Template>
+                            <ControlTemplate TargetType="TabControl">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                                    <UniformGrid Rows="2" Columns="3" IsItemsHost="True"/>
+                                    <ContentPresenter Grid.Row="1" ContentSource="SelectedContent" Margin="0,8,0,0"/>
+                                </Grid>
+                            </ControlTemplate>
+                        </TabControl.Template>
                         <TabItem Header="{DynamicResource S.M.090}">
                             <Border Style="{StaticResource SectionBorder}">
                                 <DockPanel>
@@ -2686,7 +2698,7 @@ ValueChanged="Slider_ValueChanged"/>
                            Margin="0,0,0,6" TextWrapping="Wrap"/>
                                             <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,0">
                                                 <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBonus"
+                                                    <Button Padding="0" DockPanel.Dock="Left" x:Name="BtnAddBonus"
                                 Content="+" Width="28"
                                 Click="BtnAddBonus_Click"
                                 Background="#0B0E14"
@@ -2761,7 +2773,7 @@ ValueChanged="Slider_ValueChanged"/>
                            Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
                                             <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,10">
                                                 <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBannedItem"
+                                                    <Button Padding="0" DockPanel.Dock="Left" x:Name="BtnAddBannedItem"
                                 Content="+" Width="28"
                                 Click="BtnAddBannedItem_Click"
                                 Background="#0B0E14"
@@ -2814,7 +2826,7 @@ ValueChanged="Slider_ValueChanged"/>
                                                                     <TextBlock Text="{Binding DisplayName}"
                                            Foreground="#E7EBF3" FontSize="12"
                                            VerticalAlignment="Center"/>
-                                                                    <TextBlock Text="{Binding Category}"
+                                                                    <TextBlock Text="{Binding CategoryLabel}"
                                            Foreground="#8A93A8" FontSize="11"
                                            VerticalAlignment="Center"
                                            Margin="6,0,0,0"/>
@@ -2830,7 +2842,7 @@ ValueChanged="Slider_ValueChanged"/>
                            Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
                                             <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,10">
                                                 <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBannedMagic"
+                                                    <Button Padding="0" DockPanel.Dock="Left" x:Name="BtnAddBannedMagic"
                                 Content="+" Width="28"
                                 Click="BtnAddBannedMagic_Click"
                                 Background="#0B0E14"
@@ -2895,7 +2907,7 @@ ValueChanged="Slider_ValueChanged"/>
                            Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
                                             <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1" Margin="0,0,0,10">
                                                 <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnAddBannedHero"
+                                                    <Button Padding="0" DockPanel.Dock="Left" x:Name="BtnAddBannedHero"
                                 Content="+" Width="28"
                                 Click="BtnAddBannedHero_Click"
                                 Background="#0B0E14"
@@ -2948,7 +2960,7 @@ ValueChanged="Slider_ValueChanged"/>
                                                                     <TextBlock Text="{Binding DisplayName}"
                                            Foreground="#E7EBF3" FontSize="12"
                                            VerticalAlignment="Center"/>
-                                                                    <TextBlock Text="{Binding Category}"
+                                                                    <TextBlock Text="{Binding CategoryLabel}"
                                            Foreground="#8A93A8" FontSize="11"
                                            VerticalAlignment="Center"
                                            Margin="6,0,0,0"/>
@@ -2967,7 +2979,7 @@ ValueChanged="Slider_ValueChanged"/>
                            Foreground="#E7EBF3" FontSize="12" Margin="0,0,0,4"/>
                                             <Border Background="#161A24" BorderBrush="#2A3142" BorderThickness="1">
                                                 <DockPanel>
-                                                    <Button DockPanel.Dock="Left" x:Name="BtnPickValueOverride"
+                                                    <Button Padding="0" DockPanel.Dock="Left" x:Name="BtnPickValueOverride"
                                 Content="+" Width="28"
                                 Click="BtnPickValueOverride_Click"
                                 Background="#0B0E14" BorderBrush="#3A4258" BorderThickness="0,0,1,0"
@@ -2988,11 +3000,6 @@ ValueChanged="Slider_ValueChanged"/>
                         </TabItem>
 
     </TabControl>
-            <!-- Editor lives in the tab row, set apart with a cyan accent. -->
-            <Button x:Name="BtnEditor" Content="{DynamicResource S.Btn.Editor}"
-                    Click="BtnOpenEditor_Click" ToolTip="{DynamicResource S.M.005}"
-                    Style="{StaticResource TopEditorButton}"
-                    VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,1,4,0"/>
             </Grid>
 
             <!-- ─── PREVIEW / ACTION COLUMN ──────────────────────────── -->
@@ -3011,6 +3018,7 @@ ValueChanged="Slider_ValueChanged"/>
                     <RowDefinition Height="Auto"/>   <!-- 10 show preview checkbox -->
                     <RowDefinition Height="6"/>
                     <RowDefinition Height="Auto"/>   <!-- 12 save button -->
+                    <RowDefinition Height="Auto"/>   <!-- 13 editor navigation -->
                 </Grid.RowDefinitions>
 
                 <Button Grid.Row="0"
@@ -3097,6 +3105,10 @@ ValueChanged="Slider_ValueChanged"/>
                         Visibility="Visible"
                         IsEnabled="False"
                         Click="BtnSaveGenerated_Click"/>
+                <Button Grid.Row="13" x:Name="BtnEditor" Content="{DynamicResource S.Btn.Editor}"
+                        Click="BtnOpenEditor_Click" ToolTip="{DynamicResource S.M.005}"
+                        Style="{StaticResource TopEditorButton}" Margin="0,8,0,0"
+                        HorizontalAlignment="Stretch"/>
             </Grid>
 
         </Grid>
@@ -3196,10 +3208,10 @@ ValueChanged="Slider_ValueChanged"/>
                             <TextBox Grid.Column="1" x:Name="TxtSimpleSeed" VerticalAlignment="Center"
                                      FontFamily="Consolas" ToolTip="{DynamicResource S.Simple.SeedTip}"/>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="6,0,0,0">
-                                <Button x:Name="BtnSimpleRoll" Content="🎲" Width="38"
+                                <Button Padding="0" x:Name="BtnSimpleRoll" Content="🎲" Width="38"
                                         Click="BtnSimpleRoll_Click" Style="{StaticResource ToolbarButton}"
                                         ToolTip="{DynamicResource S.Simple.Roll}"/>
-                                <Button x:Name="BtnSimpleCopySeed" Content="📋" Width="38" Margin="4,0,0,0"
+                                <Button Padding="0" x:Name="BtnSimpleCopySeed" Content="📋" Width="38" Margin="4,0,0,0"
                                         Click="BtnSimpleCopySeed_Click" Style="{StaticResource ToolbarButton}"
                                         ToolTip="{DynamicResource S.Simple.Copy}"/>
                             </StackPanel>

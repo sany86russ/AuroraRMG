@@ -24,6 +24,7 @@ namespace Olden_Era___Template_Editor
         {
             InitializeComponent();
             LoadContentLists();
+            LocalizationManager.Observe(this, () => { AvailableLists.Items.Refresh(); SelectedLists.Items.Refresh(); });
         }
 
         private void LoadContentLists()
@@ -35,7 +36,7 @@ namespace Olden_Era___Template_Editor
                 _allLists.Add(new ContentListInfo
                 {
                     Name = list.Name,
-                    Description = L("S.PC.ListItems", list.Content?.Count ?? 0),
+                    ItemCount = list.Content?.Count ?? 0,
                 });
             }
             AvailableLists.ItemsSource = _allLists;
@@ -77,8 +78,9 @@ namespace Olden_Era___Template_Editor
 
         private void AddAll_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var list in _allLists)
-                if (!_selectedLists.Any(s => s.Name == list.Name))
+            var selected = _selectedLists.Select(s => s.Name).ToHashSet(StringComparer.Ordinal);
+            foreach (var list in AvailableLists.ItemsSource.Cast<ContentListInfo>())
+                if (selected.Add(list.Name))
                     _selectedLists.Add(list);
             RefreshSelected();
         }
@@ -109,8 +111,15 @@ namespace Olden_Era___Template_Editor
             }
 
             CreatedPoolName = PoolNameBox.Text.Trim();
+            string fullName = CreatedPoolName.StartsWith("custom_", StringComparison.Ordinal) ? CreatedPoolName : "custom_" + CreatedPoolName;
+            if (GamePoolDataLoader.GetAllPools().Any(p => p.Name == fullName))
+            {
+                MessageBox.Show(this, L("S.PC.Duplicate"), Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             CreatedPoolLists = _selectedLists.Select(l => l.Name).ToList();
             PoolCreated?.Invoke(CreatedPoolName, CreatedPoolLists);
+            DialogResult = true;
             Close();
         }
     }
@@ -119,6 +128,7 @@ namespace Olden_Era___Template_Editor
     public class ContentListInfo
     {
         public string Name { get; set; } = "";
-        public string Description { get; set; } = "";
+        public int ItemCount { get; set; }
+        public string Description => LocalizationManager.T("S.PC.ListItems", ItemCount);
     }
 }

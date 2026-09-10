@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Windows;
+using System.Globalization;
 using Olden_Era___Template_Editor.Localization;
 
 namespace Olden_Era___Template_Editor.Services.Localization
@@ -20,6 +21,16 @@ namespace Olden_Era___Template_Editor.Services.Localization
 
         /// <summary>Raised after the language changes so code-driven text (combos, dialogs) can refresh.</summary>
         public event EventHandler? LanguageChanged;
+
+        /// <summary>Refresh code-created captions for the lifetime of a window.</summary>
+        public static void Observe(Window window, Action refresh)
+        {
+            EventHandler handler = (_, _) => refresh();
+            Instance.LanguageChanged += handler;
+            window.Closed += (_, _) => Instance.LanguageChanged -= handler;
+        }
+
+        public CultureInfo Culture => CultureInfo.GetCultureInfo(CurrentLanguage == AppLanguage.En ? "en-US" : "ru-RU");
 
         private ResourceDictionary? _merged;
 
@@ -60,7 +71,7 @@ namespace Olden_Era___Template_Editor.Services.Localization
         {
             var table = Table(CurrentLanguage);
             string value = table.TryGetValue(key, out var s) ? s : key;
-            return args is { Length: > 0 } ? string.Format(value, args) : value;
+            return args is { Length: > 0 } ? string.Format(Culture, value, args) : value;
         }
 
         /// <summary>Static shortcut so any window/code-behind can localize without holding a reference.</summary>

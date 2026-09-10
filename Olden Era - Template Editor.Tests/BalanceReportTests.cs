@@ -10,6 +10,27 @@ namespace Olden_Era___Template_Editor.Tests;
 
 public class BalanceReportTests
 {
+    [Fact]
+    public void Analyze_ProximityIsNotAPassage_AndDisconnectedStartsAreNotWellBalanced()
+    {
+        var template = Template([Spawn("A", "Player1", 500), Spawn("B", "Player2", 500)],
+            [new Connection { From = "A", To = "B", ConnectionType = "Proximity" }]);
+        var report = TemplateBalanceReport.Analyze(template);
+        Assert.Equal(0, report.Score);
+        Assert.Contains(report.Findings, f => f.Key == "S.Bal.Find.Disconnected");
+        Assert.DoesNotContain(report.Findings, f => f.Key == "S.Bal.Find.WellBalanced");
+        template.Variants![0].Connections![0].ConnectionType = "Portal";
+        Assert.Equal(100, TemplateBalanceReport.Analyze(template).Score);
+    }
+
+    [Fact]
+    public void Analyze_TournamentIslands_AreIntentional()
+    {
+        var settings = RandomTemplateBuilder.Build(new QuickGenerateOptions { Seed = 7, PlayerCount = 2, VictoryCondition = "win_condition_6" });
+        var report = TemplateBalanceReport.Analyze(TemplateGenerator.Generate(settings));
+        Assert.DoesNotContain(report.Findings, f => f.Key == "S.Bal.Find.Disconnected");
+    }
+
     // ── Hand-built templates: deterministic, language-independent assertions ──────
 
     private static RmgTemplate Template(List<Zone> zones, List<Connection> connections) =>
@@ -69,6 +90,7 @@ public class BalanceReportTests
 
         Assert.True(report.Applicable);
         Assert.Contains(report.Findings, f => f.Key == "S.Bal.Find.CastleUneven");
+        Assert.True(report.Score < 100);
     }
 
     [Fact]

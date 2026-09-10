@@ -7,6 +7,55 @@ namespace Olden_Era___Template_Editor.Tests;
 
 public class ZoneGraphValidatorTests
 {
+    [Fact]
+    public void BiomeDependencyCycle_IsReportedOnce_WhileContentSelfReferenceIsAllowed()
+    {
+        var zones = new[] { Spawn("A", "Player1"), Z("B"), Z("C") };
+        for (int i = 0; i < zones.Length; i++)
+            zones[i].ZoneBiome = new BiomeSelector { Type = "MatchZone", Args = [zones[(i + 1) % zones.Length].Name] };
+        var links = new[] { C("A", "B"), C("B", "C") };
+        Assert.Single(ZoneGraphValidator.Validate(zones, links), i => i.Contains("по кругу"));
+        zones[2].ZoneBiome = new BiomeSelector { Type = "FromList", Args = ["grass"] };
+        zones[2].ContentBiome = new BiomeSelector { Type = "MatchZone", Args = ["C"] };
+        Assert.Empty(ZoneGraphValidator.Validate(zones, links));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("not-an-index")]
+    [InlineData("-1")]
+    public void MalformedRoadObjectIndex_IsReported(string? arg)
+    {
+        var zone = Spawn("A", "Player1");
+        zone.Roads = [new Road { From = new RoadEndpoint { Type = "MainObject", Args = arg is null ? [] : [arg] } }];
+        Assert.Contains(ZoneGraphValidator.Validate([zone], []), i => i.Contains("Дорога"));
+    }
+
+    [Fact]
+    public void RoadCannotUseAConnectionFromAnotherZone()
+    {
+        var zones = new[] { Spawn("A", "Player1"), Z("B"), Z("C") };
+        zones[0].Roads = [new Road { From = new RoadEndpoint { Type = "Connection", Args = ["BC"] } }];
+        Assert.Contains(ZoneGraphValidator.Validate(zones, [C("A", "B", "AB"), C("B", "C", "BC")]), i => i.Contains("BC"));
+    }
+
+    [Fact]
+    public void ProximityDoesNotConnectPlayerIslands()
+    {
+        var zones = new[] { Spawn("A", "Player1"), Z("B"), Spawn("C", "Player2"), Z("D") };
+        var links = new[] { C("A", "B"), C("C", "D"), new Connection { From = "B", To = "C", ConnectionType = "Proximity" } };
+        Assert.Contains(ZoneGraphValidator.Validate(zones, links), i => i.Contains("разорвана"));
+        links[2].ConnectionType = "Portal";
+        Assert.Empty(ZoneGraphValidator.Validate(zones, links));
+    }
+
+    [Fact]
+    public void UnnamedZoneAndConnectionEndpoint_ReportIssuesWithoutCrashing()
+    {
+        var zones = new[] { Spawn("A", "Player1"), Z("") };
+        Assert.NotEmpty(ZoneGraphValidator.Validate(zones, [C("", "A")]));
+    }
+
     private static Zone Z(string name, string? layout = null) => new() { Name = name, Layout = layout };
     private static Connection C(string from, string to, string? name = null) => new() { From = from, To = to, Name = name };
 

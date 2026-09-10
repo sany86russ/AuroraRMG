@@ -9,6 +9,55 @@ namespace Olden_Era___Template_Editor.Tests;
 /// </summary>
 public class MapSketchImporterTests
 {
+    [Fact]
+    public void BoundaryAdjacency_MatchesExhaustivePixelSearch()
+    {
+        var rng = new Random(1701);
+        for (int run = 0; run < 60; run++)
+        {
+            const int width = 25, height = 20;
+            var labels = new int[width * height];
+            for (int box = 1; box <= 7; box++)
+            {
+                int x0 = rng.Next(width), y0 = rng.Next(height);
+                int x1 = Math.Min(width, x0 + rng.Next(2, 15)), y1 = Math.Min(height, y0 + rng.Next(2, 15));
+                for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) labels[y * width + x] = box;
+            }
+            int radius = rng.Next(1, 8); var kept = new HashSet<int> { 1, 2, 3, 5, 6, 7 };
+            var expected = new HashSet<(int, int)>();
+            for (int y = 0; y < height; y++) for (int x = 0; x < width; x++)
+            {
+                int a = labels[y * width + x]; if (!kept.Contains(a)) continue;
+                for (int ny = Math.Max(0, y - radius); ny <= Math.Min(height - 1, y + radius); ny++)
+                for (int nx = Math.Max(0, x - radius); nx <= Math.Min(width - 1, x + radius); nx++)
+                {
+                    int b = labels[ny * width + nx]; if (b != a && kept.Contains(b)) expected.Add((Math.Min(a,b), Math.Max(a,b)));
+                }
+            }
+            Assert.True(expected.SetEquals(MapSketchImporter.FindAdjacency(labels, width, height, kept, radius)), $"run {run}");
+        }
+    }
+    [Fact]
+    public void Analyse_ExcessGreenStartsBecomeDistinctNeutralZones()
+    {
+        byte[] pixels = Canvas();
+        for (int i = 0; i < 12; i++) Rect(pixels, i * 10 + 1, 10, i * 10 + 8, 40, 40, 200, 60);
+        var result = MapSketchImporter.Analyse(pixels, W, H, minAreaPercent: 0.1);
+        var variant = result.Template.Variants![0];
+        Assert.Equal(12, variant.Zones!.Count);
+        Assert.Equal(12, variant.Zones.Select(z => z.Name).Distinct().Count());
+        Assert.Equal(12, result.Positions.Count);
+        Assert.Equal(KnownValues.SpawnPlayers.Length, variant.Zones.SelectMany(z => z.MainObjects ?? []).Count(o => o.Type == "Spawn"));
+        Assert.Empty(ZoneGraphValidator.Validate(variant.Zones, variant.Connections!));
+    }
+
+    [Fact]
+    public void Analyse_RejectsOverflowingDimensionsBeforeAllocation()
+    {
+        Assert.Throws<ArgumentException>(() => MapSketchImporter.Analyse([], int.MaxValue, 2));
+        Assert.Throws<ArgumentException>(() => MapSketchImporter.Analyse([], int.MaxValue, int.MaxValue));
+    }
+
     private const int W = 120, H = 60;
 
     /// <summary>A white canvas — the importer's background.</summary>
@@ -79,7 +128,7 @@ public class MapSketchImporterTests
 
         Assert.Equal(2, variant.Zones!.Count);
         Assert.Single(variant.Connections!);
-        Assert.Contains(result.Warnings, w => w.Contains("extra link"));
+        Assert.Contains(Olden_Era___Template_Editor.Services.Localization.LocalizationManager.T("S.IM.Islands", 1), result.Warnings);
         Assert.Empty(ZoneGraphValidator.Validate(variant.Zones, variant.Connections!));
     }
 
@@ -94,7 +143,7 @@ public class MapSketchImporterTests
         SketchImportResult result = MapSketchImporter.Analyse(pixels, W, H, minAreaPercent: 1.0);
 
         Assert.Equal(2, result.Template.Variants![0].Zones!.Count);
-        Assert.Contains(result.Warnings, w => w.Contains("ignored as noise"));
+        Assert.Contains(Olden_Era___Template_Editor.Services.Localization.LocalizationManager.T("S.IM.Noise", 1, 1.0), result.Warnings);
     }
 
     [Fact]

@@ -70,7 +70,7 @@ public class GeneratorIntegrityTests
                     ResourceDensityPercent = pick.Next(20, 401),
                     StructureDensityPercent = pick.Next(20, 201),
                     NeutralStackStrengthPercent = pick.Next(25, 301),
-                    BorderGuardStrengthPercent = pick.Next(25, 501),
+                    BorderGuardStrengthPercent = pick.Next(25, 801),
                     Advanced = new AdvancedSettings
                     {
                         Enabled = true,
@@ -204,6 +204,7 @@ public class GeneratorIntegrityTests
                 var adjacency = zones.ToDictionary(z => z.Name, _ => new List<string>(), StringComparer.Ordinal);
                 foreach (Connection c in conns)
                 {
+                    if (!ConnectionRules.AllowsTravel(c)) continue;
                     if (!adjacency.TryGetValue(c.From, out var a) || !adjacency.TryGetValue(c.To, out var b)) continue;
                     a.Add(c.To);
                     b.Add(c.From);

@@ -1,12 +1,14 @@
 using System.Windows;
 using System.Windows.Media;
+using System.ComponentModel;
+using Olden_Era___Template_Editor.Services.Localization;
 
 namespace OldenEraTemplateEditor.Models
 {
     /// <summary>
     /// UI view-model for a single row in the banned-items / spells / heroes ListBox.
     /// </summary>
-    public class BanEntry
+    public class BanEntry : INotifyPropertyChanged
     {
         private static readonly Brush MovementCategoryBrush  = CreateFrozenBrush(Color.FromRgb(100, 149, 237)); // cornflower blue
         private static readonly Brush DiplomacyCategoryBrush = CreateFrozenBrush(Color.FromRgb(218, 165,  32)); // goldenrod
@@ -30,8 +32,16 @@ namespace OldenEraTemplateEditor.Models
         }
 
         public string Id          { get; set; } = "";
-        public string DisplayName { get; set; } = "";
+        private string _displayName = "";
+        public string DisplayName { get => GameLabels.Name(Id, _displayName); set => _displayName = value; }
         public string Category    { get; set; } = "";
+        public string CategoryLabel => GameLabels.Category(Category);
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public void RefreshLanguage()
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(CategoryLabel)));
+        }
 
         /// <summary>Optional game icon for this row. When set, it replaces the coloured category dot.</summary>
         public ImageSource? Icon  { get; set; }

@@ -16,6 +16,8 @@ namespace Olden_Era___Template_Editor.Services.GameData
     public static class IconResolver
     {
         private static readonly Dictionary<string, ImageSource?> Cache = new(StringComparer.Ordinal);
+        private static readonly Queue<string> CacheOrder = new();
+        private const int MaxCachedIcons = 512;
         private static readonly object Sync = new();
 
         public static string IconDirectory =>
@@ -50,6 +52,7 @@ namespace Olden_Era___Template_Editor.Services.GameData
                         bmp.BeginInit();
                         bmp.CacheOption  = BitmapCacheOption.OnLoad;   // load fully so the file isn't locked
                         bmp.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
+                        bmp.DecodePixelWidth = 64; // picker icons are at most 32 DIPs, including 200% DPI
                         bmp.UriSource    = new Uri(path, UriKind.Absolute);
                         bmp.EndInit();
                         bmp.Freeze();
@@ -58,7 +61,9 @@ namespace Olden_Era___Template_Editor.Services.GameData
                 }
                 catch { img = null; }
 
+                if (Cache.Count >= MaxCachedIcons) Cache.Remove(CacheOrder.Dequeue());
                 Cache[iconSid] = img;
+                CacheOrder.Enqueue(iconSid);
                 return img;
             }
         }
@@ -66,7 +71,7 @@ namespace Olden_Era___Template_Editor.Services.GameData
         /// <summary>Clears the memo (call after a fresh extraction so new icons are picked up).</summary>
         public static void Invalidate()
         {
-            lock (Sync) Cache.Clear();
+            lock (Sync) { Cache.Clear(); CacheOrder.Clear(); }
         }
     }
 }

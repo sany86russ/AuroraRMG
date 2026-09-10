@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource S.PC.Title}"
         Height="700" Width="900"
-        WindowStartupLocation="CenterOwner"
+        MinWidth="720" MinHeight="480" WindowStartupLocation="CenterOwner"
         Background="{StaticResource BrushPanel}"
         UseLayoutRounding="True">
     <Grid Margin="12">
@@ -38,13 +38,12 @@
             <Border Grid.Column="0" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="4">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="{DynamicResource S.PC.Available}" Foreground="{StaticResource BrushGold}" FontSize="11" Padding="8,4"/>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="AvailableLists" Margin="4">
-                            <ItemsControl.ItemTemplate>
+                        <ListBox HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" BorderThickness="0" Background="Transparent" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" x:Name="AvailableLists" Margin="4">
+                            <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Border BorderBrush="{StaticResource BrushBorder}" BorderThickness="0,0,0,1" Padding="4,2">
                                         <DockPanel>
-                                            <Button Content="+" DockPanel.Dock="Right" Width="24" Height="24" Margin="4,0,0,0"
+                                            <Button Padding="0" Content="+" DockPanel.Dock="Right" Width="24" Height="24" Margin="4,0,0,0"
                                                     Click="AddList_Click" Tag="{Binding Name}" ToolTip="{DynamicResource S.PC.AddTip}"/>
                                             <StackPanel>
                                                 <TextBlock Text="{Binding Name}" Foreground="{StaticResource BrushText}" FontSize="11" TextTrimming="CharacterEllipsis"/>
@@ -53,29 +52,27 @@
                                         </DockPanel>
                                     </Border>
                                 </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                 </DockPanel>
             </Border>
 
             <!-- Buttons -->
             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0">
-                <Button Content="→" Width="32" Height="32" Margin="0,4" Click="AddAll_Click" ToolTip="{DynamicResource S.PC.AddAll}"/>
-                <Button Content="←" Width="32" Height="32" Margin="0,4" Click="RemoveAll_Click" ToolTip="{DynamicResource S.PC.RemoveAll}"/>
+                <Button Padding="0" Content="→" Width="32" Height="32" Margin="0,4" Click="AddAll_Click" ToolTip="{DynamicResource S.PC.AddAll}"/>
+                <Button Padding="0" Content="←" Width="32" Height="32" Margin="0,4" Click="RemoveAll_Click" ToolTip="{DynamicResource S.PC.RemoveAll}"/>
             </StackPanel>
 
             <!-- Selected lists -->
             <Border Grid.Column="2" BorderBrush="{StaticResource BrushBorder}" BorderThickness="1" CornerRadius="4">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="{DynamicResource S.PC.Selected}" Foreground="{StaticResource BrushGold}" FontSize="11" Padding="8,4"/>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="SelectedLists" Margin="4">
-                            <ItemsControl.ItemTemplate>
+                        <ListBox HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" BorderThickness="0" Background="Transparent" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" x:Name="SelectedLists" Margin="4">
+                            <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Border BorderBrush="{StaticResource BrushBorder}" BorderThickness="0,0,0,1" Padding="4,2">
                                         <DockPanel>
-                                            <Button Content="✕" DockPanel.Dock="Right" Width="24" Height="24" Margin="4,0,0,0"
+                                            <Button Padding="0" Content="✕" DockPanel.Dock="Right" Width="24" Height="24" Margin="4,0,0,0"
                                                     Click="RemoveList_Click" Tag="{Binding Name}" ToolTip="{DynamicResource S.PC.RemoveTip}"/>
                                             <StackPanel>
                                                 <TextBlock Text="{Binding Name}" Foreground="{StaticResource BrushText}" FontSize="11" TextTrimming="CharacterEllipsis"/>
@@ -84,9 +81,8 @@
                                         </DockPanel>
                                     </Border>
                                 </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
                 </DockPanel>
             </Border>
         </Grid>

@@ -1,5 +1,8 @@
 using System;
 using System.Linq;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -23,6 +26,9 @@ namespace Olden_Era___Template_Editor
 
         private byte[]? _pixels;
         private int _width, _height;
+        private int _analysisVersion;
+        private readonly SemaphoreSlim _analysisGate = new(1, 1);
+        private bool _closed;
 
         /// <summary>The accepted import, or <c>null</c> when the dialog was cancelled.</summary>
         public SketchImportResult? Result { get; private set; }
@@ -31,6 +37,8 @@ namespace Olden_Era___Template_Editor
         {
             InitializeComponent();
             TxtSummary.Text = L("S.IM.SummaryEmpty");
+            LocalizationManager.Observe(this, () => { if (_pixels is null) TxtSummary.Text = L("S.IM.SummaryEmpty"); else Analyse(); });
+            Closed += (_, _) => { _closed = true; _analysisVersion++; };
         }
 
         private void BtnPick_Click(object sender, RoutedEventArgs e)
@@ -44,7 +52,17 @@ namespace Olden_Era___Template_Editor
                 source.BeginInit();
                 source.UriSource = new Uri(dlg.FileName);
                 source.CacheOption = BitmapCacheOption.OnLoad;   // don't hold the file open
+                using (var stream = File.OpenRead(dlg.FileName))
+                {
+                    var frame = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0];
+                    if (Math.Max(frame.PixelWidth, frame.PixelHeight) > 800)
+                    {
+                        if (frame.PixelWidth >= frame.PixelHeight) source.DecodePixelWidth = 800;
+                        else source.DecodePixelHeight = 800;
+                    }
+                }
                 source.EndInit();
+                source.Freeze();
 
                 ImgPreview.Source = source;
                 TxtNoImage.Visibility = Visibility.Collapsed;
@@ -81,16 +99,26 @@ namespace Olden_Era___Template_Editor
             Analyse();
         }
 
-        private void Analyse()
+        private async void Analyse()
         {
             if (_pixels is null) return;
-
+            int version = ++_analysisVersion;
+            byte[] pixels = _pixels;
+            int width = _width, height = _height;
+            double area = SldMinArea.Value / 10.0;
+            int radius = (int)SldLinkRadius.Value;
+            Result = null;
+            BtnImport.IsEnabled = false;
+            TxtSummary.Text = L("S.IM.Analysing");
+            await Task.Delay(180); // coalesce rapid slider moves
+            if (_closed || version != _analysisVersion) return;
+            await _analysisGate.WaitAsync();
             try
             {
-                Result = MapSketchImporter.Analyse(
-                    _pixels, _width, _height,
-                    minAreaPercent: SldMinArea.Value / 10.0,
-                    linkRadius: (int)SldLinkRadius.Value);
+                if (_closed || version != _analysisVersion) return;
+                var result = await Task.Run(() => MapSketchImporter.Analyse(pixels, width, height, area, radius));
+                if (_closed || version != _analysisVersion) return;
+                Result = result;
 
                 var variant = Result.Template.Variants![0];
                 var zones = variant.Zones ?? [];
@@ -106,10 +134,12 @@ namespace Olden_Era___Template_Editor
             }
             catch (Exception ex)
             {
+                if (_closed || version != _analysisVersion) return;
                 Result = null;
                 BtnImport.IsEnabled = false;
                 TxtSummary.Text = ex.Message;
             }
+            finally { _analysisGate.Release(); }
         }
 
         private void BtnImport_Click(object sender, RoutedEventArgs e)

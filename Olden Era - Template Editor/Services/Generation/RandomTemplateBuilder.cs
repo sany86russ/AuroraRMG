@@ -373,6 +373,7 @@ namespace Olden_Era___Template_Editor.Services.Generation
             QuickGuardLevel.Strong     => PickPercent(150, 220, chaos, rng),  // tough gates
             QuickGuardLevel.Fortress   => PickPercent(230, 300, chaos, rng),  // a real wall — keeps rushers out for weeks
             QuickGuardLevel.Impassable => PickPercent(300, 500, chaos, rng),  // an impassable wall — a high-difficulty AI grinds its own land for weeks
+            QuickGuardLevel.Extreme    => rng.Next(800, 801),                 // exactly 800%, still consumes one draw to preserve the rest of the map
             _                          => PickPercent(80, 140, chaos, rng),   // Normal — unchanged historical band
         };
 

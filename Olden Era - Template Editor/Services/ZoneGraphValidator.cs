@@ -17,6 +17,7 @@ namespace Olden_Era___Template_Editor.Services
         public static List<string> Validate(IReadOnlyList<Zone> zones, IReadOnlyList<Connection> connections)
         {
             var issues = new List<string>();
+            issues.AddRange(FactionSelectors.ValidateReferences(zones));
             var names = new HashSet<string>(System.StringComparer.Ordinal);
 
             foreach (var z in zones)
@@ -39,7 +40,8 @@ namespace Olden_Era___Template_Editor.Services
             if (zones.Count > 1)
             {
                 var connected = new HashSet<string>(System.StringComparer.Ordinal);
-                foreach (var c in connections) { connected.Add(c.From); connected.Add(c.To); }
+                foreach (var c in connections.Where(ConnectionRules.AllowsTravel))
+                { connected.Add(c.From); connected.Add(c.To); }
                 foreach (var z in zones)
                     if (!string.IsNullOrWhiteSpace(z.Name) && !connected.Contains(z.Name))
                         issues.Add(L("S.V.Isolated", z.Name));
@@ -48,7 +50,7 @@ namespace Olden_Era___Template_Editor.Services
             }
 
             issues.AddRange(ValidateSpawns(zones));
-            issues.AddRange(ValidateRoads(zones, connNames));
+            issues.AddRange(ValidateRoads(zones, connections));
             issues.AddRange(ValidateBiomes(zones, names));
 
             return issues;
@@ -69,6 +71,7 @@ namespace Olden_Era___Template_Editor.Services
 
             foreach (var c in connections)
             {
+                if (!ConnectionRules.AllowsTravel(c) || string.IsNullOrWhiteSpace(c.From) || string.IsNullOrWhiteSpace(c.To)) continue;
                 if (!adjacency.TryGetValue(c.From, out var a) || !adjacency.TryGetValue(c.To, out var b)) continue;
                 a.Add(c.To);
                 b.Add(c.From);
@@ -76,7 +79,7 @@ namespace Olden_Era___Template_Editor.Services
 
             // Start from a zone that actually has connections, so a single stray zone does not make
             // the whole (otherwise fine) map look unreachable.
-            string? start = zones.Select(z => z.Name).FirstOrDefault(n => connectedZones.Contains(n));
+            string? start = zones.Select(z => z.Name).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n) && connectedZones.Contains(n));
             if (start is null) yield break;
 
             var seen = new HashSet<string>(System.StringComparer.Ordinal) { start };
@@ -136,23 +139,38 @@ namespace Olden_Era___Template_Editor.Services
         /// existing connection and a <c>MainObject</c> endpoint must index an object the zone actually
         /// has, otherwise the engine's road builder fails while generating the map.
         /// </summary>
-        private static IEnumerable<string> ValidateRoads(IReadOnlyList<Zone> zones, HashSet<string> connectionNames)
+        private static IEnumerable<string> ValidateRoads(IReadOnlyList<Zone> zones, IReadOnlyList<Connection> connections)
         {
-            foreach (var z in zones)
-            foreach (var road in z.Roads ?? [])
-            foreach (var endpoint in new[] { road.From, road.To })
+            var anchors = new Dictionary<string, HashSet<string>>(System.StringComparer.Ordinal);
+            foreach (var connection in connections)
             {
-                if (endpoint is null) continue;
-                string? arg = endpoint.Args is { Count: > 0 } ? endpoint.Args[0] : null;
+                if (string.IsNullOrWhiteSpace(connection.Name)) continue;
+                foreach (string endpoint in new[] { connection.From, connection.To })
+                {
+                    if (string.IsNullOrWhiteSpace(endpoint)) continue;
+                    if (!anchors.TryGetValue(endpoint, out var names))
+                        anchors[endpoint] = names = new HashSet<string>(System.StringComparer.Ordinal);
+                    names.Add(connection.Name);
+                }
+            }
+            foreach (var z in zones)
+            {
+                var connectionNames = !string.IsNullOrWhiteSpace(z.Name) && anchors.TryGetValue(z.Name, out var found)
+                    ? found : new HashSet<string>(System.StringComparer.Ordinal);
+                foreach (var road in z.Roads ?? [])
+                foreach (var endpoint in new[] { road.From, road.To })
+                {
+                    if (endpoint is null) continue;
+                    string? arg = endpoint.Args is { Count: > 0 } ? endpoint.Args[0] : null;
 
-                if (string.Equals(endpoint.Type, "Connection", System.StringComparison.Ordinal)
-                    && (arg is null || !connectionNames.Contains(arg)))
-                    yield return L("S.V.RoadConn", z.Name, arg ?? "");
+                    if (string.Equals(endpoint.Type, "Connection", System.StringComparison.Ordinal)
+                        && (arg is null || !connectionNames.Contains(arg)))
+                        yield return L("S.V.RoadConn", z.Name, arg ?? "");
 
-                if (string.Equals(endpoint.Type, "MainObject", System.StringComparison.Ordinal)
-                    && int.TryParse(arg, out int index)
-                    && (index < 0 || index >= (z.MainObjects?.Count ?? 0)))
-                    yield return L("S.V.RoadObj", z.Name, index, z.MainObjects?.Count ?? 0);
+                    if (string.Equals(endpoint.Type, "MainObject", System.StringComparison.Ordinal)
+                        && (!int.TryParse(arg, out int index) || index < 0 || index >= (z.MainObjects?.Count ?? 0)))
+                        yield return L("S.V.RoadObj", z.Name, arg ?? "", z.MainObjects?.Count ?? 0);
+                }
             }
         }
 
@@ -176,6 +194,33 @@ namespace Olden_Era___Template_Editor.Services
                     if (selector!.Args is not { Count: > 0 } args) continue;
                     if (!zoneNames.Contains(args[0])) yield return L("S.V.BiomeZone", z.Name, args[0]);
                 }
+            }
+
+            // Only zoneBiome forms terrain dependencies: content/meta may copy their own zone.
+            var next = new Dictionary<string, string>(System.StringComparer.Ordinal);
+            foreach (var zone in zones)
+                if (!string.IsNullOrWhiteSpace(zone.Name) && zone.ZoneBiome is { Type: "MatchZone", Args.Count: > 0 } biome
+                    && !string.IsNullOrWhiteSpace(biome.Args[0]))
+                    next[zone.Name] = biome.Args[0];
+            var checkedNames = new HashSet<string>(System.StringComparer.Ordinal);
+            foreach (string start in next.Keys)
+            {
+                var path = new List<string>();
+                var indices = new Dictionary<string, int>(System.StringComparer.Ordinal);
+                string current = start;
+                while (!checkedNames.Contains(current) && next.TryGetValue(current, out string? target))
+                {
+                    if (indices.TryGetValue(current, out int cycleStart))
+                    {
+                        var cycle = path.Skip(cycleStart).ToList();
+                        if (cycle.Count > 1) yield return L("S.V.BiomeCycle", string.Join(" → ", cycle.Append(current)));
+                        break;
+                    }
+                    indices[current] = path.Count;
+                    path.Add(current);
+                    current = target;
+                }
+                checkedNames.UnionWith(path);
             }
         }
     }

@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System;
+using System.Text.Json;
+using Olden_Era___Template_Editor.Services;
 using System.Windows;
 using System.Windows.Controls;
 using OldenEraTemplateEditor.Models;
@@ -30,6 +33,18 @@ namespace Olden_Era___Template_Editor
             CmbMode.ItemsSource = KnownValues.OrientationModes;
             CmbWaterType.ItemsSource = KnownValues.WaterTypes;
             CmbZeroZone.ItemsSource = zoneNames.ToList();
+            void RefreshOptions()
+            {
+                foreach (var combo in new[] { CmbMode, CmbWaterType })
+                {
+                    var text = new FrameworkElementFactory(typeof(System.Windows.Controls.TextBlock));
+                    text.SetBinding(System.Windows.Controls.TextBlock.TextProperty, new System.Windows.Data.Binding { Converter = new GameTokenConverter() });
+                    combo.ItemTemplate = new DataTemplate { VisualTree = text };
+                    combo.ToolTip = GameLabels.Token(combo.Text);
+                }
+            }
+            Loaded += (_, _) => RefreshOptions();
+            LocalizationManager.Observe(this, RefreshOptions);
 
             var o = variant.Orientation;
             CmbMode.Text = o?.Mode ?? "";
@@ -48,31 +63,45 @@ namespace Olden_Era___Template_Editor
 
         private void BtnApply_Click(object sender, RoutedEventArgs e)
         {
-            var o = _variant.Orientation ?? new ModelOrientation();
-            o.Mode = Str(CmbMode);
-            o.ZeroAngleZone = Str(CmbZeroZone);
-            o.BaseAngleMin = ParseD(TxtBaseMin);
-            o.BaseAngleMax = ParseD(TxtBaseMax);
-            o.RandomAngleAmplitude = ParseD(TxtRandAmp);
-            o.RandomAngleStep = ParseD(TxtRandStep);
-            bool oEmpty = o.Mode is null && o.ZeroAngleZone is null && o.BaseAngleMin is null
-                          && o.BaseAngleMax is null && o.RandomAngleAmplitude is null && o.RandomAngleStep is null;
-            _variant.Orientation = oEmpty ? null : o;
+            // Parse every field before changing the document, preserving unknown engine fields.
+            try
+            {
+                var o = _variant.Orientation is null ? new ModelOrientation()
+                    : JsonSerializer.Deserialize<ModelOrientation>(JsonSerializer.Serialize(_variant.Orientation, JsonExport.Options), JsonExport.Options)!;
+                o.Mode = Str(CmbMode);
+                o.ZeroAngleZone = Str(CmbZeroZone);
+                o.BaseAngleMin = ParseD(TxtBaseMin);
+                o.BaseAngleMax = ParseD(TxtBaseMax);
+                o.RandomAngleAmplitude = ParseD(TxtRandAmp);
+                o.RandomAngleStep = ParseD(TxtRandStep);
+                bool oEmpty = o.Mode is null && o.ZeroAngleZone is null && o.BaseAngleMin is null
+                              && o.BaseAngleMax is null && o.RandomAngleAmplitude is null && o.RandomAngleStep is null;
+                var b = _variant.Border is null ? new ModelBorder()
+                    : JsonSerializer.Deserialize<ModelBorder>(JsonSerializer.Serialize(_variant.Border, JsonExport.Options), JsonExport.Options)!;
+                b.CornerRadius = ParseD(TxtCorner);
+                b.ObstaclesWidth = ParseI(TxtObstWidth);
+                b.WaterWidth = ParseI(TxtWaterWidth);
+                b.WaterType = Str(CmbWaterType);
+                // ObstaclesNoise / WaterNoise are intentionally preserved.
+                bool bEmpty = b.CornerRadius is null && b.ObstaclesWidth is null && b.WaterWidth is null
+                              && b.WaterType is null
+                              && (b.ObstaclesNoise is null || b.ObstaclesNoise.Count == 0)
+                              && (b.WaterNoise is null || b.WaterNoise.Count == 0);
+                if (o.BaseAngleMin > o.BaseAngleMax || o.RandomAngleAmplitude < 0 || o.RandomAngleStep < 0
+                    || b.CornerRadius < 0 || b.ObstaclesWidth < 0 || b.WaterWidth < 0)
+                    throw new FormatException(L("S.OR.InvalidRange"));
+                if (o.ZeroAngleZone is not null && !CmbZeroZone.Items.Contains(o.ZeroAngleZone))
+                    throw new FormatException(L("S.OR.InvalidZone"));
+                _variant.Orientation = oEmpty && !(o.Extra?.Count > 0) ? null : o;
+                _variant.Border = bEmpty && !(b.Extra?.Count > 0) ? null : b;
 
-            var b = _variant.Border ?? new ModelBorder();
-            b.CornerRadius = ParseD(TxtCorner);
-            b.ObstaclesWidth = ParseI(TxtObstWidth);
-            b.WaterWidth = ParseI(TxtWaterWidth);
-            b.WaterType = Str(CmbWaterType);
-            // ObstaclesNoise / WaterNoise are intentionally preserved.
-            bool bEmpty = b.CornerRadius is null && b.ObstaclesWidth is null && b.WaterWidth is null
-                          && b.WaterType is null
-                          && (b.ObstaclesNoise is null || b.ObstaclesNoise.Count == 0)
-                          && (b.WaterNoise is null || b.WaterNoise.Count == 0);
-            _variant.Border = bEmpty ? null : b;
-
-            DialogResult = true;
-            Close();
+                DialogResult = true;
+                Close();
+            }
+            catch (FormatException ex)
+            {
+                MessageBox.Show(this, ex.Message, L("S.OR.Title"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
@@ -85,10 +114,18 @@ namespace Olden_Era___Template_Editor
             return string.IsNullOrWhiteSpace(s) ? null : s;
         }
 
-        private static double? ParseD(TextBox t) =>
-            double.TryParse(t.Text?.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ? d : (double?)null;
+        private static double? ParseD(TextBox t)
+        {
+            if (NumericInput.TryOptionalDouble(t.Text, out var value)) return value;
+            t.Focus(); t.SelectAll();
+            throw new FormatException(L("S.OR.InvalidNumber", t.Text));
+        }
 
-        private static int? ParseI(TextBox t) =>
-            int.TryParse(t.Text?.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var i) ? i : (int?)null;
+        private static int? ParseI(TextBox t)
+        {
+            if (NumericInput.TryOptionalInt(t.Text, out var value)) return value;
+            t.Focus(); t.SelectAll();
+            throw new FormatException(L("S.OR.InvalidInteger", t.Text));
+        }
     }
 }

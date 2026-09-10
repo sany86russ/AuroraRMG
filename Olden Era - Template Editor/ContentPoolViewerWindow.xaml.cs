@@ -17,9 +17,11 @@ namespace Olden_Era___Template_Editor
 
         private static string L(string key, params object[] args) => LocalizationManager.T(key, args);
 
-        public ContentPoolViewerWindow(List<string>? allPoolSids = null, List<string>? allSelectedPids = null)
+        public ContentPoolViewerWindow(List<string>? allPoolSids = null, List<string>? allSelectedPids = null, IEnumerable<GamePool>? templatePools = null)
         {
             InitializeComponent();
+            LocalizationManager.Instance.LanguageChanged += OnLanguageChanged;
+            Closed += (_, _) => LocalizationManager.Instance.LanguageChanged -= OnLanguageChanged;
 
             // Localised DataGrid headers (columns are outside the visual tree → set in code).
             ColList.Header = L("S.PV.ColList");
@@ -65,7 +67,8 @@ namespace Olden_Era___Template_Editor
 
             try
             {
-                _allPools = GamePoolDataLoader.GetAllPools();
+                _allPools = GamePoolDataLoader.GetAllPools().Concat(templatePools ?? [])
+                    .GroupBy(pool => pool.Name, StringComparer.Ordinal).Select(group => group.Last()).ToList();
                 if (_allPools.Count == 0)
                 {
                     ResultCount.Text = GamePoolDataLoader.Status;
@@ -97,6 +100,22 @@ namespace Olden_Era___Template_Editor
             ResultCount.Text = filtered.Count == 0
                 ? L("S.PV.NothingFound")
                 : L("S.PV.Found", filtered.Count, _allPools.Count);
+        }
+
+        private void OnLanguageChanged(object? sender, EventArgs e)
+        {
+            ColList.Header = L("S.PV.ColList"); ColSid.Header = L("S.PV.ColSid");
+            ColWeight.Header = L("S.PV.ColWeight"); ColBiome.Header = L("S.PV.ColBiome");
+            bool placeholderShown = SearchBox.Text == _placeholder;
+            _placeholder = L("S.PV.SearchPlaceholder");
+            if (placeholderShown) SearchBox.Text = _placeholder;
+            int category = CategoryCombo.SelectedIndex;
+            CategoryCombo.ItemsSource = new[] { "All", "Guarded", "Unguarded", "Resources", "Random", "Default", "Template", "Custom" }
+                .Select(key => L("S.PV.Cat." + key)).ToList();
+            CategoryCombo.SelectedIndex = category;
+            FilterPools();
+            if (PoolList.SelectedItem is GamePool pool) PoolDataGrid.ItemsSource = GamePoolDataLoader.GetPoolItems(pool);
+            if (_debugWindow?.Content is ScrollViewer { Content: TextBlock text }) { _debugWindow.Title = L("S.PV.Debug"); text.Text = GetDebugInfo(); }
         }
 
         private static bool MatchesCategory(string poolName, int categoryIndex)

@@ -21,6 +21,12 @@ namespace Olden_Era___Template_Editor
             CmbType.SelectedIndex     = 0;
             CmbReceiver.SelectedIndex = 0;
 
+            Services.Localization.LocalizationManager.Observe(this, () =>
+            {
+                string amount = TxtResourceAmount.Text;
+                CmbType_Changed(this, null!);
+                TxtResourceAmount.Text = amount;
+            });
             var existing = existingBonuses?.ToList() ?? [];
             _existingKeys     = existing.Select(b => b.ToString()).ToHashSet();
             _existingItemIds  = existing
@@ -107,7 +113,7 @@ namespace Olden_Era___Template_Editor
         {
             var entries = KnownValues.BannableItems
                 .Select(b => new BanEntry { Id = b.Id, DisplayName = b.DisplayName, Category = b.Category });
-            var picker = new ItemPickerWindow(entries, _existingItemIds, Services.Localization.LocalizationManager.T("S.Bonus.ChooseItem")) { Owner = this };
+            var picker = new ItemPickerWindow(entries, _existingItemIds, "S.Bonus.ChooseItem") { Owner = this };
             if (picker.ShowDialog() != true) return;
 
             if (picker.SelectedIds.Count > 1)
@@ -181,6 +187,13 @@ namespace Olden_Era___Template_Editor
                 Param          = param,
                 Param2         = param2,
             };
+
+            if (!candidate.HasValidParameters())
+            {
+                MessageBox.Show(this, Services.Localization.LocalizationManager.T("S.Bonus.InvalidNumber"),
+                    Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
             if (_existingKeys.Contains(candidate.ToString()))
             {

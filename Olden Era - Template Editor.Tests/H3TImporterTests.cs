@@ -110,7 +110,7 @@ public class H3TImporterTests
         H3TImportResult result = H3TImporter.ParseLines(file);
 
         Assert.Equal(1, result.ConnectionCount);
-        Assert.Contains(result.Warnings, w => w.Contains("not in the file"));
+        Assert.Contains(Olden_Era___Template_Editor.Services.Localization.LocalizationManager.T("S.H3T.MissingZone", 1, 9), result.Warnings);
     }
 
     [Theory]
@@ -163,6 +163,6 @@ public class H3TImporterTests
 
         H3TImportResult result = H3TImporter.ParseLines(file);
 
-        Assert.Contains(result.Warnings, w => w.Contains("No player start"));
+        Assert.Contains(Olden_Era___Template_Editor.Services.Localization.LocalizationManager.T("S.H3T.NoStarts"), result.Warnings);
     }
 }

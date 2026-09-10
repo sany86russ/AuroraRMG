@@ -61,6 +61,7 @@ namespace Olden_Era___Template_Editor.Services.Analysis
             foreach (string name in zoneByName.Keys) adj[name] = [];
             foreach (Connection c in connections)
             {
+                if (!ConnectionRules.AllowsTravel(c)) continue;
                 if (string.IsNullOrEmpty(c.From) || string.IsNullOrEmpty(c.To) || c.From == c.To) continue;
                 if (!adj.ContainsKey(c.From) || !adj.ContainsKey(c.To)) continue;
                 adj[c.From].Add(c.To);
@@ -80,6 +81,7 @@ namespace Olden_Era___Template_Editor.Services.Analysis
                 return new BalanceReport { Applicable = false, Score = 100, Players = [], Findings = [] };
 
             var playerZoneNames = new HashSet<string>(playerZones.Select(p => p.ZoneName), StringComparer.Ordinal);
+            var zoneValues = zoneByName.ToDictionary(kv => kv.Key, kv => ZoneValue(kv.Value), StringComparer.Ordinal);
 
             // Neutral castle zones: a "City" object in a zone that is NOT a player spawn.
             var castleZones = new HashSet<string>(StringComparer.Ordinal);
@@ -106,7 +108,7 @@ namespace Olden_Era___Template_Editor.Services.Analysis
                 {
                     if (string.IsNullOrWhiteSpace(z.Name) || playerZoneNames.Contains(z.Name)) continue;
                     if (d.TryGetValue(z.Name, out int hops) && hops >= 1)
-                        expansion += ZoneValue(z) / (double)hops; // closer neutral wealth counts more
+                        expansion += zoneValues[z.Name] / (double)hops; // closer neutral wealth counts more
                 }
 
                 int nearestOpp = int.MaxValue;
@@ -128,7 +130,13 @@ namespace Olden_Era___Template_Editor.Services.Analysis
             }
 
             int score = Score(players);
+            bool tournamentIslands = playerZones.Count == 2 && template?.GameRules?.WinConditions?.Tournament == true;
+            bool disconnected = !tournamentIslands
+                && playerZones.Any(p => playerZones.Any(q => !dist[p.ZoneName].ContainsKey(q.ZoneName)));
+            if (disconnected) score = 0;
             List<BalanceFinding> findings = BuildFindings(players, playerZones, dist, castleZones.Count > 0, score);
+            if (disconnected)
+                findings.Insert(0, new BalanceFinding("S.Bal.Find.Disconnected", BalanceSeverity.Warning, []));
 
             return new BalanceReport { Applicable = true, Score = score, Players = players, Findings = findings };
         }
@@ -140,7 +148,8 @@ namespace Olden_Era___Template_Editor.Services.Analysis
             double wealthFair    = 1 - RelSpread(players.Select(p => (double)p.StartWealth));
             double expansionFair = 1 - RelSpread(players.Select(p => p.ExpansionValue));
             double proximityFair = 1 - RelSpread(players.Select(p => (double)p.NearestOpponentHops));
-            double combined = 0.45 * wealthFair + 0.35 * expansionFair + 0.20 * proximityFair;
+            double castleFair = 1 - RelSpread(players.Select(p => p.CastleHops is > 0 ? 1.0 / p.CastleHops.Value : 0));
+            double combined = 0.40 * wealthFair + 0.30 * expansionFair + 0.20 * proximityFair + 0.10 * castleFair;
             return (int)Math.Round(100 * Math.Clamp(combined, 0, 1));
         }
 

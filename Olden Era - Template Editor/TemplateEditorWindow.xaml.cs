@@ -92,6 +92,7 @@ namespace Olden_Era___Template_Editor
         private readonly Dictionary<string, System.Windows.Shapes.Shape> _nodeShapes = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FrameworkElement> _nodeLabels = new(StringComparer.Ordinal);
         private readonly List<(Line Line, Connection Conn)> _edges = [];
+        private readonly Dictionary<string, List<(Line Line, Connection Conn)>> _incidentEdges = new(StringComparer.Ordinal);
         private double _radius = 24;
 
         // Interaction state
@@ -115,17 +116,26 @@ namespace Olden_Era___Template_Editor
         // model state; every MarkDirty pushes the previous baseline, so one commit = one undo step.
         private readonly List<string> _undoStack = [];
         private readonly List<string> _redoStack = [];
+        private readonly Dictionary<string, Dictionary<string, Point>> _snapshotPositions = new(StringComparer.Ordinal);
         private string _undoBaseline = "";
         private bool _restoringHistory;
         private const int MaxUndoDepth = 50;
         /// <summary>Memory ceiling for the undo history (~16 MB of UTF-16 chars), independent of depth.</summary>
         private const long MaxUndoChars = 8_000_000;
 
+        internal void DebugDiscardAndClose()
+        {
+            _dirty = false;
+            Close();
+        }
+
         public TemplateEditorWindow(RmgTemplate? template = null, MapTopology topology = MapTopology.Default)
         {
             InitializeComponent();
-            _template = template ?? NewEmptyTemplate();
+            _template = template is null ? NewEmptyTemplate() : TemplateRefactor.CreateEditingCopy(template);
             _topology = topology;
+            Services.Localization.LocalizationManager.Instance.LanguageChanged += EditorLanguageChanged;
+            Closed += (_, _) => Services.Localization.LocalizationManager.Instance.LanguageChanged -= EditorLanguageChanged;
             Loaded += (_, _) =>
             {
                 ComputePositions();
@@ -134,6 +144,7 @@ namespace Olden_Era___Template_Editor
                 UpdateTitle();
                 _undoBaseline = JsonSerializer.Serialize(_template, SnapshotOptions);
                 ApplyHotkeyTooltips(); // show each button's (rebindable) shortcut in its tooltip
+                RefreshGridSnap();
                 // Zone/connection counts now live in the permanent TxtZoneCount readout,
                 // so the transient status line keeps its localized "Ready" default.
             };
@@ -162,7 +173,7 @@ namespace Olden_Era___Template_Editor
 
         // ── Layout ──────────────────────────────────────────────────────────────────
 
-        private void ComputePositions()
+        private void ComputePositions(bool restoreSaved = true)
         {
             _positions.Clear();
             try
@@ -175,7 +186,7 @@ namespace Olden_Era___Template_Editor
 
             // A hand-arranged graph wins over the computed one: re-deriving positions on every load
             // used to throw away the user's dragging the moment a template was saved and reopened.
-            if (_currentPath is not null)
+            if (restoreSaved && _currentPath is not null)
             {
                 var remembered = EditorLayoutStore.Load(_currentPath);
                 if (remembered is not null)
@@ -208,6 +219,7 @@ namespace Olden_Era___Template_Editor
             _nodeShapes.Clear();
             _nodeLabels.Clear();
             _edges.Clear();
+            _incidentEdges.Clear();
 
             DrawGrid();
 
@@ -226,6 +238,12 @@ namespace Olden_Era___Template_Editor
                 StyleEdge(line, c);
                 GraphCanvas.Children.Add(line);
                 _edges.Add((line, c));
+                foreach (string endpoint in new[] { c.From, c.To }.Distinct(StringComparer.Ordinal))
+                {
+                    if (!_incidentEdges.TryGetValue(endpoint, out var incident))
+                        _incidentEdges[endpoint] = incident = [];
+                    incident.Add((line, c));
+                }
             }
 
             foreach (var z in Zones)
@@ -439,8 +457,8 @@ namespace Olden_Era___Template_Editor
         private static string ZoneTooltip(Zone z)
         {
             var parts = new List<string> { z.Name };
-            if (!string.IsNullOrEmpty(z.Layout)) parts.Add($"layout: {z.Layout}");
-            if (z.Size is { } s) parts.Add($"size: {s:0.##}");
+            if (!string.IsNullOrEmpty(z.Layout)) parts.Add(L("S.Label.Layout", Services.Localization.GameLabels.Token(z.Layout)));
+            if (z.Size is { } s) parts.Add(L("S.Label.Size", s));
             return string.Join("\n", parts);
         }
 
@@ -578,11 +596,11 @@ namespace Olden_Era___Template_Editor
                 var mainPanel = InspectorFieldsMain;
                 var mainSection = AddExpanderSection(L("S.EC.Name"), mainPanel);
                 AddTextField(L("S.EC.Name"), z.Name, v => { RenameZone(z, v); }, mainSection);
-                AddTextField(L("S.EC.Size"), (z.Size ?? 1.0).ToString(CultureInfo.InvariantCulture),
+                AddDecimalField(L("S.EC.Size"), (z.Size ?? 1.0).ToString(CultureInfo.InvariantCulture),
                     v =>
                     {
                         if (string.IsNullOrWhiteSpace(v)) { z.Size = 1.0; MarkDirty(); RefreshNode(z); }
-                        else if (double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) { z.Size = d; MarkDirty(); RefreshNode(z); }
+                        else if (NumericInput.TryDouble(v, out var d)) { z.Size = d; MarkDirty(); RefreshNode(z); }
                     }, mainSection);
                 AddComboField(L("S.EC.Layout"), KnownValues.ZoneLayouts, z.Layout,
                     v => { z.Layout = v; MarkDirty(); RefreshNode(z); }, mainSection);
@@ -631,29 +649,29 @@ namespace Olden_Era___Template_Editor
 
                 var guardPanel = InspectorFieldsGuard;
                 var g1 = AddExpanderSection(L("S.EC.Diplomacy"), guardPanel);
-                AddTextField(L("S.EC.Diplomacy"), (z.DiplomacyModifier ?? 0).ToString(CultureInfo.InvariantCulture),
-                    v => { if (double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) { z.DiplomacyModifier = d; MarkDirty(); } }, g1);
+                AddDecimalField(L("S.EC.Diplomacy"), (z.DiplomacyModifier ?? 0).ToString(CultureInfo.InvariantCulture),
+                    v => { if (NumericInput.TryDouble(v, out var d)) { z.DiplomacyModifier = d; MarkDirty(); } }, g1);
                 var g2 = AddExpanderSection(L("S.EC.GuardMult"), guardPanel);
-                AddTextField(L("S.EC.GuardMult"), (z.GuardMultiplier ?? 1.0).ToString(CultureInfo.InvariantCulture),
-                    v => { if (double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) { z.GuardMultiplier = d; MarkDirty(); } }, g2);
+                AddDecimalField(L("S.EC.GuardMult"), (z.GuardMultiplier ?? 1.0).ToString(CultureInfo.InvariantCulture),
+                    v => { if (NumericInput.TryDouble(v, out var d)) { z.GuardMultiplier = d; MarkDirty(); } }, g2);
                 var g3 = AddExpanderSection(L("S.EC.GuardCutoff"), guardPanel);
-                AddTextField(L("S.EC.GuardCutoff"), (z.GuardCutoffValue ?? 0).ToString(),
+                AddIntegerField(L("S.EC.GuardCutoff"), (z.GuardCutoffValue ?? 0).ToString(),
                     v => { if (int.TryParse(v, out var i)) { z.GuardCutoffValue = i; MarkDirty(); } }, g3);
                 var g4 = AddExpanderSection(L("S.EC.GuardRandom"), guardPanel);
-                AddTextField(L("S.EC.GuardRandom"), (z.GuardRandomization ?? 0).ToString(CultureInfo.InvariantCulture),
-                    v => { if (double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) { z.GuardRandomization = d; MarkDirty(); } }, g4);
+                AddDecimalField(L("S.EC.GuardRandom"), (z.GuardRandomization ?? 0).ToString(CultureInfo.InvariantCulture),
+                    v => { if (NumericInput.TryDouble(v, out var d)) { z.GuardRandomization = d; MarkDirty(); } }, g4);
                 var g5 = AddExpanderSection(L("S.EC.GuardWeeklyInc"), guardPanel);
-                AddTextField(L("S.EC.GuardWeeklyInc"), (z.GuardWeeklyIncrement ?? 0).ToString(CultureInfo.InvariantCulture),
-                    v => { if (double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) { z.GuardWeeklyIncrement = d; MarkDirty(); } }, g5);
+                AddDecimalField(L("S.EC.GuardWeeklyInc"), (z.GuardWeeklyIncrement ?? 0).ToString(CultureInfo.InvariantCulture),
+                    v => { if (NumericInput.TryDouble(v, out var d)) { z.GuardWeeklyIncrement = d; MarkDirty(); } }, g5);
                 var g6 = AddExpanderSection(L("S.EC.GuardReactDist"), guardPanel);
                 AddIntListField(L("S.EC.GuardReactDist"), z.GuardReactionDistribution,
                     v => { z.GuardReactionDistribution = v; MarkDirty(); }, g6);
                 var g7 = AddExpanderSection(L("S.EC.EncounterHoles"), guardPanel);
-                AddTextField(L("S.EC.AffectedEnc"), (z.EncounterHolesSettings?.AffectedEncounters ?? 0).ToString(CultureInfo.InvariantCulture),
-                    v => { if (double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) { z.EncounterHolesSettings ??= new(); z.EncounterHolesSettings.AffectedEncounters = d; MarkDirty(); } }, g7,
+                AddDecimalField(L("S.EC.AffectedEnc"), (z.EncounterHolesSettings?.AffectedEncounters ?? 0).ToString(CultureInfo.InvariantCulture),
+                    v => { if (NumericInput.TryDouble(v, out var d)) { z.EncounterHolesSettings ??= new(); z.EncounterHolesSettings.AffectedEncounters = d; MarkDirty(); } }, g7,
                     L("S.EC.MontHolesTip"));
-                AddTextField(L("S.EC.TwoHoleEnc"), (z.EncounterHolesSettings?.TwoHoleEncounters ?? 0).ToString(CultureInfo.InvariantCulture),
-                    v => { if (double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) { z.EncounterHolesSettings ??= new(); z.EncounterHolesSettings.TwoHoleEncounters = d; MarkDirty(); } }, g7,
+                AddDecimalField(L("S.EC.TwoHoleEnc"), (z.EncounterHolesSettings?.TwoHoleEncounters ?? 0).ToString(CultureInfo.InvariantCulture),
+                    v => { if (NumericInput.TryDouble(v, out var d)) { z.EncounterHolesSettings ??= new(); z.EncounterHolesSettings.TwoHoleEncounters = d; MarkDirty(); } }, g7,
                     L("S.EC.MontHolesTip"));
 
                 var poolsPanel = InspectorFieldsPools;
@@ -670,7 +688,7 @@ namespace Olden_Era___Template_Editor
                 {
                     try
                     {
-                        var viewer = new ContentPoolViewerWindow { Owner = this };
+                        var viewer = new ContentPoolViewerWindow(templatePools: TemplateContentPools.Definitions(_template)) { Owner = this };
                         viewer.Show();
                     }
                     catch (Exception ex)
@@ -691,34 +709,32 @@ namespace Olden_Era___Template_Editor
                 createPoolBtn.Click += (_, _) =>
                 {
                     var creator = new ContentPoolCreatorWindow { Owner = this };
-                    creator.PoolCreated += (poolName, poolLists) =>
+                    if (creator.ShowDialog() != true || creator.CreatedPoolName is not { } name || creator.CreatedPoolLists is not { } lists) return;
+                    try
                     {
-                        try
-                        {
-                            var fullName = poolName.StartsWith("custom_") ? poolName : "custom_" + poolName;
-                            var newPool = new GamePool
-                            {
-                                Name = fullName,
-                                Groups = new List<PoolGroup> { new() { Weight = 1, IncludeLists = poolLists } }
-                            };
-                            GamePoolDataLoader.AddPool(newPool);
-                            System.Windows.MessageBox.Show(this, L("S.EC.PoolCreated", fullName), L("S.EC.PoolCreatedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Windows.MessageBox.Show(this, L("S.EC.Error2", ex.Message), L("S.EC.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
-                        }
-                    };
-                    creator.Show();
+                        string fullName = name.StartsWith("custom_", StringComparison.Ordinal) ? name : "custom_" + name;
+                        if (TemplateContentPools.Names(_template).Contains(fullName, StringComparer.Ordinal))
+                            throw new InvalidOperationException(L("S.PC.Duplicate"));
+                        var pool = new GamePool { Name = fullName, Groups = [new PoolGroup { Weight = 1, IncludeLists = lists }] };
+                        GamePoolDataLoader.AddPool(pool);
+                        TemplateContentPools.Add(_template, pool);
+                        MarkDirty();
+                        BuildInspector();
+                        UpdateStatus(L("S.EC.PoolCreated", fullName));
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(this, ex.Message, L("S.EC.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
                 };
                 poolsPanel.Children.Add(createPoolBtn);
 
                 var p1 = AddExpanderSection(L("S.EC.GuardedPool"), poolsPanel);
-                AddStringListPicker(L("S.EC.GuardedPool"), KnownValues.GuardedContentPoolSids, z.GuardedContentPool, v => { z.GuardedContentPool = v; MarkDirty(); }, p1);
+                AddStringListPicker(L("S.EC.GuardedPool"), PoolOptions(KnownValues.GuardedContentPoolSids), z.GuardedContentPool, v => { TemplateContentPools.EmbedSelected(_template, v, GamePoolDataLoader.GetAllPools()); z.GuardedContentPool = v; MarkDirty(); }, p1);
                 var p2 = AddExpanderSection(L("S.EC.UnguardedPool"), poolsPanel);
-                AddStringListPicker(L("S.EC.UnguardedPool"), KnownValues.UnguardedContentPoolSids, z.UnguardedContentPool, v => { z.UnguardedContentPool = v; MarkDirty(); }, p2);
+                AddStringListPicker(L("S.EC.UnguardedPool"), PoolOptions(KnownValues.UnguardedContentPoolSids), z.UnguardedContentPool, v => { TemplateContentPools.EmbedSelected(_template, v, GamePoolDataLoader.GetAllPools()); z.UnguardedContentPool = v; MarkDirty(); }, p2);
                 var p3 = AddExpanderSection(L("S.EC.ResourcesPool"), poolsPanel);
-                AddStringListPicker(L("S.EC.ResourcesPool"), KnownValues.ResourcesContentPoolSids, z.ResourcesContentPool, v => { z.ResourcesContentPool = v; MarkDirty(); }, p3);
+                AddStringListPicker(L("S.EC.ResourcesPool"), PoolOptions(KnownValues.ResourcesContentPoolSids), z.ResourcesContentPool, v => { TemplateContentPools.EmbedSelected(_template, v, GamePoolDataLoader.GetAllPools()); z.ResourcesContentPool = v; MarkDirty(); }, p3);
                 var p4 = AddExpanderSection(L("S.EC.MandatoryContent"), poolsPanel);
                 AddStringListPicker(L("S.EC.MandatoryContent"), KnownValues.MandatoryContentNames, z.MandatoryContent, v => { z.MandatoryContent = v; MarkDirty(); }, p4);
                 var p5 = AddExpanderSection(L("S.EC.ContentCountLimits"), poolsPanel);
@@ -726,27 +742,27 @@ namespace Olden_Era___Template_Editor
 
                 var contentPanel = InspectorFieldsContent;
                 var c1 = AddExpanderSection(L("S.EC.GuardedVal"), contentPanel);
-                AddTextField(L("S.EC.GuardedVal"), (z.GuardedContentValue ?? 0).ToString(),
+                AddIntegerField(L("S.EC.GuardedVal"), (z.GuardedContentValue ?? 0).ToString(),
                     v => { if (int.TryParse(v, out var i)) { z.GuardedContentValue = i; MarkDirty(); RefreshNode(z); } }, c1);
                 var c2 = AddExpanderSection(L("S.EC.GuardedValPerArea"), contentPanel);
-                AddTextField(L("S.EC.GuardedValPerArea"), (z.GuardedContentValuePerArea ?? 0).ToString(),
+                AddIntegerField(L("S.EC.GuardedValPerArea"), (z.GuardedContentValuePerArea ?? 0).ToString(),
                     v => { if (int.TryParse(v, out var i)) { z.GuardedContentValuePerArea = i; MarkDirty(); RefreshNode(z); } }, c2);
                 var c3 = AddExpanderSection(L("S.EC.UnguardedVal"), contentPanel);
-                AddTextField(L("S.EC.UnguardedVal"), (z.UnguardedContentValue ?? 0).ToString(),
+                AddIntegerField(L("S.EC.UnguardedVal"), (z.UnguardedContentValue ?? 0).ToString(),
                     v => { if (int.TryParse(v, out var i)) { z.UnguardedContentValue = i; MarkDirty(); RefreshNode(z); } }, c3);
                 var c4 = AddExpanderSection(L("S.EC.UnguardedValPerArea"), contentPanel);
-                AddTextField(L("S.EC.UnguardedValPerArea"), (z.UnguardedContentValuePerArea ?? 0).ToString(),
+                AddIntegerField(L("S.EC.UnguardedValPerArea"), (z.UnguardedContentValuePerArea ?? 0).ToString(),
                     v => { if (int.TryParse(v, out var i)) { z.UnguardedContentValuePerArea = i; MarkDirty(); RefreshNode(z); } }, c4);
                 var c5 = AddExpanderSection(L("S.EC.ResourcesVal"), contentPanel);
-                AddTextField(L("S.EC.ResourcesVal"), (z.ResourcesValue ?? 0).ToString(),
+                AddIntegerField(L("S.EC.ResourcesVal"), (z.ResourcesValue ?? 0).ToString(),
                     v => { if (int.TryParse(v, out var i)) { z.ResourcesValue = i; MarkDirty(); RefreshNode(z); } }, c5);
                 var c6 = AddExpanderSection(L("S.EC.ResourcesValPerArea"), contentPanel);
-                AddTextField(L("S.EC.ResourcesValPerArea"), (z.ResourcesValuePerArea ?? 0).ToString(),
+                AddIntegerField(L("S.EC.ResourcesValPerArea"), (z.ResourcesValuePerArea ?? 0).ToString(),
                     v => { if (int.TryParse(v, out var i)) { z.ResourcesValuePerArea = i; MarkDirty(); RefreshNode(z); } }, c6);
 
                 var biomePanel = InspectorFieldsBiome;
                 var b1 = AddExpanderSection(L("S.EC.CrossroadsPos"), biomePanel);
-                AddTextField(L("S.EC.CrossroadsPos"), (z.CrossroadsPosition ?? 0).ToString(),
+                AddIntegerField(L("S.EC.CrossroadsPos"), (z.CrossroadsPosition ?? 0).ToString(),
                     v => { if (int.TryParse(v, out var i)) { z.CrossroadsPosition = i; MarkDirty(); } }, b1);
                 var b2 = AddExpanderSection(L("S.EC.ZoneBiome"), biomePanel);
                 AddBiomeSelector(L("S.EC.ZoneBiome"), z.ZoneBiome, v => { z.ZoneBiome = v; MarkDirty(); }, b2);
@@ -815,7 +831,15 @@ namespace Olden_Era___Template_Editor
                 var mainPanel = InspectorFieldsMain;
 
                 // Connection name
-                AddTextField(L("S.EC.ConnName"), c.Name ?? "", v => { c.Name = v; MarkDirty(); }, mainPanel);
+                AddTextField(L("S.EC.ConnName"), c.Name ?? "", v =>
+                {
+                    if (string.IsNullOrWhiteSpace(v) || Connections.Any(other => !ReferenceEquals(other, c) && other.Name == v))
+                    { UpdateStatus(L("S.CM.InvalidName")); BuildInspector(); return; }
+                    if (!string.IsNullOrEmpty(c.Name))
+                        TemplateRefactor.RenameConnectionReferences(Variant, new Dictionary<string, string> { [c.Name] = v });
+                    c.Name = v;
+                    MarkDirty();
+                }, mainPanel);
 
                 // From zone (read-only display)
                 AddReadOnly(L("S.EC.From"), c.From ?? "?", mainPanel);
@@ -832,7 +856,7 @@ namespace Olden_Era___Template_Editor
                 }, mainPanel);
 
                 // Guard value
-                AddTextField(L("S.EC.GuardValue"), (c.GuardValue ?? 0).ToString(),
+                AddIntegerField(L("S.EC.GuardValue"), (c.GuardValue ?? 0).ToString(),
                     v => { if (int.TryParse(v, out var i)) { c.GuardValue = i; MarkDirty(); } }, mainPanel);
 
                 // Road checkbox
@@ -871,6 +895,8 @@ namespace Olden_Era___Template_Editor
             var typeCombo = new ComboBox { IsEditable = false, Margin = new Thickness(0, 0, 0, 8), MaxDropDownHeight = 200 };
             foreach (var t in KnownValues.MainObjectTypes) typeCombo.Items.Add(t);
             typeCombo.SelectedItem = mo.Type;
+            LocalizeTokenOptions(typeCombo);
+            panel.Children.Add(typeCombo);
 
             // Spawn field panel (only for Spawn type)
             var spawnPanel = new StackPanel { Visibility = mo.Type == "Spawn" ? Visibility.Visible : Visibility.Collapsed };
@@ -893,7 +919,7 @@ namespace Olden_Era___Template_Editor
             var gcPanel = new StackPanel();
             AddSectionLabel(L("S.EC.MoGuardChance"), gcPanel);
             var gcBox = new TextBox { Text = (mo.GuardChance ?? 0).ToString(CultureInfo.InvariantCulture), Margin = new Thickness(0, 0, 0, 8) };
-            gcBox.LostFocus += (_, _) => { if (double.TryParse(gcBox.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) mo.GuardChance = d; MarkDirty(); };
+            gcBox.LostFocus += (_, _) => { if (NumericInput.TryDouble(gcBox.Text, out var d)) mo.GuardChance = d; MarkDirty(); };
             gcPanel.Children.Add(gcBox);
             guardFields.Add(gcPanel);
 
@@ -909,7 +935,7 @@ namespace Olden_Era___Template_Editor
             var gwPanel = new StackPanel();
             AddSectionLabel(L("S.EC.MoGuardWeeklyInc"), gwPanel);
             var gwBox = new TextBox { Text = (mo.GuardWeeklyIncrement ?? 0).ToString(CultureInfo.InvariantCulture), Margin = new Thickness(0, 0, 0, 8) };
-            gwBox.LostFocus += (_, _) => { if (double.TryParse(gwBox.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) mo.GuardWeeklyIncrement = d; MarkDirty(); };
+            gwBox.LostFocus += (_, _) => { if (NumericInput.TryDouble(gwBox.Text, out var d)) mo.GuardWeeklyIncrement = d; MarkDirty(); };
             gwPanel.Children.Add(gwBox);
             guardFields.Add(gwPanel);
 
@@ -924,36 +950,8 @@ namespace Olden_Era___Template_Editor
             buildPanel.Children.Add(buildCombo);
             guardFields.Add(buildPanel);
 
-            // Faction selector type (disabled for AbandonedOutpost and GladiatorArena)
-            bool factionEnabled = mo.Type != "AbandonedOutpost" && mo.Type != "GladiatorArena";
-            var facTypePanel = new StackPanel();
-            AddSectionLabel(L("S.EC.MoFactionType"), facTypePanel);
-            var facTypeCombo = new ComboBox { IsEditable = false, Margin = new Thickness(0, 0, 0, 8), MaxDropDownHeight = 200, IsEnabled = factionEnabled };
-            foreach (var ft in KnownValues.SelectorTypes) facTypeCombo.Items.Add(ft);
-            if (mo.Faction?.Type is not null && facTypeCombo.Items.Contains(mo.Faction.Type))
-                facTypeCombo.SelectedItem = mo.Faction.Type;
-            else
-                facTypeCombo.SelectedItem = "";
-            facTypePanel.Children.Add(facTypeCombo);
-            factionFields.Add(facTypePanel);
-
-            // Faction args panel (visible only for FromList) - NOT in factionFields, managed separately
-            var facArgsPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 4), Visibility = Visibility.Collapsed };
-            AddSectionLabel(L("S.EC.MoFactionArgs"), facArgsPanel);
-            var factionArgsCombo = new ComboBox { IsEditable = false, Margin = new Thickness(0, 0, 0, 4), IsEnabled = factionEnabled };
-            foreach (var f in KnownValues.FromListFactionArgs) factionArgsCombo.Items.Add(f);
-            if (mo.Faction?.Args is { Count: > 0 })
-                factionArgsCombo.SelectedItem = mo.Faction.Args[0];
-            factionArgsCombo.SelectionChanged += (_, _) =>
-            {
-                if (factionArgsCombo.SelectedItem is string selected && selected.Length > 0)
-                {
-                    if (mo.Faction == null) mo.Faction = new TypedSelector();
-                    mo.Faction.Args = [selected];
-                    MarkDirty();
-                }
-            };
-            facArgsPanel.Children.Add(factionArgsCombo);
+            var factionEditor = CreateFactionEditor(mo);
+            factionFields.Add(factionEditor);
 
             // Owner (visible only for City)
             var ownerPanel = new StackPanel { Visibility = mo.Type == "City" ? Visibility.Visible : Visibility.Collapsed };
@@ -966,12 +964,6 @@ namespace Olden_Era___Template_Editor
             {
                 var newOwner = ownerCombo.SelectedItem as string;
                 mo.Owner = string.IsNullOrEmpty(newOwner) ? null : newOwner;
-                if (newOwner != null && factionEnabled)
-                {
-                    if (mo.Faction == null) mo.Faction = new TypedSelector();
-                    mo.Faction.Type = "Match";
-                    mo.Faction.Args = ["0"];
-                }
                 MarkDirty();
             };
             ownerPanel.Children.Add(ownerCombo);
@@ -1034,13 +1026,6 @@ namespace Olden_Era___Template_Editor
 
                 spawnPanel.Visibility = type == "Spawn" ? Visibility.Visible : Visibility.Collapsed;
 
-                // Hide faction args when type changes (will be shown by facTypeCombo handler if needed)
-                facArgsPanel.Visibility = Visibility.Collapsed;
-
-                // Update faction enabled state
-                bool factionEnabledNew = !isAbandonedOutpost && !isGladiator;
-                facTypeCombo.IsEnabled = factionEnabledNew;
-                factionArgsCombo.IsEnabled = factionEnabledNew;
 
                 // Hide owner for non-City types
                 ownerPanel.Visibility = type == "City" ? Visibility.Visible : Visibility.Collapsed;
@@ -1054,8 +1039,6 @@ namespace Olden_Era___Template_Editor
                 if (isSpawn)
                 {
                     mo.Faction = null;
-                    facTypeCombo.SelectedItem = "";
-                    factionArgsCombo.SelectedItem = null;
                 }
             }
 
@@ -1070,30 +1053,14 @@ namespace Olden_Era___Template_Editor
                     UpdateFieldVisibility(s);
                     MarkDirty();
                     RefreshNode(z);
+                    BuildInspector();
                 }
             };
 
-            // Faction type combo handler
-            facTypeCombo.SelectionChanged += (_, _) =>
-            {
-                if (facTypeCombo.SelectedItem is string s)
-                {
-                    if (mo.Faction == null) mo.Faction = new TypedSelector();
-                    mo.Faction.Type = s;
-                    facArgsPanel.Visibility = s == "FromList" ? Visibility.Visible : Visibility.Collapsed;
-                    if (s != "FromList")
-                    {
-                        mo.Faction.Args = [];
-                        factionArgsCombo.SelectedItem = null;
-                    }
-                    MarkDirty();
-                }
-            };
 
             // One-click "capturable faction town" — the exact shape two users asked for: a full town of a
             // chosen faction that is NOT owned at start (empty owner) and is taken only after beating its
-            // guard. Sets Type=City, clears Owner, pins Faction=FromList[faction] and keeps a guard, then
-            // rebuilds the inspector so the faction can be fine-tuned in the (now visible) Faction args combo.
+            // guard. Keeps the faction rule and clears player ownership/start identity.
             var capturableBtn = new System.Windows.Controls.Button
             {
                 Content = L("S.EC.MakeCapturable"),
@@ -1104,15 +1071,7 @@ namespace Olden_Era___Template_Editor
             };
             capturableBtn.Click += (_, _) =>
             {
-                mo.Type = "City";
-                mo.Owner = null;                       // empty owner = neutral, capturable (NOT yours at start)
-                mo.RemoveGuardIfHasOwner = null;
-                if (mo.Faction is not { Type: "FromList", Args.Count: > 0 })
-                    mo.Faction = new TypedSelector { Type = "FromList", Args = [KnownValues.FromListFactionArgs[0]] };
-                if (mo.GuardValue is null or 0) { mo.GuardValue = 5000; mo.GuardChance ??= 1.0; }
-                mo.GuardWeeklyIncrement ??= 0.10;
-                mo.BuildingsConstructionSid ??= "default_buildings_construction";
-                mo.Placement ??= "Uniform";
+                TemplateRefactor.MakeCapturable(mo);
                 MarkDirty();
                 RefreshNode(z);
                 BuildInspector();
@@ -1127,19 +1086,15 @@ namespace Olden_Era___Template_Editor
             };
 
             // Add all controls to panel in order
-            panel.Children.Add(typeCombo);
             panel.Children.Add(capturableBtn);
             panel.Children.Add(capturableHelp);
             panel.Children.Add(spawnPanel);
             foreach (var field in guardFields) panel.Children.Add(field);
             foreach (var field in factionFields) panel.Children.Add(field);
-            panel.Children.Add(facArgsPanel);
             panel.Children.Add(placePanel);
 
             // Set initial visibility
             UpdateFieldVisibility(mo.Type);
-            if (mo.Faction?.Type == "FromList")
-                facArgsPanel.Visibility = Visibility.Visible;
         }
 
         private static readonly string[] MainObjectKinds = ["City", "AbandonedOutpost"];
@@ -1217,10 +1172,7 @@ namespace Olden_Era___Template_Editor
                 {
                     if (capturedIdx < z.MainObjects.Count)
                     {
-                        z.MainObjects.RemoveAt(capturedIdx);
-                        MarkDirty();
-                        RefreshNode(z);
-                        BuildInspector();
+                        RemoveEditorMainObject(z, capturedIdx);
                     }
                 };
                 headerRow.Children.Add(removeBtn);
@@ -1235,11 +1187,11 @@ namespace Olden_Era___Template_Editor
                 fieldsGrid.RowDefinitions.Add(new RowDefinition());
 
                 var gcBox = new TextBox { Text = (mo.GuardChance ?? 0).ToString(CultureInfo.InvariantCulture), Margin = new Thickness(0, 0, 4, 4) };
-                gcBox.LostFocus += (_, _) => { if (double.TryParse(gcBox.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) mo.GuardChance = d; MarkDirty(); };
+                gcBox.LostFocus += (_, _) => { if (NumericInput.TryDouble(gcBox.Text, out var d)) mo.GuardChance = d; MarkDirty(); };
                 var gvBox = new TextBox { Text = (mo.GuardValue ?? 0).ToString(), Margin = new Thickness(4, 0, 0, 4) };
                 gvBox.LostFocus += (_, _) => { if (int.TryParse(gvBox.Text, out var v)) mo.GuardValue = v; MarkDirty(); };
                 var gwBox = new TextBox { Text = (mo.GuardWeeklyIncrement ?? 0).ToString(CultureInfo.InvariantCulture), Margin = new Thickness(0, 0, 4, 4) };
-                gwBox.LostFocus += (_, _) => { if (double.TryParse(gwBox.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) mo.GuardWeeklyIncrement = d; MarkDirty(); };
+                gwBox.LostFocus += (_, _) => { if (NumericInput.TryDouble(gwBox.Text, out var d)) mo.GuardWeeklyIncrement = d; MarkDirty(); };
                 var buildCombo = new ComboBox { IsEditable = false, Margin = new Thickness(4, 0, 0, 4), MaxDropDownHeight = 200 };
                 foreach (var b in KnownValues.BuildingsConstructionSids) buildCombo.Items.Add(b);
                 buildCombo.SelectedItem = mo.BuildingsConstructionSid ?? "";
@@ -1327,7 +1279,7 @@ namespace Olden_Era___Template_Editor
                 var headerRow = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
                 var headerText = new TextBlock
                 {
-                    Text = $"{mo.Type ?? "?"} #{i}",
+                    Text = $"{Services.Localization.GameLabels.Token(mo.Type ?? "?")} #{i}",
                     FontWeight = FontWeights.SemiBold,
                     VerticalAlignment = VerticalAlignment.Center
                 };
@@ -1352,10 +1304,7 @@ namespace Olden_Era___Template_Editor
                 {
                     if (capturedIdx < z.MainObjects.Count)
                     {
-                        z.MainObjects.RemoveAt(capturedIdx);
-                        MarkDirty();
-                        RefreshNode(z);
-                        BuildInspector();
+                        RemoveEditorMainObject(z, capturedIdx);
                     }
                 };
                 headerRow.Children.Add(removeBtn);
@@ -1370,12 +1319,13 @@ namespace Olden_Era___Template_Editor
                 var typeCombo = new ComboBox { IsEditable = false, Margin = new Thickness(0, 0, 0, 4), MaxDropDownHeight = 200 };
                 foreach (var t in AdditionalMainObjectTypes) typeCombo.Items.Add(t);
                 typeCombo.SelectedItem = mo.Type;
+                LocalizeTokenOptions(typeCombo);
 
                 // Guard chance
                 var gcPanel = new StackPanel();
                 AddSectionLabel(L("S.EC.MoGuardChance"), gcPanel);
                 var gcBox = new TextBox { Text = (mo.GuardChance ?? 0).ToString(CultureInfo.InvariantCulture), Margin = new Thickness(0, 0, 0, 4) };
-                gcBox.LostFocus += (_, _) => { if (double.TryParse(gcBox.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) mo.GuardChance = d; MarkDirty(); };
+                gcBox.LostFocus += (_, _) => { if (NumericInput.TryDouble(gcBox.Text, out var d)) mo.GuardChance = d; MarkDirty(); };
                 gcPanel.Children.Add(gcBox);
                 guardFields.Add(gcPanel);
 
@@ -1391,7 +1341,7 @@ namespace Olden_Era___Template_Editor
                 var gwPanel = new StackPanel();
                 AddSectionLabel(L("S.EC.MoGuardWeeklyInc"), gwPanel);
                 var gwBox = new TextBox { Text = (mo.GuardWeeklyIncrement ?? 0).ToString(CultureInfo.InvariantCulture), Margin = new Thickness(0, 0, 0, 4) };
-                gwBox.LostFocus += (_, _) => { if (double.TryParse(gwBox.Text, NumberStyles.Any, CultureInfo.InvariantCulture, out var d)) mo.GuardWeeklyIncrement = d; MarkDirty(); };
+                gwBox.LostFocus += (_, _) => { if (NumericInput.TryDouble(gwBox.Text, out var d)) mo.GuardWeeklyIncrement = d; MarkDirty(); };
                 gwPanel.Children.Add(gwBox);
                 guardFields.Add(gwPanel);
 
@@ -1406,36 +1356,8 @@ namespace Olden_Era___Template_Editor
                 buildPanel.Children.Add(buildCombo);
                 guardFields.Add(buildPanel);
 
-                // Faction selector type
-                bool factionEnabled = mo.Type != "AbandonedOutpost" && mo.Type != "GladiatorArena";
-                var facTypePanel = new StackPanel();
-                AddSectionLabel(L("S.EC.MoFactionType"), facTypePanel);
-                var facTypeCombo = new ComboBox { IsEditable = false, Margin = new Thickness(0, 0, 0, 4), MaxDropDownHeight = 200, IsEnabled = factionEnabled };
-                foreach (var f in KnownValues.SelectorTypes) facTypeCombo.Items.Add(f);
-                if (mo.Faction?.Type is not null && facTypeCombo.Items.Contains(mo.Faction.Type))
-                    facTypeCombo.SelectedItem = mo.Faction.Type;
-                else
-                    facTypeCombo.SelectedItem = "";
-                facTypePanel.Children.Add(facTypeCombo);
-                factionFields.Add(facTypePanel);
-
-                // Faction args panel (visible only for FromList) - NOT in factionFields, managed separately
-                var facArgsPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 4), Visibility = Visibility.Collapsed };
-                AddSectionLabel(L("S.EC.MoFactionArgs"), facArgsPanel);
-                var factionArgsCombo = new ComboBox { IsEditable = false, Margin = new Thickness(0, 0, 0, 4), IsEnabled = factionEnabled };
-                foreach (var f in KnownValues.FromListFactionArgs) factionArgsCombo.Items.Add(f);
-                if (mo.Faction?.Args is { Count: > 0 })
-                    factionArgsCombo.SelectedItem = mo.Faction.Args[0];
-                factionArgsCombo.SelectionChanged += (_, _) =>
-                {
-                    if (factionArgsCombo.SelectedItem is string selected && selected.Length > 0)
-                    {
-                        if (mo.Faction == null) mo.Faction = new TypedSelector();
-                        mo.Faction.Args = [selected];
-                        MarkDirty();
-                    }
-                };
-                facArgsPanel.Children.Add(factionArgsCombo);
+                var factionEditor = CreateFactionEditor(mo);
+                factionFields.Add(factionEditor);
 
                 // Owner (visible only for City, hidden for Spawn)
                 var ownerPanel = new StackPanel { Visibility = mo.Type == "City" ? Visibility.Visible : Visibility.Collapsed };
@@ -1448,12 +1370,6 @@ namespace Olden_Era___Template_Editor
                 {
                     var newOwner = ownerCombo.SelectedItem as string;
                     mo.Owner = string.IsNullOrEmpty(newOwner) ? null : newOwner;
-                    if (newOwner != null && factionEnabled)
-                    {
-                        if (mo.Faction == null) mo.Faction = new TypedSelector();
-                        mo.Faction.Type = "Match";
-                        mo.Faction.Args = ["0"];
-                    }
                     MarkDirty();
                 };
                 ownerPanel.Children.Add(ownerCombo);
@@ -1483,13 +1399,6 @@ namespace Olden_Era___Template_Editor
                     foreach (var field in placementFields) field.Visibility = showPlacement ? Visibility.Visible : Visibility.Collapsed;
                     ownerPanel.Visibility = showOwner ? Visibility.Visible : Visibility.Collapsed;
 
-                    // Hide faction args when type changes (will be shown by facTypeCombo handler if needed)
-                    facArgsPanel.Visibility = Visibility.Collapsed;
-
-                    // Update faction enabled state
-                    bool factionEnabledNew = !isAbandonedOutpost && !isGladiator;
-                    facTypeCombo.IsEnabled = factionEnabledNew;
-                    factionArgsCombo.IsEnabled = factionEnabledNew;
                 }
 
                 // Type combo handler
@@ -1507,31 +1416,15 @@ namespace Olden_Era___Template_Editor
                         UpdateFieldVisibility(s);
                         MarkDirty();
                         RefreshNode(z);
+                        BuildInspector();
                     }
                 };
 
-                // Faction type combo handler
-                facTypeCombo.SelectionChanged += (_, _) =>
-                {
-                    if (facTypeCombo.SelectedItem is string s)
-                    {
-                        if (mo.Faction == null) mo.Faction = new TypedSelector();
-                        mo.Faction.Type = s;
-                        facArgsPanel.Visibility = s == "FromList" ? Visibility.Visible : Visibility.Collapsed;
-                        if (s != "FromList")
-                        {
-                            mo.Faction.Args = [];
-                            factionArgsCombo.SelectedItem = null;
-                        }
-                        MarkDirty();
-                    }
-                };
 
                 // Add all controls to item panel
                 itemPanel.Children.Add(typeCombo);
                 foreach (var field in guardFields) itemPanel.Children.Add(field);
                 foreach (var field in factionFields) itemPanel.Children.Add(field);
-                itemPanel.Children.Add(facArgsPanel);
                 itemPanel.Children.Add(ownerPanel);
                 foreach (var field in placementFields) itemPanel.Children.Add(field);
 
@@ -1542,8 +1435,6 @@ namespace Olden_Era___Template_Editor
 
                 // Set initial visibility
                 UpdateFieldVisibility(mo.Type ?? "City");
-                if (mo.Faction?.Type == "FromList")
-                    facArgsPanel.Visibility = Visibility.Visible;
             }
         }
 
@@ -1693,7 +1584,7 @@ namespace Olden_Era___Template_Editor
             panel.Children.Add(new TextBlock
             {
                 Text = text, Foreground = (Brush)FindResource("BrushTextDim"),
-                FontSize = 12, Margin = new Thickness(0, 8, 0, 2),
+                FontSize = 12, Margin = new Thickness(0, 8, 0, 2), TextWrapping = TextWrapping.Wrap,
             });
 
         private void AddTextField(string label, string value, Action<string> onCommit, Panel panel, string? tooltip = null)
@@ -1702,10 +1593,39 @@ namespace Olden_Era___Template_Editor
             var box = new TextBox { Text = value, Margin = new Thickness(0, 0, 0, 4) };
             if (tooltip != null)
                 box.ToolTip = tooltip;
-            box.LostFocus += (_, _) => onCommit(box.Text.Trim());
-            box.KeyDown += (_, e) => { if (e.Key == Key.Enter) onCommit(box.Text.Trim()); };
+            void Commit()
+            {
+                try
+                {
+                    onCommit(box.Text.Trim());
+                    box.ClearValue(TextBox.BorderBrushProperty);
+                    box.ToolTip = tooltip;
+                }
+                catch (FormatException ex)
+                {
+                    box.BorderBrush = (Brush)FindResource("BrushError");
+                    box.ToolTip = ex.Message;
+                    UpdateStatus(ex.Message);
+                }
+            }
+            box.LostFocus += (_, _) => Commit();
+            box.KeyDown += (_, e) => { if (e.Key == Key.Enter) { Commit(); e.Handled = true; } };
             panel.Children.Add(box);
         }
+
+        private void AddDecimalField(string label, string value, Action<string> onCommit, Panel panel, string? tooltip = null) =>
+            AddTextField(label, value, text =>
+            {
+                if (!NumericInput.TryOptionalDouble(text, out _)) throw new FormatException(L("S.OR.InvalidNumber", text));
+                onCommit(text);
+            }, panel, tooltip);
+
+        private void AddIntegerField(string label, string value, Action<string> onCommit, Panel panel, string? tooltip = null) =>
+            AddTextField(label, value, text =>
+            {
+                if (!NumericInput.TryOptionalInt(text, out _)) throw new FormatException(L("S.OR.InvalidInteger", text));
+                onCommit(text);
+            }, panel, tooltip);
 
         private void AddComboField(string label, string[] options, string? value, Action<string> onCommit, Panel panel)
         {
@@ -1717,6 +1637,8 @@ namespace Olden_Era___Template_Editor
                 MaxDropDownHeight = 300,
             };
             foreach (var o in options) combo.Items.Add(o);
+            LocalizeTokenOptions(combo);
+            combo.ToolTip = Services.Localization.GameLabels.Token(value ?? "");
             if (value is not null && combo.Items.Contains(value))
                 combo.SelectedItem = value;
             else
@@ -1778,6 +1700,11 @@ namespace Olden_Era___Template_Editor
             box.KeyDown += (_, e) => { if (e.Key == Key.Enter && !e.Handled) { onCommit(ParseStringList(box.Text)); } };
             panel.Children.Add(box);
         }
+
+        private string[] PoolOptions(IEnumerable<string> standard) => standard
+            .Concat(TemplateContentPools.Names(_template))
+            .Concat(GamePoolDataLoader.GetAllPools().Where(p => p.Name.StartsWith("custom_", StringComparison.Ordinal)).Select(p => p.Name))
+            .Distinct(StringComparer.Ordinal).ToArray();
 
         private void AddStringListPicker(string label, string[] options, List<string>? current, Action<List<string>> onCommit, Panel panel)
         {
@@ -1861,19 +1788,6 @@ namespace Olden_Era___Template_Editor
                           .Select(s => s.Trim())
                           .Where(s => s.Length > 0)
                           .ToList();
-        }
-
-        private static List<string> ParseFactionArgs(string input)
-        {
-            return input.Split(new[] { ',', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
-                          .Select(s => s.Trim())
-                          .Where(s => s.Length > 0)
-                          .ToList();
-        }
-
-        private static void UpdateFactionArgsBox(TextBox box, List<string> args)
-        {
-            box.Text = args is { Count: > 0 } ? string.Join(", ", args) : "";
         }
 
         private void AddIntListField(string label, List<int>? value, Action<List<int>> onCommit, Panel panel)
@@ -1986,7 +1900,7 @@ namespace Olden_Era___Template_Editor
             var box = new TextBox
             {
                 Text = count > 0
-                    ? string.Join("\n", value!.Select((r, i) => $"[{i}] type={r.Type ?? "?"}, from={r.From?.Type ?? "?"}/{FormatArgs(r.From?.Args)}, to={r.To?.Type ?? "?"}/{FormatArgs(r.To?.Args)}"))
+                    ? string.Join("\n", value!.Select((r, i) => L("S.Label.Road", i, r.Type ?? "?", r.From?.Type ?? "?", FormatArgs(r.From?.Args), r.To?.Type ?? "?", FormatArgs(r.To?.Args))))
                     : "",
                 Margin = new Thickness(0, 0, 0, 4),
                 MinHeight = 40,
@@ -2133,11 +2047,17 @@ namespace Olden_Era___Template_Editor
                 return;
             }
             string old = z.Name;
+            RememberCurrentLayout();
             // Re-point EVERY reference to the old name, not just the connection endpoints
             // (guardZone, MatchZone biome selectors, the orientation anchor) — see TemplateRefactor.
             TemplateRefactor.RenameZoneReferences(Variant, old, newName);
             if (_positions.Remove(old, out var pt)) _positions[newName] = pt;
             z.Name = newName;
+            if (_mirrorMap.Remove(old, out var twinName))
+            {
+                _mirrorMap[newName] = twinName;
+                _mirrorMap[twinName] = newName;
+            }
             MarkDirty();
             RebuildGraph();
             BuildInspector();
@@ -2236,7 +2156,7 @@ namespace Olden_Era___Template_Editor
             }
             if (_nodeLabels.TryGetValue(z.Name, out var label))
                 PlaceInnerLabel(label, p);
-            foreach (var (line, conn) in _edges)
+            foreach (var (line, conn) in _incidentEdges.GetValueOrDefault(z.Name) ?? [])
             {
                 if (conn.From == z.Name) { line.X1 = p.X; line.Y1 = p.Y; }
                 if (conn.To   == z.Name) { line.X2 = p.X; line.Y2 = p.Y; }
@@ -2318,10 +2238,16 @@ namespace Olden_Era___Template_Editor
         private void BtnGridSnap_Click(object sender, RoutedEventArgs e)
         {
             _gridSnap = !_gridSnap;
+            RefreshGridSnap();
+            UpdateStatus(_gridSnap ? L("S.EC.GridSnapOn") : L("S.EC.GridSnapOff"));
+        }
+
+        private void RefreshGridSnap()
+        {
+            BtnGridSnap.Content = (_gridSnap ? "✓ " : "") + L("S.EC.GridSnap");
             BtnGridSnap.Background = _gridSnap
                 ? new SolidColorBrush(Color.FromRgb(40, 60, 40))
                 : null;
-            UpdateStatus(_gridSnap ? L("S.EC.GridSnapOn") : L("S.EC.GridSnapOff"));
         }
 
         /// <summary>Snaps a point to the nearest grid intersection.</summary>
@@ -2638,6 +2564,8 @@ namespace Olden_Era___Template_Editor
 
         private void BtnDelete_Click(object sender, RoutedEventArgs e)
         {
+            Keyboard.ClearFocus();
+            RememberCurrentLayout();
             if (_selected is Zone z)
             {
                 // Also prunes the roads, biome selectors and orientation anchor that pointed at it —
@@ -2690,7 +2618,8 @@ namespace Olden_Era___Template_Editor
 
         private void BtnRelayout_Click(object sender, RoutedEventArgs e)
         {
-            ComputePositions();
+            ComputePositions(restoreSaved: false);
+            if (_mirrorMode) RebuildMirrorPairs();
             RebuildGraph();
             FitToView();
             UpdateStatus(L("S.EC.Relayout"));
@@ -2741,6 +2670,13 @@ namespace Olden_Era___Template_Editor
             var dlg = new ConnectionManagerWindow(Connections) { Owner = this };
             if (dlg.ShowDialog() == true)
             {
+                try { TemplateRefactor.ApplyConnectionEdits(Variant, dlg.EditedConnections); }
+                catch (InvalidOperationException ex)
+                {
+                    MessageBox.Show(this, ex.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                _selected = null;
                 MarkDirty();
                 RebuildGraph();
                 BuildInspector();
@@ -2788,21 +2724,7 @@ namespace Olden_Era___Template_Editor
             var clone = CloneZone(_zoneClipboard);
             clone.Name = MakeUniqueZoneName(_zoneClipboardSource);
 
-            var takenOwners = new HashSet<string>(
-                Zones.SelectMany(zz => zz.MainObjects ?? Enumerable.Empty<MainObject>())
-                     .Select(m => m.Owner)
-                     .Where(o => !string.IsNullOrEmpty(o))
-                     .Select(o => o!),
-                StringComparer.Ordinal);
-
-            bool ownerCleared = false;
-            if (clone.MainObjects is not null)
-                foreach (var m in clone.MainObjects)
-                    if (!string.IsNullOrEmpty(m.Owner) && takenOwners.Contains(m.Owner!))
-                    {
-                        m.Owner = null;
-                        ownerCleared = true;
-                    }
+            bool ownerCleared = TemplateRefactor.PreparePastedZone(clone, Zones, _zoneClipboardSource);
 
             Zones.Add(clone);
             Point basePos = _positions.TryGetValue(_zoneClipboardSource, out var sp) ? sp : new Point(160, 160);
@@ -2844,6 +2766,8 @@ namespace Olden_Era___Template_Editor
         private void BtnLoad_Click(object sender, RoutedEventArgs e)
         {
             Keyboard.ClearFocus();
+            if (_dirty && MessageBox.Show(this, L("S.EC.ReplaceUnsaved"), L("S.EC.UnsavedTitle"),
+                    MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
             var dlg = new OpenFileDialog
             {
                 Title = L("S.EC.LoadTitle"),
@@ -2855,6 +2779,7 @@ namespace Olden_Era___Template_Editor
                 var json = File.ReadAllText(dlg.FileName);
                 var loaded = JsonSerializer.Deserialize<RmgTemplate>(json, JsonOptions);
                 if (loaded is null) { UpdateStatus(L("S.EC.LoadFail")); return; }
+                if (_mirrorMode) DisableMirrorMode();
                 _template = loaded;
                 _topology = MapTopology.Default;
                 _currentPath = dlg.FileName;
@@ -2915,7 +2840,7 @@ namespace Olden_Era___Template_Editor
                 // generating the map, and the editor can easily create one (new zone, retyped layout).
                 var addedLayouts = TemplateGenerator.EnsureZoneLayoutsDefined(_template);
 
-                File.WriteAllText(dlg.FileName, JsonSerializer.Serialize(_template, JsonOptions));
+                AtomicFile.WriteAllText(dlg.FileName, JsonSerializer.Serialize(_template, JsonOptions));
                 // Remember the hand-arranged graph so reopening this template restores it (sidecar in
                 // %LOCALAPPDATA%, never next to the game's template file).
                 EditorLayoutStore.Save(dlg.FileName, _positions);
@@ -2975,6 +2900,9 @@ namespace Olden_Era___Template_Editor
             }
             _redoStack.Clear();
             _undoBaseline = now;
+            var retained = new HashSet<string>(_undoStack.Concat(_redoStack), StringComparer.Ordinal) { _undoBaseline };
+            foreach (var expired in _snapshotPositions.Keys.Where(key => !retained.Contains(key)).ToList())
+                _snapshotPositions.Remove(expired);
             UpdateUndoButtons();
         }
 
@@ -2985,6 +2913,7 @@ namespace Olden_Era___Template_Editor
         {
             Keyboard.ClearFocus(); // commit a pending inspector edit as its own undo step first
             if (_undoStack.Count == 0) { UpdateStatus(L("S.EC.UndoEmpty")); return; }
+            RememberCurrentLayout();
             string previous = _undoStack[^1];
             _undoStack.RemoveAt(_undoStack.Count - 1);
             _redoStack.Add(_undoBaseline);
@@ -2996,6 +2925,7 @@ namespace Olden_Era___Template_Editor
         {
             Keyboard.ClearFocus();
             if (_redoStack.Count == 0) { UpdateStatus(L("S.EC.RedoEmpty")); return; }
+            RememberCurrentLayout();
             string next = _redoStack[^1];
             _redoStack.RemoveAt(_redoStack.Count - 1);
             _undoStack.Add(_undoBaseline);
@@ -3012,7 +2942,13 @@ namespace Olden_Era___Template_Editor
                 _undoBaseline = json;
                 _selected = null; _connectFrom = null; _connectMode = false;
                 BtnConnectMode.Background = null;
+                // Restore only missing positions: manual moves of surviving zones stay as they are.
+                if (_snapshotPositions.TryGetValue(json, out var layout))
+                    foreach (var zone in Zones)
+                        if (!_positions.ContainsKey(zone.Name) && layout.TryGetValue(zone.Name, out var position))
+                            _positions[zone.Name] = position;
                 EnsurePositions();
+                if (_mirrorMode) RebuildMirrorPairs();
                 RebuildGraph();
                 BuildInspector();
                 _dirty = true;
@@ -3046,9 +2982,12 @@ namespace Olden_Era___Template_Editor
         {
             _undoStack.Clear();
             _redoStack.Clear();
+            _snapshotPositions.Clear();
             _undoBaseline = JsonSerializer.Serialize(_template, SnapshotOptions);
             UpdateUndoButtons();
         }
+
+        private void RememberCurrentLayout() => _snapshotPositions[_undoBaseline] = new(_positions, StringComparer.Ordinal);
 
         private void UpdateUndoButtons()
         {
@@ -3063,6 +3002,19 @@ namespace Olden_Era___Template_Editor
         }
 
         private void UpdateStatus(string text) => TxtStatus.Text = text;
+
+        private void EditorLanguageChanged(object? sender, EventArgs e)
+        {
+            Keyboard.ClearFocus();
+            BuildInspector();
+            UpdateTitle();
+            UpdateZoneCounter();
+            foreach (var zone in _template.Variants?.FirstOrDefault()?.Zones ?? [])
+                if (_nodeShapes.TryGetValue(zone.Name, out var visual)) visual.ToolTip = ZoneTooltip(zone);
+            ApplyHotkeyTooltips();
+            RefreshGridSnap();
+            UpdateStatus(L("S.Ed.012"));
+        }
 
         /// <summary>Localization shortcut.</summary>
         private static string L(string key, params object[] args) => Services.Localization.LocalizationManager.T(key, args);

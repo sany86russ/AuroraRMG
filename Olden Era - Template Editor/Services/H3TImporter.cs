@@ -30,6 +30,7 @@ namespace Olden_Era___Template_Editor.Services
     /// </summary>
     public static class H3TImporter
     {
+        private static string L(string key, params object[] args) => Localization.LocalizationManager.T(key, args);
         /// <summary>Column indices of the H3T table (0-based).</summary>
         private static class Field
         {
@@ -138,7 +139,7 @@ namespace Olden_Era___Template_Editor.Services
             }
 
             if (zoneRows.Count == 0)
-                throw new InvalidDataException("H3T: no zone rows recognised (is this a template file?).");
+                throw new InvalidDataException(L("S.H3T.NoZones"));
 
             // ── Zones ────────────────────────────────────────────────────────────────
             int playerIndex = 0;
@@ -150,7 +151,7 @@ namespace Olden_Era___Template_Editor.Services
                 if (!LayoutByZoneType.TryGetValue(typeCode, out string? layout))
                 {
                     layout = "zone_layout_sides";
-                    warnings.Add($"Zone #{ordinal}: unknown zone type {typeCode}, imported as a side zone.");
+                    warnings.Add(L("S.H3T.UnknownType", ordinal, typeCode));
                 }
 
                 string name = At(parts, Field.Name);
@@ -183,7 +184,7 @@ namespace Olden_Era___Template_Editor.Services
                             PlacementArgs = ["true", "0.7", "0"],
                         });
                     }
-                    else warnings.Add($"Zone '{name}': more starts than the engine's {KnownValues.SpawnPlayers.Length} player slots — start dropped.");
+                    else warnings.Add(L("S.H3T.ExcessStarts", name, KnownValues.SpawnPlayers.Length));
                 }
 
                 zones.Add(zone);
@@ -201,7 +202,7 @@ namespace Olden_Era___Template_Editor.Services
                 if (!nameByOrdinal.TryGetValue(from, out string? fromName) ||
                     !nameByOrdinal.TryGetValue(to, out string? toName))
                 {
-                    warnings.Add($"Connection {from}→{to} references a zone that is not in the file — skipped.");
+                    warnings.Add(L("S.H3T.MissingZone", from, to));
                     continue;
                 }
 
@@ -227,7 +228,7 @@ namespace Olden_Era___Template_Editor.Services
             }
 
             if (connections.Count == 0)
-                warnings.Add("No connections were found — the zones are imported unlinked; link them in the editor.");
+                warnings.Add(L("S.H3T.NoConnections"));
 
             var template = new RmgTemplate
             {
@@ -268,7 +269,7 @@ namespace Olden_Era___Template_Editor.Services
             TemplateGenerator.EnsureZoneLayoutsDefined(template);
 
             if (playerIndex == 0)
-                warnings.Add("No player start was marked in the file — add a Spawn object before generating a map.");
+                warnings.Add(L("S.H3T.NoStarts"));
 
             return new H3TImportResult(template, warnings, zones.Count, connections.Count);
         }
@@ -350,7 +351,7 @@ namespace Olden_Era___Template_Editor.Services
             if (biomes.Count > 0)
                 zone.ZoneBiome = new BiomeSelector { Type = "FromList", Args = biomes };
             else if (HasAnyMarker(parts, Field.TerrainFirst, Field.TerrainLast))
-                warnings.Add($"Zone '{name}': its H3 terrains have no Olden Era counterpart — the biome is left automatic.");
+                warnings.Add(L("S.H3T.NoTerrain", name));
 
             return zone;
         }

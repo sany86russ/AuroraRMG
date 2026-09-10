@@ -1,4 +1,5 @@
 using OldenEraTemplateEditor.Models;
+using Olden_Era___Template_Editor.Services.Localization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -16,7 +17,7 @@ namespace Olden_Era___Template_Editor
 
         private readonly HashSet<string>       _alreadyPicked;
         private readonly HashSet<string>       _collapsedSchools = [];
-        private readonly HashSet<TreeViewItem> _checkedLeaves    = [];
+        private readonly HashSet<string> _checkedLeaves    = [];
 
         private static readonly SolidColorBrush CheckedBrush   = new(Color.FromRgb(0x5A, 0x4A, 0x28));
         private static readonly SolidColorBrush CheckMarkBrush = new(Color.FromRgb(0xC9, 0xA8, 0x4C));
@@ -28,15 +29,6 @@ namespace Olden_Era___Template_Editor
             ["night"]   = Color.FromRgb(0x9B, 0x7E, 0xD4),
             ["space"]   = Color.FromRgb(0x7E, 0xC9, 0xD0),
             ["primal"]  = Color.FromRgb(0xD4, 0x7A, 0x48),
-        };
-
-        private static readonly Dictionary<string, string> SchoolDisplayNames = new()
-        {
-            ["neutral"] = "Neutral",
-            ["day"]     = "Day",
-            ["night"]   = "Night",
-            ["space"]   = "Space",
-            ["primal"]  = "Primal",
         };
 
         private static readonly Dictionary<string, int> SchoolOrder = new()
@@ -51,6 +43,7 @@ namespace Olden_Era___Template_Editor
             if (!showMakeFree)
                 ChkMakeFree.Visibility = Visibility.Collapsed;
             RefreshTree(string.Empty);
+            LocalizationManager.Observe(this, () => RefreshTree(TxtSearch.Text));
             TxtSearch.Focus();
         }
 
@@ -65,22 +58,21 @@ namespace Olden_Era___Template_Editor
                     else               _collapsedSchools.Add(school);
                 }
 
-            _checkedLeaves.Clear();
             TvSpells.Items.Clear();
 
             var groups = KnownValues.KnownSpells
                 .Where(s => !_alreadyPicked.Contains(s.Id))
                 .Where(s => string.IsNullOrEmpty(filter)
-                         || s.Name.Contains(filter, System.StringComparison.OrdinalIgnoreCase)
+                         || GameLabels.Name(s.Id, s.Name).Contains(filter, System.StringComparison.OrdinalIgnoreCase)
                          || s.Id.Contains(filter, System.StringComparison.OrdinalIgnoreCase)
-                         || s.School.Contains(filter, System.StringComparison.OrdinalIgnoreCase))
+                         || GameLabels.Category(s.School).Contains(filter, System.StringComparison.OrdinalIgnoreCase))
                 .GroupBy(s => s.School)
                 .OrderBy(g => SchoolOrder.GetValueOrDefault(g.Key, 99));
 
             foreach (var group in groups)
             {
                 var schoolKey = group.Key;
-                var displayName = SchoolDisplayNames.GetValueOrDefault(schoolKey, schoolKey);
+                var displayName = GameLabels.Category(schoolKey);
                 var schoolNode = new TreeViewItem
                 {
                     Tag        = schoolKey,
@@ -119,7 +111,7 @@ namespace Olden_Era___Template_Editor
             return sp;
         }
 
-        private static TreeViewItem BuildLeafItem(KnownValues.SpellEntry spell)
+        private TreeViewItem BuildLeafItem(KnownValues.SpellEntry spell)
         {
             var chk = new TextBlock
             {
@@ -134,8 +126,8 @@ namespace Olden_Era___Template_Editor
 
             var tier = new TextBlock
             {
-                Text              = $"[T{spell.Tier}]",
-                Width             = 32,
+                Text              = LocalizationManager.T("S.Label.Tier", spell.Tier),
+                Width             = 48,
                 Foreground        = new SolidColorBrush(Color.FromRgb(0x9A, 0x8A, 0x6A)),
                 FontFamily        = new FontFamily("Consolas"),
                 FontSize          = 11,
@@ -145,7 +137,7 @@ namespace Olden_Era___Template_Editor
 
             var name = new TextBlock
             {
-                Text              = spell.Name,
+                Text              = GameLabels.Name(spell.Id, spell.Name),
                 Foreground        = new SolidColorBrush(Color.FromRgb(0xE8, 0xD5, 0xA3)),
                 VerticalAlignment = VerticalAlignment.Center,
             };
@@ -155,7 +147,10 @@ namespace Olden_Era___Template_Editor
             sp.Children.Add(tier);
             sp.Children.Add(name);
 
-            return new TreeViewItem { Header = sp, Tag = spell };
+            var leaf = new TreeViewItem { Header = sp, Tag = spell };
+            if (_checkedLeaves.Contains(spell.Id))
+            { leaf.Background = CheckedBrush; if (GetCheckMark(leaf) is { } mark) mark.Text = "✓"; }
+            return leaf;
         }
 
         // ── Check-toggle helpers ──────────────────────────────────────────────────
@@ -167,15 +162,15 @@ namespace Olden_Era___Template_Editor
 
         private void ToggleLeaf(TreeViewItem item)
         {
-            if (_checkedLeaves.Contains(item))
+            if (_checkedLeaves.Contains(((KnownValues.SpellEntry)item.Tag).Id))
             {
-                _checkedLeaves.Remove(item);
+                _checkedLeaves.Remove(((KnownValues.SpellEntry)item.Tag).Id);
                 item.ClearValue(TreeViewItem.BackgroundProperty);
                 if (GetCheckMark(item) is { } chk) chk.Text = "";
             }
             else
             {
-                _checkedLeaves.Add(item);
+                _checkedLeaves.Add(((KnownValues.SpellEntry)item.Tag).Id);
                 item.Background = CheckedBrush;
                 if (GetCheckMark(item) is { } chk) chk.Text = "✓";
             }
@@ -218,14 +213,14 @@ namespace Olden_Era___Template_Editor
         {
             var leaf = FindLeafFromSource(e.OriginalSource);
             if (leaf == null) return;
-            if (!_checkedLeaves.Contains(leaf)) ToggleLeaf(leaf);
+            if (!_checkedLeaves.Contains(((KnownValues.SpellEntry)leaf.Tag).Id)) ToggleLeaf(leaf);
             CommitAll();
         }
 
         private void CommitAll()
         {
             SelectedIds = _checkedLeaves
-                .Select(tvi => ((KnownValues.SpellEntry)tvi.Tag!).Id)
+                .OrderBy(id => id, System.StringComparer.Ordinal)
                 .ToList();
             MakeFree = ChkMakeFree.IsChecked == true;
             if (SelectedIds.Count > 0)

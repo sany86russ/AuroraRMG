@@ -38,9 +38,9 @@ namespace Olden_Era___Template_Editor.Models
     /// levels keep aggressive opponents — human or AI — penned in their own zones longer, acting as a
     /// "face-control" against early rushes. <see cref="Normal"/> reproduces the historical band so a
     /// given seed's map is byte-identical to maps made before this control existed. <see cref="Impassable"/>
-    /// reaches up to 500% — a wall a high-difficulty AI grinds against for weeks before breaking out.
+    /// uses the historical 300–500% band; Extreme sets exactly 800% regardless of chaos.
     /// </summary>
-    public enum QuickGuardLevel { Weak, Normal, Strong, Fortress, Impassable }
+    public enum QuickGuardLevel { Weak, Normal, Strong, Fortress, Impassable, Extreme }
 
     /// <summary>
     /// The handful of player-facing options for Simple Mode / Quick Generate. The

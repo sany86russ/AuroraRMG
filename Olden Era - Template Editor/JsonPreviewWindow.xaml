@@ -4,7 +4,7 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         Title="{DynamicResource S.JP.Title}"
         Height="720" Width="860"
-        WindowStartupLocation="CenterOwner"
+        MinWidth="600" MinHeight="420" WindowStartupLocation="CenterOwner"
         Background="{StaticResource BrushPanel}"
         UseLayoutRounding="True">
     <Grid Margin="12">

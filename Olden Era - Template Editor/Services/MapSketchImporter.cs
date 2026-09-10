@@ -34,6 +34,7 @@ namespace Olden_Era___Template_Editor.Services
     /// </summary>
     public static class MapSketchImporter
     {
+        private static string L(string key, params object[] args) => Localization.LocalizationManager.T(key, args);
         /// <summary>Colour → zone role. Hue-based, so any shade of "green" reads as a player start.</summary>
         public static string RoleForColour(byte r, byte g, byte b)
         {
@@ -80,8 +81,8 @@ namespace Olden_Era___Template_Editor.Services
         public static SketchImportResult Analyse(
             byte[] pixels, int width, int height, double minAreaPercent = 0.3, int linkRadius = 3)
         {
-            if (width <= 0 || height <= 0 || pixels.Length < width * height * 4)
-                throw new ArgumentException("The image buffer is smaller than width × height × 4 bytes.", nameof(pixels));
+            if (width <= 0 || height <= 0 || pixels.LongLength / 4 < (long)width * height)
+                throw new ArgumentException(L("S.Label.ImageBuffer"), nameof(pixels));
 
             int[] labels = LabelBlobs(pixels, width, height, out List<SketchBlob> blobs);
 
@@ -92,11 +93,11 @@ namespace Olden_Era___Template_Editor.Services
 
             var warnings = new List<string>();
             if (blobs.Count > kept.Count)
-                warnings.Add($"{blobs.Count - kept.Count} small colour spot(s) ignored as noise (below {minAreaPercent:0.##}% of the image).");
+                warnings.Add(L("S.IM.Noise", blobs.Count - kept.Count, minAreaPercent));
             if (kept.Count == 0)
-                throw new InvalidOperationException("No coloured areas were found — draw each zone as a filled blob on a light background.");
+                throw new InvalidOperationException(L("S.IM.NoAreas"));
             if (kept.Count > KnownValues.SpawnPlayers.Length * 6)
-                warnings.Add($"{kept.Count} zones detected — that is a very large map; consider a simpler sketch.");
+                warnings.Add(L("S.IM.ManyZones", kept.Count));
 
             var keptLabels = new HashSet<int>(kept.Select(b => b.Label));
             var adjacency = FindAdjacency(labels, width, height, keptLabels, linkRadius);
@@ -187,28 +188,29 @@ namespace Olden_Era___Template_Editor.Services
         // ── Adjacency ────────────────────────────────────────────────────────────────
 
         /// <summary>Two blobs are connected when pixels of one sit within <paramref name="radius"/> of the other.</summary>
-        private static HashSet<(int, int)> FindAdjacency(
+        internal static HashSet<(int, int)> FindAdjacency(
             int[] labels, int width, int height, HashSet<int> kept, int radius)
         {
             var pairs = new HashSet<(int, int)>();
-            radius = Math.Max(1, radius);
+            radius = Math.Clamp(radius, 1, Math.Max(width, height));
 
             for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
             {
                 int label = labels[y * width + x];
                 if (label <= 0 || !kept.Contains(label)) continue;
+                // Any neighbouring blob within the radius is also within reach of a boundary pixel.
+                // Interior pixels add no pairs; on filled sketches this skips most neighbourhood scans.
+                if (x > 0 && y > 0 && x + 1 < width && y + 1 < height
+                    && labels[y * width + x - 1] == label && labels[y * width + x + 1] == label
+                    && labels[(y - 1) * width + x] == label && labels[(y + 1) * width + x] == label) continue;
 
-                for (int dy = 0; dy <= radius; dy++)
-                for (int dx = -radius; dx <= radius; dx++)
+                for (int ny = Math.Max(0, y - radius); ny <= Math.Min(height - 1, y + radius); ny++)
+                for (int nx = Math.Max(0, x - radius); nx <= Math.Min(width - 1, x + radius); nx++)
                 {
-                    if (dy == 0 && dx <= 0) continue; // each pair is visited once
-                    int nx = x + dx, ny = y + dy;
-                    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-
                     int other = labels[ny * width + nx];
-                    if (other <= 0 || other == label || !kept.Contains(other)) continue;
-                    pairs.Add(label < other ? (label, other) : (other, label));
+                    if (other <= label || !kept.Contains(other)) continue;
+                    pairs.Add((label, other));
                 }
             }
 
@@ -231,7 +233,8 @@ namespace Olden_Era___Template_Editor.Services
                 string layout = RoleForColour(blob.R, blob.G, blob.B);
                 bool isSpawn = layout is "zone_layout_player_spawn" or "zone_layout_ai_spawn";
 
-                string name = isSpawn ? $"Spawn-{(char)('A' + playerIndex)}" : $"Zone-{++otherIndex}";
+                string name = isSpawn && playerIndex < KnownValues.SpawnPlayers.Length
+                    ? $"Spawn-{(char)('A' + playerIndex)}" : $"Zone-{++otherIndex}";
                 Zone zone = SketchZone(name, layout, blob.PixelCount / averageArea);
 
                 if (isSpawn)
@@ -257,7 +260,7 @@ namespace Olden_Era___Template_Editor.Services
                     }
                     else
                     {
-                        warnings.Add($"More green areas than the engine's {KnownValues.SpawnPlayers.Length} player slots — '{name}' imported without a start.");
+                        warnings.Add(L("S.IM.ExcessStart", KnownValues.SpawnPlayers.Length, name));
                         zone.Layout = "zone_layout_sides";
                     }
                 }
@@ -268,7 +271,7 @@ namespace Olden_Era___Template_Editor.Services
             }
 
             if (playerIndex == 0)
-                warnings.Add("No green area was found — no player start was created. Paint the starting zones green, or add a Spawn in the editor.");
+                warnings.Add(L("S.IM.NoStarts"));
 
             var connections = new List<Connection>();
             foreach ((int a, int b) in adjacency.OrderBy(p => p.Item1).ThenBy(p => p.Item2))
@@ -276,7 +279,7 @@ namespace Olden_Era___Template_Editor.Services
 
             int islandLinks = ConnectIslands(blobs, zonesByLabel, connections, positions);
             if (islandLinks > 0)
-                warnings.Add($"{islandLinks} extra link(s) added: some areas did not touch anything, and a map must stay reachable.");
+                warnings.Add(L("S.IM.Islands", islandLinks));
 
             var template = new RmgTemplate
             {

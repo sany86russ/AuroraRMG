@@ -199,6 +199,10 @@ namespace Olden_Era___Template_Editor.Services
             Add(settings.ZoneCfg.Advanced.NeutralHighNoCastleCount, NeutralZoneQuality.High, 0);
             Add(settings.ZoneCfg.Advanced.NeutralHighCastleCount, NeutralZoneQuality.High, castleZoneCastleCount);
 
+            // Legacy/basic settings expose a single neutral count. Explicit tier counts take priority.
+            if (plans.Count == 0 && !settings.ZoneCfg.Advanced.Enabled && settings.ZoneCfg.NeutralZoneCount > 0)
+                Add(settings.ZoneCfg.NeutralZoneCount, NeutralZoneQuality.Medium, Math.Clamp(settings.ZoneCfg.NeutralZoneCastles, 0, 4));
+
             if (settings.Topology == MapTopology.SharedWeb && plans.Count == 0 && maxNeutralZones > 0)
             {
                 string letter = ZoneLetters[settings.PlayerCount];
@@ -683,9 +687,11 @@ namespace Olden_Era___Template_Editor.Services
                 MapTopology.Chain => neutralZoneCount >= (settings.PlayerCount - 1) * min,
                 MapTopology.HubAndSpoke => min <= 1,
                 MapTopology.SharedWeb => min <= 1 && neutralZoneCount >= 1,
-                // Lanes keep every player on a private corridor that only meets others at the shared
-                // arena, so players are never adjacent — any requested separation is honoured structurally.
-                MapTopology.Lanes => neutralZoneCount >= 1,
+                // The shortest pair crosses the two shortest corridors and the shared arena.
+                // Counts differ by at most one; a central arena alone guarantees only one neutral.
+                MapTopology.Lanes => neutralZoneCount >= 1 && (settings.PlayerCount <= 1
+                    || min <= 2 * ((neutralZoneCount - 1) / settings.PlayerCount) + 1
+                        + ((neutralZoneCount - 1) % settings.PlayerCount == settings.PlayerCount - 1 ? 1 : 0)),
                 _ => false, // Random and Balanced use position-based adjacency, no fixed separation guarantee
             };
         }
@@ -2938,7 +2944,8 @@ namespace Olden_Era___Template_Editor.Services
             void Union(int a, int b) { a = Find(a); b = Find(b); if (a != b) parent[b] = a; }
 
             foreach (var c in connections)
-                if (index.TryGetValue(c.From, out int a) && index.TryGetValue(c.To, out int b))
+                if (ConnectionRules.AllowsTravel(c)
+                    && index.TryGetValue(c.From, out int a) && index.TryGetValue(c.To, out int b))
                     Union(a, b);
 
             var components = Enumerable.Range(0, zones.Count)

@@ -1,4 +1,5 @@
 using OldenEraTemplateEditor.Models;
+using Olden_Era___Template_Editor.Services.Localization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -18,7 +19,7 @@ namespace Olden_Era___Template_Editor
         private readonly List<BanEntry>         _allEntries;
         private readonly HashSet<string>         _alreadyBanned;
         private readonly HashSet<string>         _collapsedCategories = [];
-        private readonly HashSet<TreeViewItem>   _checkedLeaves       = [];
+        private readonly HashSet<string>   _checkedLeaves       = [];
 
         private static readonly SolidColorBrush CheckedBrush  = new(Color.FromRgb(0x5A, 0x4A, 0x28));
         private static readonly SolidColorBrush CheckMarkBrush = new(Color.FromRgb(0xC9, 0xA8, 0x4C));
@@ -26,11 +27,22 @@ namespace Olden_Era___Template_Editor
         public ItemPickerWindow(IEnumerable<BanEntry> entries, IEnumerable<string> alreadyBanned, string windowTitle)
         {
             InitializeComponent();
-            Title             = windowTitle;
-            TxtWindowTitle.Text = windowTitle;
+            Title = LocalizationManager.T(windowTitle);
+            TxtWindowTitle.Text = Title;
             _allEntries    = [.. entries];
             _alreadyBanned = [.. alreadyBanned];
             RefreshTree(string.Empty);
+            bool closed = false;
+            Closed += (_, _) => closed = true;
+            LocalizationManager.Observe(this, async () =>
+            {
+                Title = LocalizationManager.T(windowTitle); TxtWindowTitle.Text = Title; RefreshTree(TxtSearch.Text);
+                if (Services.GameData.AppSettings.Current.UseGameAssets && _allEntries.Any(e => e.Id.Contains("_hero_")))
+                {
+                    await Services.GameData.GameCatalogService.Instance.GetCatalogAsync();
+                    if (!closed) RefreshTree(TxtSearch.Text);
+                }
+            });
             TxtSearch.Focus();
         }
 
@@ -45,14 +57,13 @@ namespace Olden_Era___Template_Editor
                     else               _collapsedCategories.Add(cat);
                 }
 
-            _checkedLeaves.Clear();
             TvItems.Items.Clear();
 
             var groups = _allEntries
                 .Where(e => !_alreadyBanned.Contains(e.Id))
                 .Where(e => string.IsNullOrEmpty(filter)
                          || e.DisplayName.Contains(filter, System.StringComparison.OrdinalIgnoreCase)
-                         || e.Category.Contains(filter,    System.StringComparison.OrdinalIgnoreCase)
+                         || e.CategoryLabel.Contains(filter,    System.StringComparison.OrdinalIgnoreCase)
                          || e.Id.Contains(filter,          System.StringComparison.OrdinalIgnoreCase))
                 .GroupBy(e => e.Category)
                 .OrderBy(g => g.Key);
@@ -80,7 +91,7 @@ namespace Olden_Era___Template_Editor
             var sp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
             sp.Children.Add(new TextBlock
             {
-                Text       = category,
+                Text       = GameLabels.Category(category),
                 FontWeight = FontWeights.SemiBold,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xC9, 0xA8, 0x4C)),
                 Margin     = new Thickness(0, 0, 6, 0),
@@ -96,7 +107,7 @@ namespace Olden_Era___Template_Editor
             return sp;
         }
 
-        private static TreeViewItem BuildLeafItem(BanEntry entry)
+        private TreeViewItem BuildLeafItem(BanEntry entry)
         {
             // Check mark placeholder — toggled in code
             var chk = new TextBlock
@@ -123,6 +134,7 @@ namespace Olden_Era___Template_Editor
             {
                 Text       = entry.DisplayName,
                 Width      = 220,
+                TextWrapping = TextWrapping.Wrap,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xD5, 0xA3)),
                 Margin     = new Thickness(0, 0, 14, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -136,7 +148,10 @@ namespace Olden_Era___Template_Editor
                 VerticalAlignment = VerticalAlignment.Center,
             });
 
-            return new TreeViewItem { Header = sp, Tag = entry };
+            var leaf = new TreeViewItem { Header = sp, Tag = entry };
+            if (_checkedLeaves.Contains(entry.Id))
+            { leaf.Background = CheckedBrush; if (GetCheckMark(leaf) is { } mark) mark.Text = "✓"; }
+            return leaf;
         }
 
         // ── Check-toggle helpers ─────────────────────────────────────────────────
@@ -148,16 +163,16 @@ namespace Olden_Era___Template_Editor
 
         private void ToggleLeaf(TreeViewItem item)
         {
-            if (_checkedLeaves.Contains(item))
+            if (_checkedLeaves.Contains(((BanEntry)item.Tag).Id))
             {
-                _checkedLeaves.Remove(item);
+                _checkedLeaves.Remove(((BanEntry)item.Tag).Id);
                 item.Background = DependencyProperty.UnsetValue as Brush; // reset
                 item.ClearValue(TreeViewItem.BackgroundProperty);
                 if (GetCheckMark(item) is { } chk) chk.Text = "";
             }
             else
             {
-                _checkedLeaves.Add(item);
+                _checkedLeaves.Add(((BanEntry)item.Tag).Id);
                 item.Background = CheckedBrush;
                 if (GetCheckMark(item) is { } chk) chk.Text = "✓";
             }
@@ -201,14 +216,14 @@ namespace Olden_Era___Template_Editor
             var leaf = FindLeafFromSource(e.OriginalSource);
             if (leaf == null) return;
             // Ensure it's checked, then commit
-            if (!_checkedLeaves.Contains(leaf)) ToggleLeaf(leaf);
+            if (!_checkedLeaves.Contains(((BanEntry)leaf.Tag).Id)) ToggleLeaf(leaf);
             CommitAll();
         }
 
         private void CommitAll()
         {
             SelectedIds = _checkedLeaves
-                .Select(tvi => ((BanEntry)tvi.Tag!).Id)
+                .OrderBy(id => id, System.StringComparer.Ordinal)
                 .ToList();
             if (SelectedIds.Count > 0)
                 DialogResult = true;

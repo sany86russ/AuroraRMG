@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource S.HW.Title}"
         Height="640" Width="720"
-        WindowStartupLocation="CenterOwner"
+        MinWidth="500" MinHeight="380" WindowStartupLocation="CenterOwner"
         Background="{StaticResource BrushPanel}"
         UseLayoutRounding="True">
     <Grid Margin="16">

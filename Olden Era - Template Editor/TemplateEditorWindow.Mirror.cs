@@ -224,6 +224,7 @@ namespace Olden_Era___Template_Editor
                 return;
             }
 
+            RememberCurrentLayout();
             foreach (Zone z in right)
             {
                 TemplateRefactor.RemoveZoneReferences(Variant, z.Name);
@@ -236,6 +237,12 @@ namespace Olden_Era___Template_Editor
 
             foreach (Zone source in left)
                 CreateTwin(source, _positions[source.Name]);
+
+            // All pairs must exist before cross-zone faction references can be mapped.
+            foreach (Zone source in left)
+                if (TwinOf(source) is { } twin)
+                    foreach (var obj in twin.MainObjects ?? [])
+                        FactionSelectors.RemapZones(obj.Faction, _mirrorMap);
 
             // Mirror the connections whose BOTH endpoints survived (a link that touched the old right
             // half is gone with it).
@@ -262,9 +269,9 @@ namespace Olden_Era___Template_Editor
         {
             foreach (Zone axisZone in axisZones)
             {
-                bool linked = Connections.Any(c =>
+                bool linked = Connections.Any(c => ConnectionRules.AllowsTravel(c) && (
                     string.Equals(c.From, axisZone.Name, StringComparison.Ordinal) ||
-                    string.Equals(c.To, axisZone.Name, StringComparison.Ordinal));
+                    string.Equals(c.To, axisZone.Name, StringComparison.Ordinal)));
                 if (linked) continue;
                 if (!_positions.TryGetValue(axisZone.Name, out Point axisPos)) continue;
 
@@ -379,7 +386,9 @@ namespace Olden_Era___Template_Editor
         private void MirrorAfterZoneAdded(Zone z, Point pos)
         {
             if (!_mirrorMode) return;
-            CreateTwin(z, pos);
+            if (CreateTwin(z, pos) is { } twin)
+                foreach (var obj in twin.MainObjects ?? [])
+                    FactionSelectors.RemapZones(obj.Faction, _mirrorMap);
         }
 
         /// <summary>Keeps the twin at the mirrored position while a zone is dragged.</summary>
@@ -456,13 +465,15 @@ namespace Olden_Era___Template_Editor
             Zone fresh = CloneZone(source);
             fresh.Name = keepName;
             fresh.Roads = twin.Roads;              // roads point at this side's own connections
+            foreach (var obj in fresh.MainObjects ?? [])
+                FactionSelectors.RemapZones(obj.Faction, _mirrorMap);
 
             // Restore the twin's own player identity onto the copied main objects.
             if (fresh.MainObjects is not null)
                 for (int i = 0; i < fresh.MainObjects.Count && i < spawns.Count; i++)
                 {
-                    fresh.MainObjects[i].Spawn = spawns[i].Spawn;
-                    fresh.MainObjects[i].Owner = spawns[i].Owner;
+                    fresh.MainObjects[i].Spawn = string.IsNullOrEmpty(fresh.MainObjects[i].Spawn) ? null : spawns[i].Spawn;
+                    fresh.MainObjects[i].Owner = string.IsNullOrEmpty(fresh.MainObjects[i].Owner) ? null : spawns[i].Owner;
                 }
 
             foreach (BiomeSelector? selector in new[] { fresh.ZoneBiome, fresh.ContentBiome, fresh.MetaObjectsBiome })

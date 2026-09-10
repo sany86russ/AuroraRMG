@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource S.IM.Title}"
         Height="640" Width="960"
-        WindowStartupLocation="CenterOwner"
+        MinWidth="760" MinHeight="440" WindowStartupLocation="CenterOwner"
         Background="{StaticResource BrushPanel}"
         UseLayoutRounding="True">
     <Grid Margin="14">
@@ -33,7 +33,10 @@
             </Grid>
         </Border>
 
-        <StackPanel Grid.Row="1" Grid.Column="1">
+        <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto">
+        <StackPanel>
+            <TextBlock Text="{DynamicResource S.IM.Compatibility}" Foreground="{StaticResource BrushTextDim}"
+                       FontSize="12" TextWrapping="Wrap" Margin="0,0,0,12"/>
             <Button Content="{DynamicResource S.IM.Pick}" Height="32" Margin="0,0,0,12"
                     Style="{StaticResource ToolbarButton}" Click="BtnPick_Click"/>
 
@@ -66,9 +69,10 @@
             </Border>
         </StackPanel>
 
+        </ScrollViewer>
         <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="BtnImport" Content="{DynamicResource S.IM.Import}" Width="180" Height="30"
+            <Button x:Name="BtnImport" Content="{DynamicResource S.IM.Import}" MinWidth="240" Height="32"
                     Margin="0,0,8,0" IsEnabled="False"
                     Style="{StaticResource GenerateButton}" Click="BtnImport_Click"/>
             <Button Content="{DynamicResource S.IM.Cancel}" Width="110" Height="30"

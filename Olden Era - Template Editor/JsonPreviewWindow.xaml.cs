@@ -17,6 +17,9 @@ namespace Olden_Era___Template_Editor
         // Display copy of the save options with indentation on — same converters/encoder, so a
         // round-trip is faithful; the editor still SAVES with the original compact options.
         private readonly JsonSerializerOptions _display;
+        private string? _statusKey;
+        private object[] _statusArgs = [];
+        private void Status(string key, params object[] args) { _statusKey = key; _statusArgs = args; TxtStatus.Text = L(key, args); }
 
         private static string L(string key, params object[] args) => LocalizationManager.T(key, args);
 
@@ -28,6 +31,7 @@ namespace Olden_Era___Template_Editor
             InitializeComponent();
             _display = new JsonSerializerOptions(options) { WriteIndented = true };
             TxtJson.Text = JsonSerializer.Serialize(template, _display);
+            LocalizationManager.Observe(this, () => { if (_statusKey is not null) TxtStatus.Text = L(_statusKey, _statusArgs); });
         }
 
         private void BtnApply_Click(object sender, RoutedEventArgs e)
@@ -45,7 +49,7 @@ namespace Olden_Era___Template_Editor
             if (TryParse(out var parsed))
             {
                 TxtJson.Text = JsonSerializer.Serialize(parsed, _display);
-                TxtStatus.Text = L("S.JP.Reformatted");
+                Status("S.JP.Reformatted");
             }
         }
 
@@ -54,9 +58,9 @@ namespace Olden_Era___Template_Editor
             try
             {
                 Clipboard.SetText(TxtJson.Text);
-                TxtStatus.Text = L("S.JP.Copied");
+                Status("S.JP.Copied");
             }
-            catch (Exception ex) { TxtStatus.Text = ex.Message; }
+            catch (Exception ex) { Status("S.Label.CopyFailed", ex.Message); }
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
@@ -68,13 +72,14 @@ namespace Olden_Era___Template_Editor
             try
             {
                 var t = JsonSerializer.Deserialize<RmgTemplate>(TxtJson.Text, _display);
-                if (t is null) { TxtStatus.Text = L("S.JP.ParseError", "null"); return false; }
+                if (t is null) { Status("S.JP.ParseError", "null"); return false; }
                 parsed = t;
                 return true;
             }
             catch (Exception ex)
             {
-                TxtStatus.Text = L("S.JP.ParseError", ex.Message);
+                if (ex is JsonException json) Status("S.Label.JsonPosition", (json.LineNumber ?? 0) + 1, (json.BytePositionInLine ?? 0) + 1, json.Path ?? "$");
+                else Status("S.JP.ParseError", ex.Message);
                 return false;
             }
         }

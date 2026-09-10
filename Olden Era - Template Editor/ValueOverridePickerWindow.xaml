@@ -44,6 +44,8 @@
 
                 <!-- Search box -->
                 <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <TextBlock Text="{DynamicResource S.PC.Search}" Foreground="{StaticResource BrushTextDim}"
+                               FontSize="12" Margin="0,0,0,4"/>
                     <TextBox x:Name="TxtSearch"
                              TextChanged="TxtSearch_TextChanged"
                              Height="28"/>
@@ -68,7 +70,7 @@
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
                             HorizontalAlignment="Right" Margin="0,8,0,0">
                     <Button x:Name="BtnAdd" Content="{DynamicResource S.Spell.003}"
-                            Width="120" Height="28" Margin="0,0,8,0"
+                            MinWidth="165" Height="28" Margin="0,0,8,0"
                             IsDefault="True"
                             Click="BtnAdd_Click"/>
                     <Button Content="{DynamicResource S.Spell.004}"
@@ -79,7 +81,7 @@
 
                 <!-- Object SID list -->
                 <ListBox x:Name="LbSids"
-                         PreviewMouseLeftButtonDown="LbSids_PreviewMouseLeftButtonDown"
+                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                          Background="{StaticResource BrushInput}"
                          Foreground="{StaticResource BrushText}"
                          BorderBrush="{StaticResource BrushBorder}" BorderThickness="1">
@@ -101,15 +103,12 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="ChkMark" Text="" Width="16"
-                                           Foreground="{StaticResource BrushGold}" FontWeight="Bold"
-                                           VerticalAlignment="Center" Margin="0,0,4,0"/>
-                                <TextBlock Text="{Binding}"
+                            <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                <TextBlock Text="{Binding DisplayName}" ToolTip="{Binding Id}"
                                            FontFamily="Consolas" FontSize="12"
                                            Foreground="{StaticResource BrushText}"
                                            VerticalAlignment="Center"/>
-                            </StackPanel>
+                            </CheckBox>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
