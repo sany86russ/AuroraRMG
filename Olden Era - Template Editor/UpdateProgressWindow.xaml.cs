@@ -18,12 +18,24 @@ namespace Olden_Era___Template_Editor
         private readonly CancellationTokenSource _cts = new();
         private bool _completed;
         private bool _installing;
+        private bool _running = true;
+        private string _statusKey = "S.Upd.ConnGitHub";
+        private double? _progress;
+
+        private void RefreshLanguage()
+        {
+            TitleText.Text = Services.Localization.LocalizationManager.T("S.Upd.DownTitle", Format(_info.Version));
+            StatusText.Text = _progress is { } p
+                ? Services.Localization.LocalizationManager.T("S.Upd.Pct", (p * 100).ToString("0")) + (_info.AssetSize > 0 ? Services.Localization.LocalizationManager.T("S.Upd.OfMb", Mb(_info.AssetSize * p), Mb(_info.AssetSize)) : "")
+                : Services.Localization.LocalizationManager.T(_statusKey);
+        }
 
         public UpdateProgressWindow(UpdateInfo info)
         {
             InitializeComponent();
             _info = info;
-            TitleText.Text = Services.Localization.LocalizationManager.T("S.Upd.DownTitle", Format(info.Version));
+            RefreshLanguage();
+            Services.Localization.LocalizationManager.Observe(this, RefreshLanguage);
             Loaded += async (_, _) => await RunAsync();
         }
 
@@ -34,61 +46,68 @@ namespace Olden_Era___Template_Editor
                 if (p < 0)
                 {
                     ProgressBar.IsIndeterminate = true;
-                    StatusText.Text = Services.Localization.LocalizationManager.T("S.Upd.Loading");
+                    _statusKey = "S.Upd.Loading"; _progress = null; RefreshLanguage();
                 }
                 else
                 {
                     ProgressBar.IsIndeterminate = false;
                     ProgressBar.Value = p * 100;
-                    StatusText.Text = Services.Localization.LocalizationManager.T("S.Upd.Pct", (p * 100).ToString("0"))
-                        + (_info.AssetSize > 0 ? Services.Localization.LocalizationManager.T("S.Upd.OfMb", Mb(_info.AssetSize * p), Mb(_info.AssetSize)) : "");
+                    _progress = p; RefreshLanguage();
                 }
             });
 
             try
             {
-                StatusText.Text = Services.Localization.LocalizationManager.T("S.Upd.ConnGitHub");
+                _statusKey = "S.Upd.ConnGitHub"; _progress = null; RefreshLanguage();
                 string file = await UpdateService.DownloadAsync(_info, progress, _cts.Token);
+                _cts.Token.ThrowIfCancellationRequested();
 
-                StatusText.Text = Services.Localization.LocalizationManager.T("S.Upd.Preparing");
+                _statusKey = "S.Upd.Preparing"; _progress = null; RefreshLanguage();
                 _installing = true;
                 UpdateService.InstallAndRestart(file);
 
                 _completed = true;
+                _running = false;
                 DialogResult = true;   // caller shuts the app down → helper swaps the exe
             }
             catch (OperationCanceledException)
             {
+                _running = false;
                 DialogResult = false;
             }
             catch (Exception ex)
             {
                 _installing = false;
+                _running = false;
                 ProgressBar.IsIndeterminate = false;
                 MessageBox.Show(this,
                     Services.Localization.LocalizationManager.T("S.Upd.Failed", ex.Message),
                     Services.Localization.LocalizationManager.T("S.Upd.001"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 DialogResult = false;
             }
+            finally { _cts.Dispose(); }
         }
 
         private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_completed || _installing) return;
+            if (_completed || _installing || !_running) return;
             _cts.Cancel();
-            DialogResult = false;
         }
 
         private void Window_Closing(object sender, CancelEventArgs e)
         {
             // Block closing while the installer is being launched.
             if (_installing && !_completed) { e.Cancel = true; return; }
-            if (!_completed) _cts.Cancel();
+            if (_running)
+            {
+                e.Cancel = true;
+                _cts.Cancel(); // RunAsync closes the dialog after download cleanup finishes.
+            }
         }
 
         private static string Format(Version v)
             => v.Build > 0 ? $"v{v.Major}.{v.Minor}.{v.Build}" : $"v{v.Major}.{v.Minor}";
 
-        private static string Mb(double bytes) => (bytes / 1024d / 1024d).ToString("0.0");
+        private static string Mb(double bytes) => (bytes / 1024d / 1024d).ToString("0.0", Services.Localization.LocalizationManager.Instance.Culture);
     }
 }

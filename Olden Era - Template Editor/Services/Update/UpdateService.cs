@@ -2,6 +2,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Reflection.PortableExecutable;
+using System.Security.Cryptography;
+using Olden_Era___Template_Editor.Services.Localization;
 using System.Text.Json.Serialization;
 
 namespace Olden_Era___Template_Editor.Services.Update
@@ -16,7 +19,8 @@ namespace Olden_Era___Template_Editor.Services.Update
         string AssetName,
         long AssetSize,
         string? ReleaseNotes,
-        string ReleaseUrl);
+        string ReleaseUrl,
+        string? Digest = null);
 
     /// <summary>
     /// AuroraRMG self-update.
@@ -81,7 +85,8 @@ namespace Olden_Era___Template_Editor.Services.Update
                     AssetName:    asset.Name ?? PreferredAssetName,
                     AssetSize:    asset.Size,
                     ReleaseNotes: release.Body,
-                    ReleaseUrl:   release.HtmlUrl ?? $"https://github.com/{Owner}/{Repo}/releases/latest");
+                    ReleaseUrl:   release.HtmlUrl ?? $"https://github.com/{Owner}/{Repo}/releases/latest",
+                    Digest:       asset.Digest);
             }
             catch
             {
@@ -102,32 +107,72 @@ namespace Olden_Era___Template_Editor.Services.Update
             IProgress<double>? progress = null,
             CancellationToken ct = default)
         {
-            string dir = Path.Combine(Path.GetTempPath(), "AuroraRMG-update");
+            using var http = CreateClient(TimeSpan.FromMinutes(10));
+            return await DownloadAsync(info, http, Path.Combine(Path.GetTempPath(), "AuroraRMG-update"), progress, ct).ConfigureAwait(false);
+        }
+
+        internal static async Task<string> DownloadAsync(UpdateInfo info, HttpClient http, string directory,
+            IProgress<double>? progress = null, CancellationToken ct = default)
+        {
+            if (info.AssetSize <= 0) throw new InvalidDataException(LocalizationManager.T("S.Upd.InvalidSize"));
+            string dir = Path.Combine(directory, Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             string dest = Path.Combine(dir, $"AuroraRMG-{info.Version}.exe");
-
-            using var http = CreateClient(TimeSpan.FromMinutes(10));
-            using var resp = await http.GetAsync(info.DownloadUrl,
-                HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-            resp.EnsureSuccessStatusCode();
-
-            long total = resp.Content.Headers.ContentLength ?? info.AssetSize;
-            await using var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            await using (var dst = new FileStream(dest, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, true))
+            string partial = dest + ".partial";
+            try
             {
-                var buffer = new byte[1 << 16];
+                using var resp = await http.GetAsync(info.DownloadUrl,
+                    HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                resp.EnsureSuccessStatusCode();
+                if (resp.Content.Headers.ContentLength is long declared && declared != info.AssetSize)
+                    throw new InvalidDataException(LocalizationManager.T("S.Upd.SizeMismatch"));
+                long total = info.AssetSize;
                 long read = 0;
-                int n;
-                while ((n = await src.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                await using var src = await resp.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                await using (var dst = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1 << 16, true))
                 {
-                    await dst.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
-                    read += n;
-                    if (progress is not null)
-                        progress.Report(total > 0 ? (double)read / total : -1);
+                    var buffer = new byte[1 << 16];
+                    int n;
+                    while ((n = await src.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                    {
+                        if (read + n > total) throw new InvalidDataException(LocalizationManager.T("S.Upd.SizeMismatch"));
+                        await dst.WriteAsync(buffer.AsMemory(0, n), ct).ConfigureAwait(false);
+                        hash.AppendData(buffer, 0, n);
+                        read += n;
+                        if (progress is not null)
+                            progress.Report(total > 0 ? (double)read / total : -1);
+                    }
                 }
+                ct.ThrowIfCancellationRequested();
+                if (read != total) throw new InvalidDataException(LocalizationManager.T("S.Upd.Incomplete"));
+                string actualDigest = "sha256:" + Convert.ToHexString(hash.GetHashAndReset());
+                if (!string.IsNullOrEmpty(info.Digest) && !actualDigest.Equals(info.Digest, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException(LocalizationManager.T("S.Upd.Checksum"));
+                ValidateExecutable(partial);
+                File.Move(partial, dest);
+                return dest;
             }
+            catch
+            {
+                try { File.Delete(partial); Directory.Delete(dir); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+                throw;
+            }
+        }
 
-            return dest;
+        private static void ValidateExecutable(string path)
+        {
+            using var stream = File.OpenRead(path);
+            try
+            {
+                using var pe = new PEReader(stream);
+                if (pe.PEHeaders.PEHeader is null)
+                    throw new InvalidDataException(LocalizationManager.T("S.Upd.NotExecutable"));
+            }
+            catch (BadImageFormatException ex)
+            { throw new InvalidDataException(LocalizationManager.T("S.Upd.NotExecutable"), ex); }
         }
 
         // ── Install ───────────────────────────────────────────────────────────
@@ -142,58 +187,92 @@ namespace Olden_Era___Template_Editor.Services.Update
         {
             string? target = GetCurrentExecutablePath();
             if (string.IsNullOrEmpty(target))
-                throw new InvalidOperationException("Не удалось определить путь к текущему исполняемому файлу.");
-
-            string helper = Path.Combine(Path.GetTempPath(), "AuroraRMG-update", "apply-update.ps1");
-            File.WriteAllText(helper, HelperScript);
-
-            int pid = Environment.ProcessId;
-            var psi = new ProcessStartInfo
+                throw new InvalidOperationException(LocalizationManager.T("S.Upd.NoExePath"));
+            if (Path.GetFileNameWithoutExtension(target).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(LocalizationManager.T("S.Upd.StandaloneOnly"));
+            ValidateExecutable(newExePath);
+            // Stage beside the application while it is still running: permission/disk errors are
+            // reported before shutdown, and File.Replace can then perform a same-volume swap.
+            string staged = Path.Combine(Path.GetDirectoryName(target)!, $".aurorarmg-{Guid.NewGuid():N}.update");
+            string helper = Path.Combine(Path.GetDirectoryName(newExePath)!, "apply-update.ps1");
+            try
             {
-                FileName = "powershell.exe",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                WorkingDirectory = Path.GetDirectoryName(helper)!,
-            };
-            psi.ArgumentList.Add("-NoProfile");
-            psi.ArgumentList.Add("-ExecutionPolicy");
-            psi.ArgumentList.Add("Bypass");
-            psi.ArgumentList.Add("-WindowStyle");
-            psi.ArgumentList.Add("Hidden");
-            psi.ArgumentList.Add("-File");
-            psi.ArgumentList.Add(helper);
-            psi.ArgumentList.Add("-ProcessId");
-            psi.ArgumentList.Add(pid.ToString());
-            psi.ArgumentList.Add("-Source");
-            psi.ArgumentList.Add(newExePath);
-            psi.ArgumentList.Add("-Target");
-            psi.ArgumentList.Add(target);
+                File.Copy(newExePath, staged);
+                File.WriteAllText(helper, HelperScript);
 
-            Process.Start(psi);
+                int pid = Environment.ProcessId;
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetDirectoryName(helper)!,
+                };
+                psi.ArgumentList.Add("-NoProfile");
+                psi.ArgumentList.Add("-ExecutionPolicy");
+                psi.ArgumentList.Add("Bypass");
+                psi.ArgumentList.Add("-WindowStyle");
+                psi.ArgumentList.Add("Hidden");
+                psi.ArgumentList.Add("-File");
+                psi.ArgumentList.Add(helper);
+                psi.ArgumentList.Add("-ProcessId");
+                psi.ArgumentList.Add(pid.ToString());
+                psi.ArgumentList.Add("-Source");
+                psi.ArgumentList.Add(staged);
+                psi.ArgumentList.Add("-Target");
+                psi.ArgumentList.Add(target);
+
+                using var process = Process.Start(psi) ?? throw new IOException(LocalizationManager.T("S.Upd.HelperFailed"));
+            }
+            catch
+            {
+                try { File.Delete(staged); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+                throw;
+            }
         }
 
         // PowerShell helper: wait for the app to exit, swap the exe, relaunch.
-        private const string HelperScript = @"
+        internal const string HelperScript = @"
 param(
     [Parameter(Mandatory=$true)][int]$ProcessId,
     [Parameter(Mandatory=$true)][string]$Source,
-    [Parameter(Mandatory=$true)][string]$Target
+    [Parameter(Mandatory=$true)][string]$Target,
+    [switch]$NoRestart,
+    [int]$Attempts = 40
 )
-$ErrorActionPreference = 'SilentlyContinue'
-try { Wait-Process -Id $ProcessId -Timeout 60 } catch {}
-Start-Sleep -Milliseconds 400
-$copied = $false
-for ($i = 0; $i -lt 40; $i++) {
-    try {
-        Copy-Item -LiteralPath $Source -Destination $Target -Force
-        $copied = $true
-        break
-    } catch {
-        Start-Sleep -Milliseconds 500
+$ErrorActionPreference = 'Stop'
+$replaced = $false
+try {
+    if (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) {
+        Wait-Process -Id $ProcessId -Timeout 60 -ErrorAction Stop
     }
-}
-if ($copied) {
-    Start-Process -FilePath $Target
+    for ($i = 0; $i -lt $Attempts; $i++) {
+        try {
+            [System.IO.File]::Replace($Source, $Target, $Target + '.previous')
+            $replaced = $true
+            break
+        } catch {
+            if ($i -eq $Attempts - 1) { throw }
+            Start-Sleep -Milliseconds 500
+        }
+    }
+    if (!$replaced) { throw 'The update was not installed.' }
+    if (!$NoRestart) { Start-Process -FilePath $Target }
+} catch {
+    try {
+        $_ | Out-String | Set-Content -LiteralPath ($Target + '.update-error.log') -Encoding UTF8
+    } catch {
+        Write-Warning 'Could not write the update error log.'
+    }
+    if ($replaced) {
+        [System.IO.File]::Replace($Target + '.previous', $Target, $null)
+    }
+    if (!$NoRestart -and !(Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $Target)) {
+        Start-Process -FilePath $Target
+    }
+    exit 1
 }
 ";
 
@@ -208,14 +287,12 @@ if ($copied) {
             return http;
         }
 
-        private static GhAsset? PickAsset(List<GhAsset>? assets)
+        internal static GhAsset? PickAsset(List<GhAsset>? assets)
         {
             if (assets is null || assets.Count == 0) return null;
-            // Prefer the exact preferred name, then any .exe.
+            // Only the documented release asset is suitable for replacing this application.
             return assets.FirstOrDefault(a =>
-                       string.Equals(a.Name, PreferredAssetName, StringComparison.OrdinalIgnoreCase))
-                   ?? assets.FirstOrDefault(a =>
-                       a.Name is not null && a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
+                       string.Equals(a.Name, PreferredAssetName, StringComparison.OrdinalIgnoreCase));
         }
 
         /// <summary>Parses tags like "v0.8.0", "0.8.0", "v0.8.0.0" into a normalised Version.</summary>
@@ -258,10 +335,11 @@ if ($copied) {
             [JsonPropertyName("assets")]     public List<GhAsset>? Assets { get; set; }
         }
 
-        private sealed class GhAsset
+        internal sealed class GhAsset
         {
             [JsonPropertyName("name")]                 public string? Name { get; set; }
             [JsonPropertyName("size")]                 public long Size { get; set; }
+            [JsonPropertyName("digest")]               public string? Digest { get; set; }
             [JsonPropertyName("browser_download_url")] public string? DownloadUrl { get; set; }
         }
     }

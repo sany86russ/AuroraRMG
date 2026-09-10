@@ -107,7 +107,7 @@ namespace Olden_Era___Template_Editor.Services
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
                 var payload = bindings.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value);
-                File.WriteAllText(FilePath, JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
+                AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
             }
             catch
             {

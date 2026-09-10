@@ -86,14 +86,14 @@ namespace Olden_Era___Template_Editor.Services
                                 break;
                             default:
                                 throw new JsonException(
-                                    $"Unexpected token '{reader.TokenType}' inside a string-array; expected a string or number.");
+                                    Localization.LocalizationManager.T("S.Label.JsonScalar", reader.TokenType));
                         }
                     }
-                    throw new JsonException("Unterminated array while reading a string list.");
+                    throw new JsonException(Localization.LocalizationManager.T("S.Label.JsonArray"));
 
                 default:
                     throw new JsonException(
-                        $"Expected a string, a number, or an array of them, but got '{reader.TokenType}'.");
+                        Localization.LocalizationManager.T("S.Label.JsonScalar", reader.TokenType));
             }
         }
 
@@ -168,7 +168,7 @@ namespace Olden_Era___Template_Editor.Services
                     return list;
                 list.Add(JsonSerializer.Deserialize<T>(ref reader, options)!);
             }
-            throw new JsonException("Unterminated array while reading a list of objects.");
+            throw new JsonException(Localization.LocalizationManager.T("S.Label.JsonArray"));
         }
 
         public override void Write(Utf8JsonWriter writer, List<T> value, JsonSerializerOptions options)

@@ -53,7 +53,7 @@ namespace Olden_Era___Template_Editor.Services
                 Directory.CreateDirectory(Dir);
                 var payload = new Dictionary<string, double[]>(StringComparer.Ordinal);
                 foreach (var kv in positions) payload[kv.Key] = [kv.Value.X, kv.Value.Y];
-                File.WriteAllText(SidecarFor(templatePath), JsonSerializer.Serialize(payload));
+                AtomicFile.WriteAllText(SidecarFor(templatePath), JsonSerializer.Serialize(payload));
             }
             catch
             {

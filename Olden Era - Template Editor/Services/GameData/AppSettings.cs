@@ -58,7 +58,7 @@ namespace Olden_Era___Template_Editor.Services.GameData
             try
             {
                 Directory.CreateDirectory(Dir);
-                File.WriteAllText(FilePath, JsonSerializer.Serialize(this));
+                AtomicFile.WriteAllText(FilePath, JsonSerializer.Serialize(this));
             }
             catch { /* best effort */ }
         }
