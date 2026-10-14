@@ -16,6 +16,8 @@
 
 </div>
 
+The working branch is being adapted to Olden Era 0.81.04 data: actual alliances, separate patch presets, battle calendars, rivers, current content catalogs and complete settings snapshots. The [54-item implementation ledger](docs/plans/2026-10-14-implementation-status.md) separates implementation from game acceptance. Release approval is still required.
+
 ## New in v1.11.0
 
 Border and portal guards up to **800%**, neutral-town faction rules without manual JSON editing, and fixes for mirrored references and undo/redo. Window layouts, RU/EN translations, file saving and automatic updates have also been improved.
@@ -185,7 +187,7 @@ For players who **don't want to learn templates**. You set just a few clear opti
 |---|---|
 | **Players** | How many players (starting castles) are on the map. |
 | **Game type** | Layout: **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Lanes (corridors)** *(parallel corridors converging on a central arena)*, **Team game** *(this mode isn't in the game yet)*, or **Single player (RPG/PvE, experimental)** *(only your hero roams — no AI opponent; the goal is to capture a neutral city — see [special modes](#-victory-conditions--special-modes))*. |
-| **Map size** | Small / Medium / Large / **Huge (256–400)**. "Huge" goes past the official 240×240 cap (experimental), but the game engine supports it. |
+| **Map size** | Small / Medium / Large / **Huge (256–400)**. 256×256 is standard; sizes above 256 need game acceptance. |
 | **Game length** | Short / Medium / Long — affects size, zone count and guard strength. |
 | **Chaos level** | Tame / Normal / Wild — how wild and unpredictable the map gets. |
 | **Victory condition** | All the real in-game modes — classic, city/capital hold, final battle, tournament (see [Victory conditions](#-victory-conditions--special-modes)). |
@@ -299,8 +301,8 @@ The window has three areas:
 |---|---|
 | **Preset** | A menu of 43 ready configs (grouped by mode type). Picking one fills every field instantly. See [Presets](#-built-in-presets-43). |
 | **Template name** | The name the template appears under in the game. |
-| **Map size** | Playfield size. Standard values roughly from 80×80 to 240×240. |
-| 🗺 **Large maps: 256×256 … 512×512** `[EXP.]` | A highlighted checkbox right under the size picker — adds the larger sizes (up to 512×512) to the list. No official template ships this big, so they aren't guaranteed, but the game engine handles them (players run games at 300–400). In **Simple Mode** this corresponds to the **"Huge"** size. |
+| **Map size** | Playfield size. Standard sizes from 80×80 to 256×256. |
+| 🗺 **Large maps: 272×272 … 512×512** `[EXP.]` | Adds sizes above the standard 256×256. Their generation and performance require separate in-game acceptance. In **Simple Mode**, larger values are in the **"Huge"** band. |
 | **Players** | Number of players on the map *(2 – 8, default 2)*. |
 
 #### "Heroes" block
@@ -796,8 +798,8 @@ Tips based on how the generator and the Olden Era engine work — they help you 
 **What is the "seed" in Simple Mode?**
 The same seed, settings and generator version produce the same template. Share them together or send the `.rmg.json` file. The game builds the actual world and object placement. The 🎲 button rolls a new random seed, 📋 copies the current one.
 
-**Can I create maps bigger than 240×240?**
-Yes. In **Simple Mode** pick the **"Huge (256–400)"** size; in **Advanced** tick **"🗺 Large maps: 256×256 … 512×512"** right under the size picker — the larger sizes (up to 512×512) appear in the list. Official templates stop at 240×240, but the game engine handles larger maps (which is why the option is marked experimental).
+**Can I create maps bigger than 256×256?**
+Yes. In **Simple Mode** pick the **"Huge (256–400)"** size; in **Advanced** tick **"🗺 Large maps: 256×256 … 512×512"** right under the size picker — the larger sizes (up to 512×512) appear in the list. 256×256 is available in the native game configurator. Larger sizes are experimental and require separate in-game acceptance.
 
 **What does "Balance: NN/100" mean?**
 It's a measure of how equal the players' starting conditions are (wealth, room to expand, distances, castle access). The higher, the fairer the map; specific notes appear alongside. More: [Map analysis](#-map-analysis-balance--contents).
