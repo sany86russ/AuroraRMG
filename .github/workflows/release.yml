@@ -41,32 +41,52 @@ jobs:
       ASSET: "AuroraRMG.exe"
 
     steps:
-      - name: Checkout
+      - name: Resolve tag & version
+        id: ver
+        shell: bash
+        env:
+          REQUESTED_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          TAG="$REQUESTED_TAG"
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Тег должен быть в формате vMAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          # Снимаем ведущую 'v': v0.8.2 -> 0.8.2
+          VERSION="${TAG#v}"
+          echo "tag=$TAG"          >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION"  >> "$GITHUB_OUTPUT"
+          echo "Релиз $TAG (версия сборки $VERSION)"
+
+      - name: Checkout release tag
         uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ steps.ver.outputs.tag }}
+
+      - name: Verify source revision
+        id: source
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.ver.outputs.tag }}
+          TRIGGER_REF: ${{ github.ref }}
+          TRIGGER_SHA: ${{ github.sha }}
+        run: |
+          COMMIT="$(git rev-parse HEAD)"
+          TAG_COMMIT="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          if [ "$COMMIT" != "$TAG_COMMIT" ]; then
+            echo "::error::Исходники не соответствуют тегу релиза"
+            exit 1
+          fi
+          if [ "$TRIGGER_REF" != "refs/tags/$RELEASE_TAG" ] || [ "$TRIGGER_SHA" != "$COMMIT" ]; then
+            echo "::error::Запускайте workflow из самого тега релиза: происхождение бинарника должно соответствовать исходникам"
+            exit 1
+          fi
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
-
-      - name: Resolve tag & version
-        id: ver
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
-          # Снимаем ведущую 'v': v0.8.2 -> 0.8.2
-          VERSION="${TAG#v}"
-          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Тег '$TAG' не в формате vMAJOR.MINOR.PATCH"
-            exit 1
-          fi
-          echo "tag=$TAG"          >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION"  >> "$GITHUB_OUTPUT"
-          echo "Релиз $TAG (версия сборки $VERSION)"
 
       - name: Restore
         run: dotnet restore "$env:SLN"
@@ -99,6 +119,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.source.outputs.commit }}
         run: |
           TAG="${{ steps.ver.outputs.tag }}"
           NOTES="docs/release-notes-$TAG.md"
@@ -119,5 +140,5 @@ jobs:
               --title "AuroraRMG $TAG" \
               "${NOTE_ARGS[@]}" \
               --latest \
-              --target "$GITHUB_SHA"
+              --target "$RELEASE_COMMIT"
           fi
