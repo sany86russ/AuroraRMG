@@ -1,8 +1,36 @@
 {
   "name": "FFA 6 Ring",
   "gameMode": "Classic",
-  "description": "Generated with Olden Era Template Generator v1.1: Ring layout, 12 neutral zones, 1 castle per player zone, mixed neutral zone tiers.",
+  "description": "Игроки: 6; альянсы: FFA. Размер: 192 × 192. Победа: Стандартные условия. Герои: 4–8. Богатство: Обычная; опасность карты: Обычная; темп: Прежний профиль. Seed: 000006C1; профиль: olden-era-0.81.04; алгоритм: aurora-generator-2.",
   "displayWinCondition": "win_condition_1",
+  "descBlocks": {
+    "blocks": [
+      {
+        "type": "text",
+        "p": [
+          "Игроки: 6; альянсы: FFA. Размер: 192 × 192. Победа: Стандартные условия. Герои: 4–8. Богатство: Обычная; опасность карты: Обычная; темп: Прежний профиль. Seed: 000006C1; профиль: olden-era-0.81.04; алгоритм: aurora-generator-2."
+        ]
+      },
+      {
+        "type": "text",
+        "p": [
+          "Плотность: ресурсы 100%, объекты 100%; сила нейтралов 100%, границ 100%."
+        ]
+      },
+      {
+        "type": "text",
+        "p": [
+          "Поражение без владений: с дня 3, порог армии 3000."
+        ]
+      },
+      {
+        "type": "tags",
+        "p": [
+          "map_tags_1,map_tags_2,map_tags_15,map_tags_7,map_tags_4,map_tags_12"
+        ]
+      }
+    ]
+  },
   "sizeX": 192,
   "sizeZ": 192,
   "gameRules": {
@@ -11,6 +39,9 @@
     "heroCountIncrement": 1,
     "heroHireBan": false,
     "encounterHoles": false,
+    "disableFactionLaws": false,
+    "disableMagicGuild": false,
+    "disableMagicCustomLearning": false,
     "factionLawsExpModifier": 1,
     "astrologyExpModifier": 1,
     "winConditions": {
@@ -30,7 +61,7 @@
   "variants": [
     {
       "orientation": {
-        "zeroAngleZone": "Spawn-C",
+        "zeroAngleZone": "Spawn-B",
         "baseAngleMin": 45,
         "baseAngleMax": 45,
         "randomAngleAmplitude": 360,
@@ -56,45 +87,51 @@
       },
       "zones": [
         {
-          "name": "Spawn-C",
+          "name": "Spawn-B",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
           "guardRandomization": 0.05,
           "guardMultiplier": 1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
-            60,
-            20,
-            10,
-            10,
+            0,
             2,
-            0
+            10,
+            10,
+            20,
+            60
+          ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
           ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_C"
+            "mandatory_content_side_B"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -125,7 +162,7 @@
               "spawn": "Player1",
               "guardChance": 1,
               "guardValue": 5000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "removeGuardIfHasOwner": true,
               "buildingsConstructionSid": "default_buildings_construction",
               "placement": "Uniform",
@@ -180,7 +217,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-R-C"
+                  "Ring-R-B"
                 ]
               }
             },
@@ -194,7 +231,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-C-G"
+                  "Ring-B-G"
                 ]
               }
             }
@@ -207,7 +244,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -216,27 +253,33 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
             "mandatory_content_neutral_G"
@@ -269,7 +312,7 @@
               "type": "City",
               "guardChance": 1,
               "guardValue": 4000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "poor_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -327,7 +370,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-C-G"
+                  "Ring-B-G"
                 ]
               }
             },
@@ -354,7 +397,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.4,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -363,24 +406,30 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t3_item",
-            "classic_template_pool_random_t3_pandora",
-            "classic_template_pool_random_t3_hire",
-            "classic_template_pool_random_t3_unit_bank",
-            "classic_template_pool_random_t3_res_bank",
-            "classic_template_pool_random_t3_stat",
-            "classic_template_pool_random_t3_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t3_item",
-            "classic_template_pool_random_unguarded_t3_pandora",
-            "classic_template_pool_random_unguarded_t3_hire",
-            "classic_template_pool_random_unguarded_t3_unit_bank",
-            "classic_template_pool_random_unguarded_t3_res_bank",
-            "classic_template_pool_random_unguarded_t3_stat",
-            "classic_template_pool_random_unguarded_t3_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
             "content_pool_general_resources_start_zone_medium"
@@ -436,52 +485,58 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-M-D"
+                  "Ring-M-C"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Spawn-D",
+          "name": "Spawn-C",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
           "guardRandomization": 0.05,
           "guardMultiplier": 1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
-            60,
-            20,
-            10,
-            10,
+            0,
             2,
-            0
+            10,
+            10,
+            20,
+            60
+          ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
           ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_D"
+            "mandatory_content_side_C"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -512,7 +567,7 @@
               "spawn": "Player2",
               "guardChance": 1,
               "guardValue": 5000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "removeGuardIfHasOwner": true,
               "buildingsConstructionSid": "default_buildings_construction",
               "placement": "Uniform",
@@ -567,7 +622,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-M-D"
+                  "Ring-M-C"
                 ]
               }
             },
@@ -581,7 +636,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-D-H"
+                  "Ring-C-H"
                 ]
               }
             }
@@ -594,7 +649,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -603,27 +658,33 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
             "mandatory_content_neutral_H"
@@ -656,7 +717,7 @@
               "type": "City",
               "guardChance": 1,
               "guardValue": 4000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "poor_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -714,7 +775,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-D-H"
+                  "Ring-C-H"
                 ]
               }
             },
@@ -741,7 +802,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.4,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -750,24 +811,30 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t3_item",
-            "classic_template_pool_random_t3_pandora",
-            "classic_template_pool_random_t3_hire",
-            "classic_template_pool_random_t3_unit_bank",
-            "classic_template_pool_random_t3_res_bank",
-            "classic_template_pool_random_t3_stat",
-            "classic_template_pool_random_t3_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t3_item",
-            "classic_template_pool_random_unguarded_t3_pandora",
-            "classic_template_pool_random_unguarded_t3_hire",
-            "classic_template_pool_random_unguarded_t3_unit_bank",
-            "classic_template_pool_random_unguarded_t3_res_bank",
-            "classic_template_pool_random_unguarded_t3_stat",
-            "classic_template_pool_random_unguarded_t3_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
             "content_pool_general_resources_start_zone_medium"
@@ -823,52 +890,58 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-N-A"
+                  "Ring-N-F"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Spawn-A",
+          "name": "Spawn-F",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
           "guardRandomization": 0.05,
           "guardMultiplier": 1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
-            60,
-            20,
-            10,
-            10,
+            0,
             2,
-            0
+            10,
+            10,
+            20,
+            60
+          ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
           ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_A"
+            "mandatory_content_side_F"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -899,7 +972,7 @@
               "spawn": "Player3",
               "guardChance": 1,
               "guardValue": 5000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "removeGuardIfHasOwner": true,
               "buildingsConstructionSid": "default_buildings_construction",
               "placement": "Uniform",
@@ -954,7 +1027,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-N-A"
+                  "Ring-N-F"
                 ]
               }
             },
@@ -968,7 +1041,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-A-I"
+                  "Ring-F-I"
                 ]
               }
             }
@@ -981,7 +1054,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -990,27 +1063,33 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
             "mandatory_content_neutral_I"
@@ -1043,7 +1122,7 @@
               "type": "City",
               "guardChance": 1,
               "guardValue": 4000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "poor_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -1101,7 +1180,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-A-I"
+                  "Ring-F-I"
                 ]
               }
             },
@@ -1128,7 +1207,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.4,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -1137,24 +1216,30 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t3_item",
-            "classic_template_pool_random_t3_pandora",
-            "classic_template_pool_random_t3_hire",
-            "classic_template_pool_random_t3_unit_bank",
-            "classic_template_pool_random_t3_res_bank",
-            "classic_template_pool_random_t3_stat",
-            "classic_template_pool_random_t3_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t3_item",
-            "classic_template_pool_random_unguarded_t3_pandora",
-            "classic_template_pool_random_unguarded_t3_hire",
-            "classic_template_pool_random_unguarded_t3_unit_bank",
-            "classic_template_pool_random_unguarded_t3_res_bank",
-            "classic_template_pool_random_unguarded_t3_stat",
-            "classic_template_pool_random_unguarded_t3_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
             "content_pool_general_resources_start_zone_medium"
@@ -1210,52 +1295,58 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-O-E"
+                  "Ring-O-D"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Spawn-E",
+          "name": "Spawn-D",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
           "guardRandomization": 0.05,
           "guardMultiplier": 1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
-            60,
-            20,
-            10,
-            10,
+            0,
             2,
-            0
+            10,
+            10,
+            20,
+            60
+          ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
           ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_E"
+            "mandatory_content_side_D"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -1286,7 +1377,7 @@
               "spawn": "Player4",
               "guardChance": 1,
               "guardValue": 5000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "removeGuardIfHasOwner": true,
               "buildingsConstructionSid": "default_buildings_construction",
               "placement": "Uniform",
@@ -1341,7 +1432,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-O-E"
+                  "Ring-O-D"
                 ]
               }
             },
@@ -1355,7 +1446,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-E-J"
+                  "Ring-D-J"
                 ]
               }
             }
@@ -1368,7 +1459,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -1377,27 +1468,33 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
             "mandatory_content_neutral_J"
@@ -1430,7 +1527,7 @@
               "type": "City",
               "guardChance": 1,
               "guardValue": 4000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "poor_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -1488,7 +1585,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-E-J"
+                  "Ring-D-J"
                 ]
               }
             },
@@ -1515,7 +1612,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.4,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -1524,24 +1621,30 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t3_item",
-            "classic_template_pool_random_t3_pandora",
-            "classic_template_pool_random_t3_hire",
-            "classic_template_pool_random_t3_unit_bank",
-            "classic_template_pool_random_t3_res_bank",
-            "classic_template_pool_random_t3_stat",
-            "classic_template_pool_random_t3_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t3_item",
-            "classic_template_pool_random_unguarded_t3_pandora",
-            "classic_template_pool_random_unguarded_t3_hire",
-            "classic_template_pool_random_unguarded_t3_unit_bank",
-            "classic_template_pool_random_unguarded_t3_res_bank",
-            "classic_template_pool_random_unguarded_t3_stat",
-            "classic_template_pool_random_unguarded_t3_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
             "content_pool_general_resources_start_zone_medium"
@@ -1597,52 +1700,58 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-P-B"
+                  "Ring-P-E"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Spawn-B",
+          "name": "Spawn-E",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
           "guardRandomization": 0.05,
           "guardMultiplier": 1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
-            60,
-            20,
-            10,
-            10,
+            0,
             2,
-            0
+            10,
+            10,
+            20,
+            60
+          ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
           ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_B"
+            "mandatory_content_side_E"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -1673,7 +1782,7 @@
               "spawn": "Player5",
               "guardChance": 1,
               "guardValue": 5000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "removeGuardIfHasOwner": true,
               "buildingsConstructionSid": "default_buildings_construction",
               "placement": "Uniform",
@@ -1728,7 +1837,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-P-B"
+                  "Ring-P-E"
                 ]
               }
             },
@@ -1742,7 +1851,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-B-K"
+                  "Ring-E-K"
                 ]
               }
             }
@@ -1755,7 +1864,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -1764,27 +1873,33 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
             "mandatory_content_neutral_K"
@@ -1817,7 +1932,7 @@
               "type": "City",
               "guardChance": 1,
               "guardValue": 4000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "poor_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -1875,7 +1990,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-B-K"
+                  "Ring-E-K"
                 ]
               }
             },
@@ -1902,7 +2017,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.4,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -1911,24 +2026,30 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t3_item",
-            "classic_template_pool_random_t3_pandora",
-            "classic_template_pool_random_t3_hire",
-            "classic_template_pool_random_t3_unit_bank",
-            "classic_template_pool_random_t3_res_bank",
-            "classic_template_pool_random_t3_stat",
-            "classic_template_pool_random_t3_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t3_item",
-            "classic_template_pool_random_unguarded_t3_pandora",
-            "classic_template_pool_random_unguarded_t3_hire",
-            "classic_template_pool_random_unguarded_t3_unit_bank",
-            "classic_template_pool_random_unguarded_t3_res_bank",
-            "classic_template_pool_random_unguarded_t3_stat",
-            "classic_template_pool_random_unguarded_t3_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
             "content_pool_general_resources_start_zone_medium"
@@ -1984,52 +2105,58 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-Q-F"
+                  "Ring-Q-A"
                 ]
               }
             }
           ]
         },
         {
-          "name": "Spawn-F",
+          "name": "Spawn-A",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
           "guardRandomization": 0.05,
           "guardMultiplier": 1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
-            60,
-            20,
-            10,
-            10,
+            0,
             2,
-            0
+            10,
+            10,
+            20,
+            60
+          ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
           ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_F"
+            "mandatory_content_side_A"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -2060,7 +2187,7 @@
               "spawn": "Player6",
               "guardChance": 1,
               "guardValue": 5000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "removeGuardIfHasOwner": true,
               "buildingsConstructionSid": "default_buildings_construction",
               "placement": "Uniform",
@@ -2115,7 +2242,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-Q-F"
+                  "Ring-Q-A"
                 ]
               }
             },
@@ -2129,7 +2256,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-F-L"
+                  "Ring-A-L"
                 ]
               }
             }
@@ -2142,7 +2269,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -2151,27 +2278,33 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
             "mandatory_content_neutral_L"
@@ -2204,7 +2337,7 @@
               "type": "City",
               "guardChance": 1,
               "guardValue": 4000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "poor_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -2262,7 +2395,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-F-L"
+                  "Ring-A-L"
                 ]
               }
             },
@@ -2289,7 +2422,7 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.4,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -2298,24 +2431,30 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t3_item",
-            "classic_template_pool_random_t3_pandora",
-            "classic_template_pool_random_t3_hire",
-            "classic_template_pool_random_t3_unit_bank",
-            "classic_template_pool_random_t3_res_bank",
-            "classic_template_pool_random_t3_stat",
-            "classic_template_pool_random_t3_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t3_item",
-            "classic_template_pool_random_unguarded_t3_pandora",
-            "classic_template_pool_random_unguarded_t3_hire",
-            "classic_template_pool_random_unguarded_t3_unit_bank",
-            "classic_template_pool_random_unguarded_t3_res_bank",
-            "classic_template_pool_random_unguarded_t3_stat",
-            "classic_template_pool_random_unguarded_t3_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
             "content_pool_general_resources_start_zone_medium"
@@ -2371,7 +2510,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Ring-R-C"
+                  "Ring-R-B"
                 ]
               }
             }
@@ -2380,16 +2519,16 @@
       ],
       "connections": [
         {
-          "name": "Ring-C-G",
-          "from": "Spawn-C",
+          "name": "Ring-B-G",
+          "from": "Spawn-B",
           "to": "Neutral-G",
           "connectionType": "Direct",
-          "guardZone": "Spawn-C",
+          "guardZone": "Spawn-B",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_C_G"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_B_G"
         },
         {
           "name": "Ring-G-M",
@@ -2400,32 +2539,32 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "ring_guard_G_M"
         },
         {
-          "name": "Ring-M-D",
+          "name": "Ring-M-C",
           "from": "Neutral-M",
-          "to": "Spawn-D",
+          "to": "Spawn-C",
           "connectionType": "Direct",
           "guardZone": "Neutral-M",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_M_D"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_M_C"
         },
         {
-          "name": "Ring-D-H",
-          "from": "Spawn-D",
+          "name": "Ring-C-H",
+          "from": "Spawn-C",
           "to": "Neutral-H",
           "connectionType": "Direct",
-          "guardZone": "Spawn-D",
+          "guardZone": "Spawn-C",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_D_H"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_C_H"
         },
         {
           "name": "Ring-H-N",
@@ -2436,32 +2575,32 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "ring_guard_H_N"
         },
         {
-          "name": "Ring-N-A",
+          "name": "Ring-N-F",
           "from": "Neutral-N",
-          "to": "Spawn-A",
+          "to": "Spawn-F",
           "connectionType": "Direct",
           "guardZone": "Neutral-N",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_N_A"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_N_F"
         },
         {
-          "name": "Ring-A-I",
-          "from": "Spawn-A",
+          "name": "Ring-F-I",
+          "from": "Spawn-F",
           "to": "Neutral-I",
           "connectionType": "Direct",
-          "guardZone": "Spawn-A",
+          "guardZone": "Spawn-F",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_A_I"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_F_I"
         },
         {
           "name": "Ring-I-O",
@@ -2472,32 +2611,32 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "ring_guard_I_O"
         },
         {
-          "name": "Ring-O-E",
+          "name": "Ring-O-D",
           "from": "Neutral-O",
-          "to": "Spawn-E",
+          "to": "Spawn-D",
           "connectionType": "Direct",
           "guardZone": "Neutral-O",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_O_E"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_O_D"
         },
         {
-          "name": "Ring-E-J",
-          "from": "Spawn-E",
+          "name": "Ring-D-J",
+          "from": "Spawn-D",
           "to": "Neutral-J",
           "connectionType": "Direct",
-          "guardZone": "Spawn-E",
+          "guardZone": "Spawn-D",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_E_J"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_D_J"
         },
         {
           "name": "Ring-J-P",
@@ -2508,32 +2647,32 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "ring_guard_J_P"
         },
         {
-          "name": "Ring-P-B",
+          "name": "Ring-P-E",
           "from": "Neutral-P",
-          "to": "Spawn-B",
+          "to": "Spawn-E",
           "connectionType": "Direct",
           "guardZone": "Neutral-P",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_P_B"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_P_E"
         },
         {
-          "name": "Ring-B-K",
-          "from": "Spawn-B",
+          "name": "Ring-E-K",
+          "from": "Spawn-E",
           "to": "Neutral-K",
           "connectionType": "Direct",
-          "guardZone": "Spawn-B",
+          "guardZone": "Spawn-E",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_B_K"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_E_K"
         },
         {
           "name": "Ring-K-Q",
@@ -2544,32 +2683,32 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "ring_guard_K_Q"
         },
         {
-          "name": "Ring-Q-F",
+          "name": "Ring-Q-A",
           "from": "Neutral-Q",
-          "to": "Spawn-F",
+          "to": "Spawn-A",
           "connectionType": "Direct",
           "guardZone": "Neutral-Q",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_Q_F"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_Q_A"
         },
         {
-          "name": "Ring-F-L",
-          "from": "Spawn-F",
+          "name": "Ring-A-L",
+          "from": "Spawn-A",
           "to": "Neutral-L",
           "connectionType": "Direct",
-          "guardZone": "Spawn-F",
+          "guardZone": "Spawn-A",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_F_L"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_A_L"
         },
         {
           "name": "Ring-L-R",
@@ -2580,20 +2719,20 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "ring_guard_L_R"
         },
         {
-          "name": "Ring-R-C",
+          "name": "Ring-R-B",
           "from": "Neutral-R",
-          "to": "Spawn-C",
+          "to": "Spawn-B",
           "connectionType": "Direct",
           "guardZone": "Neutral-R",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "ring_guard_R_C"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "ring_guard_R_B"
         }
       ]
     }

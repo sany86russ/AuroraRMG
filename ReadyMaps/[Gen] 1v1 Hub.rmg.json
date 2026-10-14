@@ -1,8 +1,36 @@
 {
   "name": "1v1 Hub",
   "gameMode": "Classic",
-  "description": "Generated with Olden Era Template Generator v1.1: Hub layout, 4 neutral zones, 1 castle per player zone, mixed neutral zone tiers.",
+  "description": "Игроки: 2; альянсы: FFA. Размер: 144 × 144. Победа: Стандартные условия. Герои: 4–8. Богатство: Обычная; опасность карты: Обычная; темп: Прежний профиль. Seed: 000006C1; профиль: olden-era-0.81.04; алгоритм: aurora-generator-2.",
   "displayWinCondition": "win_condition_1",
+  "descBlocks": {
+    "blocks": [
+      {
+        "type": "text",
+        "p": [
+          "Игроки: 2; альянсы: FFA. Размер: 144 × 144. Победа: Стандартные условия. Герои: 4–8. Богатство: Обычная; опасность карты: Обычная; темп: Прежний профиль. Seed: 000006C1; профиль: olden-era-0.81.04; алгоритм: aurora-generator-2."
+        ]
+      },
+      {
+        "type": "text",
+        "p": [
+          "Плотность: ресурсы 100%, объекты 100%; сила нейтралов 100%, границ 100%."
+        ]
+      },
+      {
+        "type": "text",
+        "p": [
+          "Поражение без владений: с дня 3, порог армии 3000."
+        ]
+      },
+      {
+        "type": "tags",
+        "p": [
+          "map_tags_1,map_tags_2,map_tags_15,map_tags_7,map_tags_4,map_tags_12"
+        ]
+      }
+    ]
+  },
   "sizeX": 144,
   "sizeZ": 144,
   "gameRules": {
@@ -11,6 +39,9 @@
     "heroCountIncrement": 1,
     "heroHireBan": false,
     "encounterHoles": false,
+    "disableFactionLaws": false,
+    "disableMagicGuild": false,
+    "disableMagicCustomLearning": false,
     "factionLawsExpModifier": 1,
     "astrologyExpModifier": 1,
     "winConditions": {
@@ -30,7 +61,7 @@
   "variants": [
     {
       "orientation": {
-        "zeroAngleZone": "Spawn-A",
+        "zeroAngleZone": "Spawn-B",
         "baseAngleMin": 45,
         "baseAngleMax": 45,
         "randomAngleAmplitude": 360,
@@ -62,33 +93,39 @@
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
           "guardMultiplier": 1.5,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
             10,
-            20,
+            10,
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t3_item",
-            "classic_template_pool_random_t3_pandora",
-            "classic_template_pool_random_t3_hire",
-            "classic_template_pool_random_t3_unit_bank",
-            "classic_template_pool_random_t3_res_bank",
-            "classic_template_pool_random_t3_stat",
-            "classic_template_pool_random_t3_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t3_item",
-            "classic_template_pool_random_unguarded_t3_pandora",
-            "classic_template_pool_random_unguarded_t3_hire",
-            "classic_template_pool_random_unguarded_t3_unit_bank",
-            "classic_template_pool_random_unguarded_t3_res_bank",
-            "classic_template_pool_random_unguarded_t3_stat",
-            "classic_template_pool_random_unguarded_t3_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
             "content_pool_general_resources_start_zone_medium"
@@ -119,7 +156,7 @@
               "from": {
                 "type": "Connection",
                 "args": [
-                  "Hub-A"
+                  "Hub-B"
                 ]
               },
               "to": {
@@ -133,7 +170,7 @@
               "from": {
                 "type": "Connection",
                 "args": [
-                  "Hub-A"
+                  "Hub-B"
                 ]
               },
               "to": {
@@ -147,13 +184,13 @@
               "from": {
                 "type": "Connection",
                 "args": [
-                  "Hub-A"
+                  "Hub-B"
                 ]
               },
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Hub-B"
+                  "Hub-A"
                 ]
               }
             },
@@ -161,7 +198,7 @@
               "from": {
                 "type": "Connection",
                 "args": [
-                  "Hub-A"
+                  "Hub-B"
                 ]
               },
               "to": {
@@ -175,7 +212,7 @@
               "from": {
                 "type": "Connection",
                 "args": [
-                  "Hub-A"
+                  "Hub-B"
                 ]
               },
               "to": {
@@ -188,45 +225,51 @@
           ]
         },
         {
-          "name": "Spawn-A",
+          "name": "Spawn-B",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
           "guardRandomization": 0.05,
           "guardMultiplier": 1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
-            60,
-            20,
-            10,
-            10,
+            0,
             2,
-            0
+            10,
+            10,
+            20,
+            60
+          ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
           ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_A"
+            "mandatory_content_side_B"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -257,7 +300,7 @@
               "spawn": "Player1",
               "guardChance": 1,
               "guardValue": 5000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "removeGuardIfHasOwner": true,
               "buildingsConstructionSid": "default_buildings_construction",
               "placement": "Uniform",
@@ -312,7 +355,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Hub-A"
+                  "Hub-B"
                 ]
               }
             }
@@ -324,8 +367,8 @@
           "layout": "zone_layout_sides",
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
-          "guardMultiplier": 1.1,
-          "guardWeeklyIncrement": 0.2,
+          "guardMultiplier": 1.265,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -334,27 +377,33 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
             "mandatory_content_neutral_C"
@@ -376,18 +425,18 @@
             "content_limits_side_4_6",
             "content_limits_side_5_6"
           ],
-          "guardedContentValue": 88181,
-          "guardedContentValuePerArea": 857,
-          "unguardedContentValue": 18371,
-          "unguardedContentValuePerArea": 171,
-          "resourcesValue": 11022,
-          "resourcesValuePerArea": 102,
+          "guardedContentValue": 101408,
+          "guardedContentValuePerArea": 986,
+          "unguardedContentValue": 21127,
+          "unguardedContentValuePerArea": 197,
+          "resourcesValue": 12675,
+          "resourcesValuePerArea": 117,
           "mainObjects": [
             {
               "type": "City",
               "guardChance": 1,
-              "guardValue": 4000,
-              "guardWeeklyIncrement": 0.1,
+              "guardValue": 4600,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "poor_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -457,8 +506,8 @@
           "layout": "zone_layout_treasure_zone",
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
-          "guardMultiplier": 1.4,
-          "guardWeeklyIncrement": 0.2,
+          "guardMultiplier": 1.61,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -467,24 +516,30 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t3_item",
-            "classic_template_pool_random_t3_pandora",
-            "classic_template_pool_random_t3_hire",
-            "classic_template_pool_random_t3_unit_bank",
-            "classic_template_pool_random_t3_res_bank",
-            "classic_template_pool_random_t3_stat",
-            "classic_template_pool_random_t3_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t3_item",
-            "classic_template_pool_random_unguarded_t3_pandora",
-            "classic_template_pool_random_unguarded_t3_hire",
-            "classic_template_pool_random_unguarded_t3_unit_bank",
-            "classic_template_pool_random_unguarded_t3_res_bank",
-            "classic_template_pool_random_unguarded_t3_stat",
-            "classic_template_pool_random_unguarded_t3_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
             "content_pool_general_resources_start_zone_medium"
@@ -509,18 +564,18 @@
             "content_limits_side_4_6",
             "content_limits_side_5_6"
           ],
-          "guardedContentValue": 176363,
-          "guardedContentValuePerArea": 1714,
-          "unguardedContentValue": 27924,
-          "unguardedContentValuePerArea": 257,
-          "resourcesValue": 20208,
-          "resourcesValuePerArea": 180,
+          "guardedContentValue": 202817,
+          "guardedContentValuePerArea": 1971,
+          "unguardedContentValue": 32113,
+          "unguardedContentValuePerArea": 296,
+          "resourcesValue": 23239,
+          "resourcesValuePerArea": 207,
           "mainObjects": [
             {
               "type": "City",
               "guardChance": 1,
-              "guardValue": 8000,
-              "guardWeeklyIncrement": 0.1,
+              "guardValue": 9200,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "rich_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -585,45 +640,51 @@
           ]
         },
         {
-          "name": "Spawn-B",
+          "name": "Spawn-A",
           "size": 1,
           "layout": "zone_layout_spawns",
           "guardCutoffValue": 1500,
           "guardRandomization": 0.05,
           "guardMultiplier": 1,
-          "guardWeeklyIncrement": 0.2,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
-            60,
-            20,
-            10,
-            10,
+            0,
             2,
-            0
+            10,
+            10,
+            20,
+            60
+          ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
           ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
-            "mandatory_content_side_B"
+            "mandatory_content_side_A"
           ],
           "contentCountLimits": [
             "content_limits_side_1_2",
@@ -654,7 +715,7 @@
               "spawn": "Player2",
               "guardChance": 1,
               "guardValue": 5000,
-              "guardWeeklyIncrement": 0.1,
+              "guardWeeklyIncrement": 0.075,
               "removeGuardIfHasOwner": true,
               "buildingsConstructionSid": "default_buildings_construction",
               "placement": "Uniform",
@@ -709,7 +770,7 @@
               "to": {
                 "type": "Connection",
                 "args": [
-                  "Hub-B"
+                  "Hub-A"
                 ]
               }
             }
@@ -721,8 +782,8 @@
           "layout": "zone_layout_sides",
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
-          "guardMultiplier": 1.1,
-          "guardWeeklyIncrement": 0.2,
+          "guardMultiplier": 1.265,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -731,27 +792,33 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t2_item",
-            "classic_template_pool_random_t2_pandora",
-            "classic_template_pool_random_t2_hire",
-            "classic_template_pool_random_t2_unit_bank",
-            "classic_template_pool_random_t2_res_bank",
-            "classic_template_pool_random_t2_stat",
-            "classic_template_pool_random_t2_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t2_item",
-            "classic_template_pool_random_unguarded_t2_pandora",
-            "classic_template_pool_random_unguarded_t2_hire",
-            "classic_template_pool_random_unguarded_t2_unit_bank",
-            "classic_template_pool_random_unguarded_t2_res_bank",
-            "classic_template_pool_random_unguarded_t2_stat",
-            "classic_template_pool_random_unguarded_t2_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
-            "content_pool_general_resources_start_zone_poor"
+            "content_pool_general_resources_start_zone_medium"
           ],
           "mandatoryContent": [
             "mandatory_content_neutral_D"
@@ -773,18 +840,18 @@
             "content_limits_side_4_6",
             "content_limits_side_5_6"
           ],
-          "guardedContentValue": 88181,
-          "guardedContentValuePerArea": 857,
-          "unguardedContentValue": 18371,
-          "unguardedContentValuePerArea": 171,
-          "resourcesValue": 11022,
-          "resourcesValuePerArea": 102,
+          "guardedContentValue": 101408,
+          "guardedContentValuePerArea": 986,
+          "unguardedContentValue": 21127,
+          "unguardedContentValuePerArea": 197,
+          "resourcesValue": 12675,
+          "resourcesValuePerArea": 117,
           "mainObjects": [
             {
               "type": "City",
               "guardChance": 1,
-              "guardValue": 4000,
-              "guardWeeklyIncrement": 0.1,
+              "guardValue": 4600,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "poor_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -854,8 +921,8 @@
           "layout": "zone_layout_treasure_zone",
           "guardCutoffValue": 2000,
           "guardRandomization": 0.05,
-          "guardMultiplier": 1.4,
-          "guardWeeklyIncrement": 0.2,
+          "guardMultiplier": 1.61,
+          "guardWeeklyIncrement": 0.075,
           "guardReactionDistribution": [
             0,
             10,
@@ -864,24 +931,30 @@
             10,
             0
           ],
+          "randomHireEnableWeeklyUnitIncrement": [
+            true,
+            true,
+            true,
+            true,
+            true,
+            true,
+            true
+          ],
+          "randomHireInitialUnitIncrement": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "diplomacyModifier": -0.5,
           "guardedContentPool": [
-            "classic_template_pool_random_t3_item",
-            "classic_template_pool_random_t3_pandora",
-            "classic_template_pool_random_t3_hire",
-            "classic_template_pool_random_t3_unit_bank",
-            "classic_template_pool_random_t3_res_bank",
-            "classic_template_pool_random_t3_stat",
-            "classic_template_pool_random_t3_magic"
+            "template_pool_random_maps_t3"
           ],
           "unguardedContentPool": [
-            "classic_template_pool_random_unguarded_t3_item",
-            "classic_template_pool_random_unguarded_t3_pandora",
-            "classic_template_pool_random_unguarded_t3_hire",
-            "classic_template_pool_random_unguarded_t3_unit_bank",
-            "classic_template_pool_random_unguarded_t3_res_bank",
-            "classic_template_pool_random_unguarded_t3_stat",
-            "classic_template_pool_random_unguarded_t3_magic"
+            "template_pool_random_maps_unguarded_t3"
           ],
           "resourcesContentPool": [
             "content_pool_general_resources_start_zone_medium"
@@ -906,18 +979,18 @@
             "content_limits_side_4_6",
             "content_limits_side_5_6"
           ],
-          "guardedContentValue": 176363,
-          "guardedContentValuePerArea": 1714,
-          "unguardedContentValue": 27924,
-          "unguardedContentValuePerArea": 257,
-          "resourcesValue": 20208,
-          "resourcesValuePerArea": 180,
+          "guardedContentValue": 202817,
+          "guardedContentValuePerArea": 1971,
+          "unguardedContentValue": 32113,
+          "unguardedContentValuePerArea": 296,
+          "resourcesValue": 23239,
+          "resourcesValuePerArea": 207,
           "mainObjects": [
             {
               "type": "City",
               "guardChance": 1,
-              "guardValue": 8000,
-              "guardWeeklyIncrement": 0.1,
+              "guardValue": 9200,
+              "guardWeeklyIncrement": 0.075,
               "buildingsConstructionSid": "rich_buildings_construction",
               "faction": {
                 "type": "FromList",
@@ -984,16 +1057,16 @@
       ],
       "connections": [
         {
-          "name": "Hub-A",
+          "name": "Hub-B",
           "from": "Hub",
-          "to": "Spawn-A",
+          "to": "Spawn-B",
           "connectionType": "Direct",
           "guardZone": "Hub",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 30000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "hub_guard_A"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "hub_guard_B"
         },
         {
           "name": "Hub-C",
@@ -1004,7 +1077,7 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "hub_guard_C"
         },
         {
@@ -1016,20 +1089,20 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "hub_guard_E"
         },
         {
-          "name": "Hub-B",
+          "name": "Hub-A",
           "from": "Hub",
-          "to": "Spawn-B",
+          "to": "Spawn-A",
           "connectionType": "Direct",
           "guardZone": "Hub",
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 30000,
-          "guardWeeklyIncrement": 0.15,
-          "guardMatchGroup": "hub_guard_B"
+          "guardWeeklyIncrement": 0.075,
+          "guardMatchGroup": "hub_guard_A"
         },
         {
           "name": "Hub-D",
@@ -1040,7 +1113,7 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 15000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "hub_guard_D"
         },
         {
@@ -1052,12 +1125,12 @@
           "guardEscape": false,
           "simTurnSquad": true,
           "guardValue": 20000,
-          "guardWeeklyIncrement": 0.15,
+          "guardWeeklyIncrement": 0.075,
           "guardMatchGroup": "hub_guard_F"
         },
         {
-          "name": "Pseudo-A-C",
-          "from": "Spawn-A",
+          "name": "Pseudo-B-C",
+          "from": "Spawn-B",
           "to": "Neutral-C",
           "connectionType": "Proximity"
         },
@@ -1068,14 +1141,14 @@
           "connectionType": "Proximity"
         },
         {
-          "name": "Pseudo-E-B",
+          "name": "Pseudo-E-A",
           "from": "Neutral-E",
-          "to": "Spawn-B",
+          "to": "Spawn-A",
           "connectionType": "Proximity"
         },
         {
-          "name": "Pseudo-B-D",
-          "from": "Spawn-B",
+          "name": "Pseudo-A-D",
+          "from": "Spawn-A",
           "to": "Neutral-D",
           "connectionType": "Proximity"
         },
@@ -1086,9 +1159,9 @@
           "connectionType": "Proximity"
         },
         {
-          "name": "Pseudo-F-A",
+          "name": "Pseudo-F-B",
           "from": "Neutral-F",
-          "to": "Spawn-A",
+          "to": "Spawn-B",
           "connectionType": "Proximity"
         }
       ]
