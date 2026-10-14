@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Ui', 'Kit')][string]$Mode = 'Ui',
+    [ValidateSet('Ui', 'Docs', 'Kit')][string]$Mode = 'Ui',
     [ValidateSet('ru', 'en')][string]$Language = 'ru',
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$GameInstallPath,
@@ -34,7 +34,7 @@ try {
     for ($cpuIndex = 0; $cpuIndex -lt 63; $cpuIndex++) { $cpuBit = 1L -shl $cpuIndex; if (($allowedMask -band $cpuBit) -ne 0) { $selectedMask = $cpuBit } }
     if ($selectedMask -ne 0) { $checkProcess.ProcessorAffinity = [IntPtr]$selectedMask }
     $env:AURORARMG_DATA_DIRECTORY = $verificationDataPath; $env:DOTNET_PROCESSOR_COUNT = '1'
-    $command = if ($Mode -eq 'Ui') { '--shoot-patch' } else { '--make-patch-kit' }
+    $command = switch ($Mode) { 'Ui' { '--shoot-patch' } 'Docs' { '--shoot-docs' } 'Kit' { '--make-patch-kit' } }
     $argumentList = @($command, ('"' + $resolvedOutput + '"'), '--lang', $Language)
     $verificationProcess = Start-Process -FilePath $applicationPath -ArgumentList $argumentList -WindowStyle Hidden -PassThru
     $verificationProcess.PriorityClass = 'Idle'; $verificationProcess.ProcessorAffinity = $checkProcess.ProcessorAffinity

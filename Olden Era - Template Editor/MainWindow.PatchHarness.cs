@@ -16,7 +16,7 @@ public partial class MainWindow
 {
     private void InitializePatchHarness(string[] arguments)
     {
-        int index = Array.FindIndex(arguments, a => a is "--shoot-patch" or "--make-patch-kit");
+        int index = Array.FindIndex(arguments, a => a is "--shoot-patch" or "--shoot-docs" or "--make-patch-kit");
         if (index < 0) return;
         if (index + 1 >= arguments.Length) throw new ArgumentException("The verification command requires an output directory.");
         ShowActivated = false; WindowStartupLocation = WindowStartupLocation.Manual; Left = -6000; Top = 100;
@@ -30,7 +30,11 @@ public partial class MainWindow
                     var receipt = await PatchAcceptanceSuite.RunAsync(directory, await CurrentPatchCatalog(true));
                     if (!receipt.OfflinePassed) throw new InvalidOperationException("Offline acceptance did not pass.");
                 }
-                else await VerifyPatchUiAsync(directory);
+                else
+                {
+                    await VerifyPatchUiAsync(directory);
+                    if (command == "--shoot-docs") await CaptureDocumentationAsync(directory);
+                }
                 Application.Current.Shutdown(0);
             }
             catch (Exception ex)
@@ -52,6 +56,18 @@ public partial class MainWindow
         CmbSimpleType.SelectedIndex = 5; ApplySimplePlayerSelection(2, false);
         Require(CmbSimpleType.SelectedIndex == 1 && SldSimplePlayers.Value == 2, "Solo options silently clamped the new player count.");
         checks.Add("Simple: options can change Duel to five players and Solo to two without clamping.");
+        _profileOptions = GenerationProfileOptions.CurrentDefaults();
+        CmbSimpleType.SelectedIndex = 4; SldSimplePlayers.Value = 4; TxtSimpleSeed.Text = "000006C1";
+        BtnSimpleGenerate_Click(this, new());
+        Require(_lastQuickSettings?.Topology == MapTopology.Lanes && _generatedSettingsSnapshot?.Topology == MapTopology.Lanes
+            && _generatedTopology == MapTopology.Default && TxtSimpleSummary.Text.Contains(L.Get("S.Topo.Ring")),
+            "Simple preview/summary did not use the effective tempo topology while preserving the Lanes input.");
+        L.Toggle();
+        Require(TxtSimpleSummary.Text.Contains(L.Get("S.Topo.Ring")), "Switching language restored the original topology label.");
+        L.Toggle();
+        Require(TxtSimpleSummary.Text.Contains(L.Get("S.Topo.Ring")) && _generatedSettingsSnapshot?.Topology == MapTopology.Lanes,
+            "Restoring language changed the topology summary or captured input.");
+        checks.Add("Preview: effective tempo topology is shown in both languages while the original Lanes input remains captured.");
         var manualOptions = GenerationProfileOptions.CurrentDefaults();
         manualOptions.Alliances = new() { Enabled = true, Preset = "auto", Slots = [new() { Player = 1, Alliance = 1, Locked = true }, new() { Player = 2, Alliance = 2, Locked = false }] };
         var manualDialog = new GenerationOptionsWindow(manualOptions, 2);
@@ -94,6 +110,8 @@ public partial class MainWindow
         Require(JsonSerializer.Serialize(regenerated, JsonExport.Options) == JsonSerializer.Serialize(_generatedTemplate, JsonExport.Options), "Captured Simple settings do not reproduce the template.");
         checks.Add("Simple: 5 players, 2v2v1 teams, full settings snapshot reproduces JSON.");
         checks.Add("Name: cosmetic renaming updates the template, snapshot and Advanced input.");
+        if (SimplePreviewBox.Visibility != Visibility.Visible) BtnSimpleTogglePreview_Click(this, new());
+        Require(ImgSimplePreview.Source is not null, "Showing the Simple preview did not render the generated graph.");
         await CaptureMainPatchAsync(directory, "main-simple");
         ChkSimplePortals.IsChecked = !ChkSimplePortals.IsChecked;
         Require(_templateOutdated && !BtnSimpleSave.IsEnabled && !BtnSimpleSaveToGame.IsEnabled && !await CanExportGeneratedTemplate(), "Simple stale export was not blocked.");
@@ -110,6 +128,8 @@ public partial class MainWindow
         BtnPreview_Click(this, new());
         Require(!_templateOutdated && _generatedTemplate is not null && ImgPreview.Source is not null,
             "Advanced generation did not produce a current preview.");
+        Require(_generatedTopology == Services.Generation.GenerationProfileApplier.Prepare(restored).Topology,
+            "Advanced preview uses the original topology instead of the generated tempo topology.");
         Require(JsonSerializer.Serialize(_generatedTemplate, JsonExport.Options) == JsonSerializer.Serialize(regenerated, JsonExport.Options),
             "Advanced generation changed the captured Simple input.");
         checks.Add("Advanced: restored inputs generate the same current template and preview.");
@@ -140,6 +160,70 @@ public partial class MainWindow
         }
         checks.Add("WPF: all new dialogs rendered off screen in the active language.");
         File.WriteAllLines(Path.Combine(directory, "ui-verification.txt"), checks);
+    }
+
+    private async Task CaptureDocumentationAsync(string directory)
+    {
+        File.Copy(Path.Combine(directory, "main-simple.png"), Path.Combine(directory, "ui-simple.png"));
+        _profileOptions = GenerationProfileOptions.CurrentDefaults();
+        _profileOptions.Tempo = MapTempo.Legacy;
+        _profileOptions.TemplateSeed = 1234;
+        SetMode(advanced: false, persist: false);
+        CmbSimpleType.SelectedIndex = Array.IndexOf(SimpleTypeKeys, "S.Simple.Type.Lanes");
+        ApplySimplePlayerSelection(4, false);
+        TxtSimpleSeed.Text = "1234ABCD";
+        BtnSimpleGenerate_Click(this, new());
+        Require(!_templateOutdated && _generatedTemplate is not null, "The documentation example did not generate.");
+        if (SimplePreviewBox.Visibility != Visibility.Visible) BtnSimpleTogglePreview_Click(this, new());
+        Require(ImgSimplePreview.Source is not null, "The Lanes documentation preview is empty.");
+        await CaptureMainPatchAsync(directory, "ui-simple-lanes");
+        var documentationSettings = _lastQuickSettings ?? throw new InvalidOperationException("The documentation example has no captured input.");
+        SyncAdvancedFromSettings(documentationSettings);
+        SetMode(advanced: true, persist: false);
+        BtnPreview_Click(this, new());
+        Require(!_templateOutdated && _generatedTemplate is not null, "The Advanced documentation example did not generate.");
+        foreach (var (index, file) in ShootTabs)
+        {
+            Require(index < MainTabs.Items.Count, "A documentation tab is missing: " + file);
+            MainTabs.SelectedIndex = index;
+            await SettlePatchLayoutAsync((FrameworkElement)Content);
+            BtnPreview_Click(this, new());
+            Require(!_templateOutdated && _generatedTemplate is not null, "The documentation tab has a stale preview: " + file);
+            await CaptureMainPatchAsync(directory, file);
+        }
+        var template = _generatedTemplate!;
+        var variant = template.Variants![0];
+        await CapturePatchWindowAsync(new TemplateEditorWindow(template, documentationSettings.Topology), directory, "ui-editor", window =>
+        {
+            var editor = (TemplateEditorWindow)window;
+            editor.DebugSelectZone(variant.Zones![0].Name);
+            editor.DebugFitForCapture();
+        });
+        await CapturePatchWindowAsync(new JsonPreviewWindow(template, JsonExport.Options), directory, "ui-tool-json");
+        await CapturePatchWindowAsync(new ConnectionManagerWindow(variant.Connections!), directory, "ui-tool-connections");
+        await CapturePatchWindowAsync(new OrientationWindow(variant, variant.Zones!.Select(zone => zone.Name).ToList()), directory, "ui-tool-orientation");
+        await CapturePatchWindowAsync(new EditorHelpWindow(), directory, "ui-tool-help");
+        await CapturePatchWindowAsync(new MirrorSettingsWindow(true, true), directory, "ui-tool-mirror-settings");
+        await CapturePatchWindowAsync(new HotkeySettingsWindow(), directory, "ui-tool-hotkeys");
+        await CapturePatchWindowAsync(new ImageImportWindow(), directory, "ui-tool-sketch");
+        var references = (await CurrentPatchCatalog(true)).GetReferenceCatalog();
+        string readyDirectory = Path.Combine(directory, "ReadyMaps");
+        Directory.CreateDirectory(readyDirectory);
+        foreach (var preset in PatchPresets.Current.Concat(PatchPresets.Cooperative))
+        {
+            var settings = Presets.ToGeneratorSettings(PatchPresets.Clone(preset.Settings));
+            settings.Seed = 1729; settings.ProfileOptions.TemplateSeed = 1729;
+            var readyTemplate = TemplateGenerator.Generate(settings);
+            var errors = TemplateCompatibilityValidator.Validate(readyTemplate, TemplateValidationMode.StrictExport, references)
+                .Where(issue => issue.Severity == TemplateIssueSeverity.Error).ToArray();
+            Require(errors.Length == 0, "ReadyMaps validation failed: " + preset.Id + ": " + string.Join("; ", errors.Select(error => error.Message)));
+            File.WriteAllText(Path.Combine(readyDirectory, "[Gen] " + settings.TemplateName + ".rmg.json"), JsonSerializer.Serialize(readyTemplate, JsonExport.Options));
+        }
+        Require(Directory.GetFiles(readyDirectory, "*.rmg.json").Length == 53, "The current ReadyMaps collection is incomplete.");
+        foreach (string name in ShootTabs.Select(tab => tab.File).Concat(new[] { "ui-simple", "ui-simple-lanes", "ui-editor",
+                     "ui-tool-json", "ui-tool-connections", "ui-tool-orientation", "ui-tool-help", "ui-tool-mirror-settings", "ui-tool-hotkeys", "ui-tool-sketch" }))
+            Require(new FileInfo(Path.Combine(directory, name + ".png")).Length > 100, "A documentation capture is empty: " + name);
+        File.WriteAllText(Path.Combine(directory, "documentation-verification.txt"), "All 14 documentation screenshots captured after the 16 UI checks passed; all 53 current ReadyMaps passed strict validation.");
     }
 
     private async Task CaptureMainPatchAsync(string directory, string name)

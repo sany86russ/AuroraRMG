@@ -2250,11 +2250,16 @@ namespace Olden_Era___Template_Editor
             if (!Validate()) return;
             _profileOptions.TemplateSeed ??= Random.Shared.Next(int.MinValue, int.MaxValue);
             var settings = BuildSettings();
-            try { _generatedTemplate = TemplateGenerator.Generate(settings); }
+            MapTopology effectiveTopology;
+            try
+            {
+                effectiveTopology = Services.Generation.GenerationProfileApplier.Prepare(settings).Topology;
+                _generatedTemplate = TemplateGenerator.Generate(settings);
+            }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException or FormatException or OverflowException or JsonException)
             { MessageBox.Show(L.Get("S.Patch.OperationFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return; }
             _generatedSettingsSnapshot = SettingsSnapshotMapper.Clone(settings);
-            _generatedTopology = settings.Topology;
+            _generatedTopology = effectiveTopology;
             _templateOutdated = false;
             _lastQuickSettings = null;
             _lastQuickOptions = null;
@@ -2510,16 +2515,18 @@ namespace Olden_Era___Template_Editor
             var opts = BuildQuickOptions();
             TxtSimpleSeed.Text = ((uint)opts.Seed).ToString("X8"); // normalise display
             GeneratorSettings settings;
+            MapTopology effectiveTopology;
             try
             {
                 settings = Olden_Era___Template_Editor.Services.Generation.RandomTemplateBuilder.Build(opts);
+                effectiveTopology = Services.Generation.GenerationProfileApplier.Prepare(settings).Topology;
                 _generatedTemplate = TemplateGenerator.Generate(settings);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException or FormatException or OverflowException or JsonException)
             { MessageBox.Show(L.Get("S.Patch.OperationFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return; }
             _profileOptions.TemplateSeed = settings.Seed;
             _generatedSettingsSnapshot = SettingsSnapshotMapper.Clone(settings);
-            _generatedTopology = settings.Topology;
+            _generatedTopology = effectiveTopology;
             _templateOutdated  = false;
             _lastQuickSettings = settings;
             _lastQuickOptions = opts;
@@ -2624,6 +2631,7 @@ namespace Olden_Era___Template_Editor
 
         private string BuildSimpleSummary(GeneratorSettings s, QuickGenerateOptions opts)
         {
+            s = Services.Generation.GenerationProfileApplier.Prepare(s);
             var topo = TopologyOptions.FirstOrDefault(t => t.Topology == s.Topology);
             string topoLabel = topo.Label != null ? L.Get(topo.Label) : s.Topology.ToString();
             string lengthLabel = L.Get(SimpleLenLabelKeys[EstimateLengthIndex(s.MapSize, opts.Length)]);

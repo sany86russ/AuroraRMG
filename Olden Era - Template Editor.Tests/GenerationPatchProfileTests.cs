@@ -482,11 +482,14 @@ public class GenerationPatchProfileTests
     public void PreparedTempoCopiesBonusInputsAndUsesProfileSeedWithoutMutatingSource(MapTempo tempo)
     {
         var settings = Settings(); settings.Seed = null;
+        settings.Topology = MapTopology.Lanes;
         settings.ProfileOptions.TemplateSeed = 361; settings.ProfileOptions.Tempo = tempo;
         settings.RandomPortals = true;
         settings.Bonuses = [new() { PresetType = BonusPresetType.StartingGold, Param = "1250", Param2 = "0" }];
         string before = JsonSerializer.Serialize(settings, SettingsSnapshotMapper.SnapshotOptions);
         var prepared = GenerationProfileApplier.Prepare(settings);
+        Assert.Equal(MapTopology.Default, prepared.Topology);
+        Assert.Equal(MapTopology.Lanes, settings.Topology);
         Assert.NotSame(settings, prepared); Assert.Equal(361, prepared.Seed);
         Assert.NotSame(settings.Bonuses[0], prepared.Bonuses[0]); Assert.Equal("1250", prepared.Bonuses[0].Param);
         Assert.Null(settings.Seed);

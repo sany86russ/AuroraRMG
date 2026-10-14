@@ -12,7 +12,7 @@ namespace Olden_Era___Template_Editor
     {
         protected override void OnStartup(StartupEventArgs e)
         {
-            if (e.Args.Any(a => a is "--shoot-patch" or "--make-patch-kit"))
+            if (e.Args.Any(a => a is "--shoot-patch" or "--shoot-docs" or "--make-patch-kit"))
             {
                 System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
                 string? requested = Environment.GetEnvironmentVariable("AURORARMG_DATA_DIRECTORY");

@@ -3070,6 +3070,17 @@ namespace Olden_Era___Template_Editor
             if (z is not null) Select(z);
         }
 
+        /// <summary>Documentation hook: fit the complete graph after the inspector has finished its layout.</summary>
+        internal void DebugFitForCapture()
+        {
+            UpdateLayout();
+            FitToView();
+            if (_positions.Count != Zones.Count || _positions.Values.Any(position =>
+                position.X * CanvasScale.ScaleX + CanvasTranslate.X < 0 || position.X * CanvasScale.ScaleX + CanvasTranslate.X > CanvasHost.ActualWidth
+                || position.Y * CanvasScale.ScaleY + CanvasTranslate.Y < 0 || position.Y * CanvasScale.ScaleY + CanvasTranslate.Y > CanvasHost.ActualHeight))
+                throw new InvalidOperationException("The documentation graph is not completely inside its viewport.");
+        }
+
         private void MarkDirty()
         {
             // Mirror mode: an inspector edit on either half is copied to the twin BEFORE the undo
