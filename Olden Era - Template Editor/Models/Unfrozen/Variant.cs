@@ -11,6 +11,9 @@ namespace OldenEraTemplateEditor.Models
         [JsonPropertyName("border")]
         public Border? Border { get; set; }
 
+        [JsonPropertyName("river")]
+        public RiverSettings? River { get; set; }
+
         [JsonPropertyName("zones")]
         public List<Zone>? Zones { get; set; }
 

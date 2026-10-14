@@ -27,6 +27,8 @@ namespace Olden_Era___Template_Editor
     /// </summary>
     public partial class TemplateEditorWindow : Window
     {
+        private readonly HashSet<TextBox> _invalidWeightEditors = [];
+        private bool _saveCheckingReferences;
         // Colours mirror TemplatePreviewPngWriter so the editor speaks the same visual language.
         private static readonly Color SpawnFill    = Color.FromRgb( 42,  90,  50);
         private static readonly Color SpawnBorder  = Color.FromRgb(100, 200, 120);
@@ -84,6 +86,7 @@ namespace Olden_Era___Template_Editor
             new(Olden_Era___Template_Editor.Services.JsonExport.Options) { WriteIndented = false };
 
         private RmgTemplate _template;
+        private TemplatePropertiesDraft _saveValidationBaseline;
         private MapTopology _topology;
         private string? _currentPath;
         private bool _dirty;
@@ -133,6 +136,7 @@ namespace Olden_Era___Template_Editor
         {
             InitializeComponent();
             _template = template is null ? NewEmptyTemplate() : TemplateRefactor.CreateEditingCopy(template);
+            _saveValidationBaseline = new TemplatePropertiesDraft(_template);
             _topology = topology;
             Services.Localization.LocalizationManager.Instance.LanguageChanged += EditorLanguageChanged;
             Closed += (_, _) => Services.Localization.LocalizationManager.Instance.LanguageChanged -= EditorLanguageChanged;
@@ -583,6 +587,7 @@ namespace Olden_Era___Template_Editor
 
         private void BuildInspector()
         {
+            _invalidWeightEditors.Clear();
             InspectorFieldsMain.Children.Clear();
             InspectorFieldsGuard.Children.Clear();
             InspectorFieldsPools.Children.Clear();
@@ -664,8 +669,14 @@ namespace Olden_Era___Template_Editor
                 AddDecimalField(L("S.EC.GuardWeeklyInc"), (z.GuardWeeklyIncrement ?? 0).ToString(CultureInfo.InvariantCulture),
                     v => { if (NumericInput.TryDouble(v, out var d)) { z.GuardWeeklyIncrement = d; MarkDirty(); } }, g5);
                 var g6 = AddExpanderSection(L("S.EC.GuardReactDist"), guardPanel);
-                AddIntListField(L("S.EC.GuardReactDist"), z.GuardReactionDistribution,
+                AddDoubleListField(L("S.EC.GuardReactDist"), z.GuardReactionDistribution,
                     v => { z.GuardReactionDistribution = v; MarkDirty(); }, g6);
+                AddJsonField("randomHireEnableWeeklyUnitIncrement", z.RandomHireEnableWeeklyUnitIncrement,
+                    v => { z.RandomHireEnableWeeklyUnitIncrement = v; MarkDirty(); }, g6);
+                AddJsonField("randomHireEnableModificatorWeeklyUnitIncrement", z.RandomHireEnableModificatorWeeklyUnitIncrement,
+                    v => { z.RandomHireEnableModificatorWeeklyUnitIncrement = v; MarkDirty(); }, g6);
+                AddJsonField("randomHireInitialUnitIncrement", z.RandomHireInitialUnitIncrement,
+                    v => { z.RandomHireInitialUnitIncrement = v; MarkDirty(); }, g6);
                 var g7 = AddExpanderSection(L("S.EC.EncounterHoles"), guardPanel);
                 AddDecimalField(L("S.EC.AffectedEnc"), (z.EncounterHolesSettings?.AffectedEncounters ?? 0).ToString(CultureInfo.InvariantCulture),
                     v => { if (NumericInput.TryDouble(v, out var d)) { z.EncounterHolesSettings ??= new(); z.EncounterHolesSettings.AffectedEncounters = d; MarkDirty(); } }, g7,
@@ -688,7 +699,7 @@ namespace Olden_Era___Template_Editor
                 {
                     try
                     {
-                        var viewer = new ContentPoolViewerWindow(templatePools: TemplateContentPools.Definitions(_template)) { Owner = this };
+                        var viewer = new ContentPoolViewerWindow(templatePools: TemplateContentPools.Definitions(_template), template: _template) { Owner = this };
                         viewer.Show();
                     }
                     catch (Exception ex)
@@ -708,16 +719,16 @@ namespace Olden_Era___Template_Editor
                 };
                 createPoolBtn.Click += (_, _) =>
                 {
-                    var creator = new ContentPoolCreatorWindow { Owner = this };
-                    if (creator.ShowDialog() != true || creator.CreatedPoolName is not { } name || creator.CreatedPoolLists is not { } lists) return;
+                    var creator = new ContentPoolCreatorWindow(_template) { Owner = this };
+                    if (creator.ShowDialog() != true || creator.CreatedPool is not { } pool) return;
                     try
                     {
-                        string fullName = name.StartsWith("custom_", StringComparison.Ordinal) ? name : "custom_" + name;
+                        string fullName = pool.Name;
                         if (TemplateContentPools.Names(_template).Contains(fullName, StringComparer.Ordinal))
                             throw new InvalidOperationException(L("S.PC.Duplicate"));
-                        var pool = new GamePool { Name = fullName, Groups = [new PoolGroup { Weight = 1, IncludeLists = lists }] };
                         GamePoolDataLoader.AddPool(pool);
                         TemplateContentPools.Add(_template, pool);
+                        if (creator.EmbedListDefinitions) GamePoolDataLoader.EmbedSelected(_template, [pool.Name]);
                         MarkDirty();
                         BuildInspector();
                         UpdateStatus(L("S.EC.PoolCreated", fullName));
@@ -870,6 +881,21 @@ namespace Olden_Era___Template_Editor
                     }
                     RebuildGraph();
                 }, mainPanel);
+                AddTextField("guardZone", c.GuardZone ?? "", v => { c.GuardZone = EmptyToNull(v); MarkDirty(); }, mainPanel);
+                AddTextField("guardMatchGroup", c.GuardMatchGroup ?? "", v => { c.GuardMatchGroup = EmptyToNull(v); MarkDirty(); }, mainPanel);
+                AddComboField("guardReaction", ["", "Aggressive", "Negative", "Common", "Friendly", "Peaceful", "Docile"], c.GuardReaction,
+                    v => { c.GuardReaction = EmptyToNull(v); MarkDirty(); }, mainPanel);
+                AddDecimalField("guardWeeklyIncrement", c.GuardWeeklyIncrement?.ToString(CultureInfo.InvariantCulture) ?? "",
+                    v => { c.GuardWeeklyIncrement = OptionalDouble(v); MarkDirty(); }, mainPanel);
+                AddDecimalField("length", c.Length?.ToString(CultureInfo.InvariantCulture) ?? "",
+                    v => { c.Length = OptionalDouble(v); MarkDirty(); }, mainPanel);
+                AddTextField("gatePlacement", c.GatePlacement ?? "", v => { c.GatePlacement = EmptyToNull(v); MarkDirty(); }, mainPanel);
+                AddStringListField("gatePlacementArgs", c.GatePlacementArgs, v => { c.GatePlacementArgs = v; MarkDirty(); }, mainPanel);
+                AddOptionalCheckField("portalFromEnabled", c.PortalFromEnabled, v => { c.PortalFromEnabled = v; MarkDirty(); }, mainPanel);
+                AddOptionalCheckField("portalToEnabled", c.PortalToEnabled, v => { c.PortalToEnabled = v; MarkDirty(); }, mainPanel);
+                AddOptionalCheckField("guardEscape", c.GuardEscape, v => { c.GuardEscape = v; MarkDirty(); }, mainPanel);
+                AddJsonField("portalPlacementRulesFrom", c.PortalPlacementRulesFrom, v => { c.PortalPlacementRulesFrom = v; MarkDirty(); }, mainPanel);
+                AddJsonField("portalPlacementRulesTo", c.PortalPlacementRulesTo, v => { c.PortalPlacementRulesTo = v; MarkDirty(); }, mainPanel);
             }
             else
             {
@@ -1003,6 +1029,10 @@ namespace Olden_Era___Template_Editor
 
             // Hold city win condition
             AddCheckField(L("S.EC.MoHoldCity"), mo.HoldCityWinCon == true, v => { mo.HoldCityWinCon = v; MarkDirty(); }, panel);
+            AddOptionalCheckField("isKeyObject", mo.IsKeyObject, v => { mo.IsKeyObject = v; MarkDirty(); }, panel);
+            AddOptionalCheckField("enableWeeklyUnitIncrement", mo.EnableWeeklyUnitIncrement, v => { mo.EnableWeeklyUnitIncrement = v; MarkDirty(); }, panel);
+            AddOptionalCheckField("weekOneOnlyModificatorGrowth", mo.WeekOneOnlyModificatorGrowth, v => { mo.WeekOneOnlyModificatorGrowth = v; MarkDirty(); }, panel);
+            AddJsonField("initialUnitIncrement", mo.InitialUnitIncrement, v => { mo.InitialUnitIncrement = v; MarkDirty(); }, panel);
 
             // Function to update guard fields visibility based on RemoveGuardIfHasOwner flag
             void UpdateGuardFieldsVisibility()
@@ -1598,11 +1628,13 @@ namespace Olden_Era___Template_Editor
                 try
                 {
                     onCommit(box.Text.Trim());
+                    _invalidWeightEditors.Remove(box);
                     box.ClearValue(TextBox.BorderBrushProperty);
                     box.ToolTip = tooltip;
                 }
                 catch (FormatException ex)
                 {
+                    _invalidWeightEditors.Add(box);
                     box.BorderBrush = (Brush)FindResource("BrushError");
                     box.ToolTip = ex.Message;
                     UpdateStatus(ex.Message);
@@ -1661,6 +1693,42 @@ namespace Olden_Era___Template_Editor
                 }
             };
             panel.Children.Add(combo);
+        }
+
+        private static string? EmptyToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        private static double? OptionalDouble(string text) => string.IsNullOrWhiteSpace(text) ? null
+            : NumericInput.TryDouble(text, out var value) ? value : throw new FormatException(text);
+
+        private void AddOptionalCheckField(string label, bool? value, Action<bool?> onCommit, Panel panel)
+        {
+            AddSectionLabel(label, panel);
+            var combo = new ComboBox { Margin = new Thickness(0, 0, 0, 4) };
+            foreach (var (key, state) in new (string, bool?)[] { ("S.Patch.Default", null), ("S.Patch.Yes", true), ("S.Patch.No", false) })
+                combo.Items.Add(new ComboBoxItem { Content = L(key), Tag = state });
+            combo.SelectedIndex = value is null ? 0 : value.Value ? 1 : 2;
+            combo.SelectionChanged += (_, _) => onCommit((combo.SelectedItem as ComboBoxItem)?.Tag as bool?);
+            panel.Children.Add(combo);
+        }
+
+        private void AddJsonField<T>(string label, T value, Action<T> onCommit, Panel panel)
+        {
+            AddSectionLabel(label + " (JSON)", panel);
+            var box = new TextBox { Text = JsonSerializer.Serialize(value, JsonOptions), AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap, MinHeight = 42, MaxHeight = 150, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Margin = new Thickness(0, 0, 0, 5) };
+            box.LostFocus += (_, _) =>
+            {
+                try
+                {
+                    string json = string.IsNullOrWhiteSpace(box.Text) ? "null" : box.Text;
+                    TemplateJsonReader.GuardBeforeDeserialize(json);
+                    T parsed = JsonSerializer.Deserialize<T>(json, JsonOptions)!;
+                    onCommit(parsed); _invalidWeightEditors.Remove(box); box.ClearValue(System.Windows.Controls.Border.BorderBrushProperty);
+                }
+                catch (Exception ex) when (ex is JsonException or FormatException or ArgumentException)
+                { _invalidWeightEditors.Add(box); box.BorderBrush = Brushes.OrangeRed; box.ToolTip = ex.Message; UpdateStatus(ex.Message); }
+            };
+            panel.Children.Add(box);
         }
 
         private void AddCheckField(string label, bool value, Action<bool> onCommit, Panel panel, string? tooltip = null)
@@ -1797,6 +1865,38 @@ namespace Olden_Era___Template_Editor
             var box = new TextBox { Text = text, Margin = new Thickness(0, 0, 0, 4), MinHeight = 40, TextWrapping = TextWrapping.Wrap, AcceptsReturn = true };
             box.LostFocus += (_, _) => onCommit(ParseIntList(box.Text));
             box.KeyDown += (_, e) => { if (e.Key == Key.Enter && !e.Handled) { onCommit(ParseIntList(box.Text)); } };
+            panel.Children.Add(box);
+        }
+
+        private void AddDoubleListField(string label, List<double>? value, Action<List<double>> onCommit, Panel panel)
+        {
+            AddSectionLabel(label, panel);
+            var box = new TextBox { Text = value is null ? "" : string.Join(", ", value.Select(v => v.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+                Margin = new Thickness(0, 0, 0, 4), MinHeight = 40, TextWrapping = TextWrapping.Wrap, AcceptsReturn = true };
+            void Commit()
+            {
+                var numbers = new List<double>();
+                foreach (var token in box.Text.Split([',', '\n', '\r', ' '], StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (!double.TryParse(token, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number)
+                        || !double.IsFinite(number) || number < 0)
+                    {
+                        box.ToolTip = L("S.Patch.InvalidWeights");
+                        _invalidWeightEditors.Add(box);
+                        box.BorderBrush = Brushes.OrangeRed;
+                        return;
+                    }
+                    numbers.Add(number);
+                }
+                if (numbers.Count != 6 || numbers.Sum() <= 0)
+                { box.ToolTip = L("S.Patch.InvalidWeights"); _invalidWeightEditors.Add(box); box.BorderBrush = Brushes.OrangeRed; return; }
+                _invalidWeightEditors.Remove(box);
+                box.SetResourceReference(Control.BorderBrushProperty, "BrushBorder");
+                box.ToolTip = null;
+                onCommit(numbers);
+            }
+            box.LostFocus += (_, _) => Commit();
+            box.KeyDown += (_, e) => { if (e.Key == Key.Enter) { Commit(); e.Handled = true; } };
             panel.Children.Add(box);
         }
 
@@ -2408,6 +2508,7 @@ namespace Olden_Era___Template_Editor
                 H3TImportResult result = H3TImporter.Parse(dlg.FileName);
 
                 _template = result.Template;
+                _saveValidationBaseline = new TemplatePropertiesDraft(_template);
                 _topology = MapTopology.Default;
                 _currentPath = null;             // an import is a new template, not an edit of the .h3t
                 _dirty = true;
@@ -2452,6 +2553,7 @@ namespace Olden_Era___Template_Editor
             if (dlg.ShowDialog() != true || dlg.Result is not { } result) return;
 
             _template = result.Template;
+            _saveValidationBaseline = new TemplatePropertiesDraft(_template);
             _topology = MapTopology.Default;
             _currentPath = null;
             _dirty = true;
@@ -2614,7 +2716,10 @@ namespace Olden_Era___Template_Editor
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        private List<string> Validate() => ZoneGraphValidator.Validate(Zones, Connections);
+        private List<string> Validate() => ZoneGraphValidator.Validate(Zones, Connections)
+            .Concat(Services.Analysis.TemplateCompatibilityValidator.Validate(_template, Services.Analysis.TemplateValidationMode.TolerantImport)
+                .Where(i => i.Severity != Services.Analysis.TemplateIssueSeverity.Information)
+                .Select(i => i.Path + ": " + i.Message)).Distinct().ToList();
 
         private void BtnRelayout_Click(object sender, RoutedEventArgs e)
         {
@@ -2777,10 +2882,11 @@ namespace Olden_Era___Template_Editor
             try
             {
                 var json = File.ReadAllText(dlg.FileName);
-                var loaded = JsonSerializer.Deserialize<RmgTemplate>(json, JsonOptions);
+                var loaded = TemplateJsonReader.Deserialize(json, JsonOptions);
                 if (loaded is null) { UpdateStatus(L("S.EC.LoadFail")); return; }
                 if (_mirrorMode) DisableMirrorMode();
                 _template = loaded;
+                _saveValidationBaseline = new TemplatePropertiesDraft(_template);
                 _topology = MapTopology.Default;
                 _currentPath = dlg.FileName;
                 _dirty = false;
@@ -2799,9 +2905,34 @@ namespace Olden_Era___Template_Editor
             }
         }
 
-        private void BtnSave_Click(object sender, RoutedEventArgs e)
+        private void BtnBulkProperties_Click(object sender, RoutedEventArgs e)
         {
             Keyboard.ClearFocus();
+            if (_invalidWeightEditors.Count > 0) { MessageBox.Show(L("S.Patch.InvalidEditor"), Title); return; }
+            var dialog = new TemplateBulkEditWindow(_template) { Owner = this };
+            if (dialog.ShowDialog() != true || dialog.ResultTemplate is not { } result) return;
+            _selected = null; _template = result; MarkDirty(); RebuildGraph(); BuildInspector();
+        }
+
+        private void BtnProperties_Click(object sender, RoutedEventArgs e)
+        {
+            Keyboard.ClearFocus();
+            if (_invalidWeightEditors.Count > 0) { MessageBox.Show(L("S.Patch.InvalidEditor"), Title); return; }
+            var dialog = new TemplatePropertiesWindow(_template) { Owner = this };
+            if (dialog.ShowDialog() != true || dialog.ResultTemplate is not { } result) return;
+            _selected = null; _template = result; MarkDirty(); RebuildGraph(); BuildInspector();
+            if (dialog.ValidationIssues.Count > 0) UpdateStatus(string.Join("; ", dialog.ValidationIssues.Take(5).Select(i => i.Message)));
+        }
+
+        private async void BtnSave_Click(object sender, RoutedEventArgs e)
+        {
+            if (_saveCheckingReferences) return;
+            Keyboard.ClearFocus();
+            if (_invalidWeightEditors.Count > 0)
+            {
+                MessageBox.Show(L("S.Patch.InvalidEditor"), Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
             // Hard-blocking validation: empty connection names
             var emptyNameConns = Connections.Where(c => string.IsNullOrWhiteSpace(c.Name)).ToList();
@@ -2814,7 +2945,28 @@ namespace Olden_Era___Template_Editor
                 return;
             }
 
-            var issues = Validate();
+            RmgTemplate savable;
+            IReadOnlyList<string> addedLayouts;
+            IReadOnlyList<Services.Analysis.TemplateValidationIssue> catalogFindings;
+            try
+            {
+                _saveCheckingReferences = true; IsEnabled = false;
+                var catalog = await Services.GameData.GameCatalogService.Instance.GetCatalogAsync();
+                savable = TemplateRefactor.CreateEditingCopy(_template);
+                addedLayouts = TemplateGenerator.EnsureZoneLayoutsDefined(savable);
+                var original = _saveValidationBaseline.Snapshot().Deserialize<RmgTemplate>(JsonOptions)!;
+                var draft = new TemplatePropertiesDraft(original, catalog.GetReferenceCatalog());
+                savable = draft.Commit(JsonSerializer.SerializeToNode(savable, JsonOptions)!.AsObject(), out catalogFindings);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or JsonException or IOException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception)
+            {
+                MessageBox.Show(this, ex.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            finally { IsEnabled = true; _saveCheckingReferences = false; }
+            var issues = Validate().Concat(catalogFindings
+                .Where(finding => finding.Severity != Services.Analysis.TemplateIssueSeverity.Information)
+                .Select(finding => finding.Path + ": " + finding.Message)).Distinct(StringComparer.Ordinal).ToList();
             if (issues.Count > 0)
             {
                 var go = MessageBox.Show(this,
@@ -2838,9 +2990,8 @@ namespace Olden_Era___Template_Editor
             {
                 // A zone whose layout has no definition in the file makes the engine fail while
                 // generating the map, and the editor can easily create one (new zone, retyped layout).
-                var addedLayouts = TemplateGenerator.EnsureZoneLayoutsDefined(_template);
-
-                AtomicFile.WriteAllText(dlg.FileName, JsonSerializer.Serialize(_template, JsonOptions));
+                AtomicFile.WriteAllText(dlg.FileName, JsonSerializer.Serialize(savable, JsonOptions));
+                CommitSavedTemplate(savable);
                 // Remember the hand-arranged graph so reopening this template restores it (sidecar in
                 // %LOCALAPPDATA%, never next to the game's template file).
                 EditorLayoutStore.Save(dlg.FileName, _positions);
@@ -2858,6 +3009,59 @@ namespace Olden_Era___Template_Editor
         }
 
         // ── Misc ──────────────────────────────────────────────────────────────────────
+
+        private void CommitSavedTemplate(RmgTemplate saved)
+        {
+            var selected = _selected;
+            string? connectFromName = _connectFrom?.Name;
+            _template = saved;
+            _selected = selected switch
+            {
+                Zone zone => Zones.FirstOrDefault(item => item.Name == zone.Name),
+                Connection connection => Connections.FirstOrDefault(item => item.Name == connection.Name),
+                _ => null,
+            };
+            _connectFrom = connectFromName is null ? null : Zones.FirstOrDefault(item => item.Name == connectFromName);
+            _dragZone = null;
+            _saveValidationBaseline = new TemplatePropertiesDraft(_template);
+            CaptureUndoSnapshot();
+            RebuildGraph(); BuildInspector();
+        }
+
+        internal void DebugVerifySavedInspectorEditing()
+        {
+            string name = Zones.First().Name;
+            DebugSelectZone(name);
+            CommitSavedTemplate(TemplateRefactor.CreateEditingCopy(_template));
+            var sizeEditor = LogicalDescendants(InspectorFieldsMain).OfType<TextBox>().Skip(1).First();
+            sizeEditor.Text = "1.25";
+            sizeEditor.RaiseEvent(new RoutedEventArgs(LostFocusEvent));
+            if (Zones.Single(zone => zone.Name == name).Size != 1.25)
+                throw new InvalidOperationException("The inspector edited a detached zone after saving.");
+
+            static IEnumerable<DependencyObject> LogicalDescendants(DependencyObject parent)
+            {
+                foreach (var child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
+                {
+                    yield return child;
+                    foreach (var nested in LogicalDescendants(child)) yield return nested;
+                }
+            }
+        }
+
+        internal void DebugVerifyJsonFieldDuplicateRejection()
+        {
+            var panel = new StackPanel(); bool committed = false;
+            AddJsonField("portal placement", new List<ContentPlacementRule>(), _ => committed = true, panel);
+            var box = panel.Children.OfType<TextBox>().Single();
+            box.Text = "[{\"type\":\"NearZone\",\"type\":\"NearConnection\"}]";
+            box.RaiseEvent(new RoutedEventArgs(LostFocusEvent));
+            if (committed || !_invalidWeightEditors.Contains(box))
+                throw new InvalidOperationException("A repeated portal placement property reached the inspector model.");
+            box.Text = "[]"; box.RaiseEvent(new RoutedEventArgs(LostFocusEvent));
+            if (!committed || _invalidWeightEditors.Contains(box))
+                throw new InvalidOperationException("Correcting the raw JSON field did not clear its save blocker.");
+        }
 
         /// <summary>Test/screenshot hook: select a zone by name (used by --shoot-editor verification).</summary>
         internal void DebugSelectZone(string name)

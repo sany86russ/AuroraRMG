@@ -20,13 +20,15 @@ namespace Olden_Era___Template_Editor.Services.Generation
 
     /// <summary>
     /// Produces the engine's six-bucket <c>guardReactionDistribution</c> weights.
-    /// Index 0 is the most passive reaction (guards flee / let the player pass) and index 5 the
-    /// most aggressive (stand and fight). <see cref="MonsterAggression.Normal"/> reproduces the
-    /// values the generator historically hard-coded, so default output is unchanged.
+    /// The engine order is Aggressive, Negative, Common, Friendly, Peaceful, Docile.
+    /// Distribution preserves historical raw values for legacy seeds. NativeDistribution corrects
+    /// the historical reversed interpretation for current-profile player-facing aggression.
     /// </summary>
     public static class GuardReaction
     {
-        public static List<int> Distribution(GuardRole role, MonsterAggression aggression) => role switch
+        public static List<double> NativeDistribution(GuardRole role, MonsterAggression aggression)
+            => Distribution(role, aggression).AsEnumerable().Reverse().ToList();
+        public static List<double> Distribution(GuardRole role, MonsterAggression aggression) => role switch
         {
             GuardRole.StartZone => aggression switch
             {

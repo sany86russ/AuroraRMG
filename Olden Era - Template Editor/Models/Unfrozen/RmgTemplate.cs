@@ -17,6 +17,15 @@ namespace OldenEraTemplateEditor.Models
         [JsonPropertyName("displayWinCondition")]
         public string? DisplayWinCondition { get; set; }
 
+        [JsonPropertyName("spawnInfos")]
+        public List<SpawnInfo>? SpawnInfos { get; set; }
+
+        [JsonPropertyName("maxAlliancesCount")]
+        public int? MaxAlliancesCount { get; set; }
+
+        [JsonPropertyName("descBlocks")]
+        public DescriptionData? DescBlocks { get; set; }
+
         [JsonPropertyName("sizeX")]
         public int SizeX { get; set; }
 

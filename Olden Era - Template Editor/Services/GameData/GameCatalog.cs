@@ -26,8 +26,30 @@ namespace Olden_Era___Template_Editor.Services.GameData
         [JsonPropertyName("language")]   public string Language { get; set; } = "russian";
         [JsonPropertyName("sourceStamp")] public long  SourceStamp { get; set; }
         [JsonPropertyName("heroes")]     public List<HeroCatalogEntry> Heroes { get; set; } = [];
+        public int SnapshotFormatVersion { get; set; } = 4;
+        public GameInstallation? Source { get; set; }
+        public List<GameContentEntry> Content { get; set; } = [];
+        public List<string> Warnings { get; set; } = [];
+        public GameReferenceSnapshot References { get; set; } = new();
 
-        [JsonIgnore] public bool IsEmpty => Heroes.Count == 0;
+        public Analysis.TemplateReferenceCatalog GetReferenceCatalog(bool includeNativeSchemaDefinitions = false)
+        {
+            // Only observed object configurations establish an index domain. An absent/empty domain is unknown.
+            IReadOnlyDictionary<string, IReadOnlySet<int>>? rewardIndices = Source is null ? null : Content
+                .Where(entry => entry.Kind == GameContentKind.Object && entry.RewardVariants.Count > 0)
+                .GroupBy(entry => entry.Sid, StringComparer.Ordinal)
+                .Select(group => (Sid: group.Key, Indices: group.SelectMany(entry => entry.RewardVariants).Select(variant => variant.Index)
+                    .Where(index => index >= 0).ToHashSet()))
+                .Where(group => group.Indices.Count > 0)
+                .ToDictionary(group => group.Sid, group => (IReadOnlySet<int>)group.Indices, StringComparer.Ordinal);
+            return References.ToReferenceCatalog(Source, includeNativeSchemaDefinitions, rewardIndices);
+        }
+
+        [JsonIgnore] public bool IsEmpty => Heroes.Count == 0 && Content.Count == 0;
+        [JsonIgnore] public bool IsLiveSource => Source is not null;
+        public IEnumerable<GameContentEntry> Search(string? text = null, GameContentKind? kind = null,
+            bool? rmgReferenced = null) => Content.Where(e => (kind is null || e.Kind == kind) &&
+                (rmgReferenced is null || e.ReferencedByRmgContent == rmgReferenced) && e.Matches(text));
     }
 
     /// <summary>
@@ -48,9 +70,9 @@ namespace Olden_Era___Template_Editor.Services.GameData
         };
 
         /// <summary>Builds the hero catalog from an open Core.zip archive for the given language.</summary>
-        public static List<HeroCatalogEntry> BuildHeroes(ZipArchive core, string language)
+        public static List<HeroCatalogEntry> BuildHeroes(ZipArchive core, string language, ICollection<string>? warnings = null)
         {
-            var names = ReadHeroNames(core, language);
+            var names = ReadHeroNames(core, language, warnings);
 
             var heroes = new List<HeroCatalogEntry>();
             var seen   = new HashSet<string>();
@@ -66,7 +88,7 @@ namespace Olden_Era___Template_Editor.Services.GameData
                 string folder = segments[2];
                 if (ExcludedHeroFolders.Contains(folder, System.StringComparer.OrdinalIgnoreCase)) continue;
 
-                foreach (var hero in ParseHeroEntries(entry))
+                foreach (var hero in ParseHeroEntries(entry, warnings))
                 {
                     if (string.IsNullOrEmpty(hero.Sid) || !seen.Add(hero.Sid)) continue;
                     if (names.TryGetValue(hero.Sid, out var localized) && localized.Length > 0)
@@ -83,7 +105,7 @@ namespace Olden_Era___Template_Editor.Services.GameData
         }
 
         /// <summary>Reads localized hero display names (<c>sid → text</c>) from Lang/&lt;lang&gt;/texts/heroInfo.json.</summary>
-        private static Dictionary<string, string> ReadHeroNames(ZipArchive core, string language)
+        private static Dictionary<string, string> ReadHeroNames(ZipArchive core, string language, ICollection<string>? warnings)
         {
             var map = new Dictionary<string, string>(System.StringComparer.Ordinal);
             var entry = core.GetEntry($"Lang/{language}/texts/heroInfo.json")
@@ -93,14 +115,14 @@ namespace Olden_Era___Template_Editor.Services.GameData
             try
             {
                 using var doc = ReadJson(entry);
-                if (doc.RootElement.TryGetProperty("tokens", out var tokens) &&
+                if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("tokens", out var tokens) &&
                     tokens.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var tok in tokens.EnumerateArray())
                     {
-                        if (tok.TryGetProperty("sid",  out var sid) &&
+                        if (tok.ValueKind == JsonValueKind.Object && tok.TryGetProperty("sid",  out var sid) &&
                             tok.TryGetProperty("text", out var text) &&
-                            sid.ValueKind == JsonValueKind.String)
+                            sid.ValueKind == JsonValueKind.String && text.ValueKind == JsonValueKind.String)
                         {
                             // Store every key; the join only ever looks up bare hero ids,
                             // so _motto / _description / _spec_* keys are harmless noise.
@@ -111,24 +133,27 @@ namespace Olden_Era___Template_Editor.Services.GameData
                     }
                 }
             }
-            catch { /* malformed loc file → fall back to prettified ids */ }
+            catch (System.Exception ex) when (ex is JsonException or IOException or InvalidDataException)
+            { warnings?.Add($"Hero localization {entry.FullName} could not be read: {ex.Message}"); }
             return map;
         }
 
-        private static IEnumerable<HeroCatalogEntry> ParseHeroEntries(ZipArchiveEntry entry)
+        private static IEnumerable<HeroCatalogEntry> ParseHeroEntries(ZipArchiveEntry entry, ICollection<string>? warnings)
         {
             JsonDocument doc;
             try { doc = ReadJson(entry); }
-            catch { yield break; }
+            catch (System.Exception ex) when (ex is JsonException or IOException or InvalidDataException)
+            { warnings?.Add($"Hero data {entry.FullName} could not be read: {ex.Message}"); yield break; }
 
             using (doc)
             {
-                if (!doc.RootElement.TryGetProperty("array", out var arr) ||
+                if (doc.RootElement.ValueKind != JsonValueKind.Object || !doc.RootElement.TryGetProperty("array", out var arr) ||
                     arr.ValueKind != JsonValueKind.Array)
                     yield break;
 
                 foreach (var h in arr.EnumerateArray())
                 {
+                    if (h.ValueKind != JsonValueKind.Object) continue;
                     string id      = GetString(h, "id");
                     if (id.Length == 0) continue;
                     string faction = GetString(h, "fraction"); // note: game spells it "fraction"

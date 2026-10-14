@@ -8,7 +8,7 @@ namespace Olden_Era___Template_Editor.Localization
     /// Both tables MUST have identical key sets (enforced by a unit test).
     /// Only display text lives here — never logic tokens (SIDs, enum names, gameMode, Tag values).
     /// </summary>
-    public static class Strings
+    public static partial class Strings
     {
         public static readonly Dictionary<string, string> Ru = new()
         {
@@ -158,7 +158,7 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.Simple.Chaos"]           = "Уровень хаоса",
             ["S.Simple.Extras"]          = "Дополнительно",
             ["S.Simple.Water"]           = "Вода",
-            ["S.Simple.Portals"]         = "Порталы",
+            ["S.Simple.Portals"]         = "Дополнительные порталы",
             ["S.Simple.StrongNeutrals"]  = "Сильные нейтралы",
             ["S.Simple.Seed"]            = "Сид",
             ["S.Simple.SeedTip"]         = "Одинаковые сид, настройки и версия генератора создают одинаковый шаблон. Делитесь ими вместе.",
@@ -1105,7 +1105,7 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.Simple.Chaos"]           = "Chaos level",
             ["S.Simple.Extras"]          = "Extras",
             ["S.Simple.Water"]           = "Water",
-            ["S.Simple.Portals"]         = "Portals",
+            ["S.Simple.Portals"]         = "Additional portals",
             ["S.Simple.StrongNeutrals"]  = "Strong neutrals",
             ["S.Simple.Seed"]            = "Seed",
             ["S.Simple.SeedTip"]         = "The same seed, settings and generator version produce the same template. Share them together.",

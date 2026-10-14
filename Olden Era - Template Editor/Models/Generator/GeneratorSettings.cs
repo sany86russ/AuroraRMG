@@ -68,6 +68,9 @@ namespace Olden_Era___Template_Editor.Models
 
     public class GeneratorSettings
     {
+        [System.Text.Json.Serialization.JsonExtensionData]
+        public Dictionary<string, System.Text.Json.JsonElement>? Extra { get; set; }
+        public GenerationProfileOptions ProfileOptions { get; set; } = new();
         public string TemplateName { get; set; } = "Custom Template";
         public string GameMode { get; set; } = "Classic";
         public bool SingleHeroMode { get; set; } = false;

@@ -1,5 +1,6 @@
 using OldenEraTemplateEditor.Models;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Olden_Era___Template_Editor.Models
@@ -9,6 +10,15 @@ namespace Olden_Era___Template_Editor.Models
     /// </summary>
     public sealed class SettingsFile
     {
+        [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
+        [JsonPropertyName("schemaVersion")] public int SchemaVersion { get; set; } = 2;
+        [JsonPropertyName("seed")] public int? Seed { get; set; }
+        [JsonPropertyName("profileOptions")] public GenerationProfileOptions ProfileOptions { get; set; } = new();
+        // Canonical generator input. UI rows are a projection and cannot represent every native rule.
+        [JsonPropertyName("generatorSnapshotVersion")] public int GeneratorSnapshotVersion { get; set; } = 1;
+        [JsonPropertyName("generatorSnapshot")] public JsonElement? GeneratorSnapshot { get; set; }
+        [JsonPropertyName("gameMode")] public string GameMode { get; set; } = "Classic";
+        [JsonPropertyName("matchSpawnTerrainToFaction")] public bool MatchSpawnTerrainToFaction { get; set; }
         [JsonPropertyName("templateName")]      public string  TemplateName           { get; set; } = "Custom Template";
         [JsonPropertyName("mapSize")]           public int     MapSize                { get; set; } = 160;
         [JsonPropertyName("playerCount")]       public int     PlayerCount            { get; set; } = 2;

@@ -21,7 +21,7 @@ namespace Olden_Era___Template_Editor
                 a.Equals("--minimized", StringComparison.OrdinalIgnoreCase) ||
                 a.Equals("-m", StringComparison.OrdinalIgnoreCase) ||
                 a.Equals("/min", StringComparison.OrdinalIgnoreCase));
-            if (startMinimized) return;
+            if (startMinimized || Environment.GetCommandLineArgs().Any(a => a.StartsWith("--shoot", StringComparison.OrdinalIgnoreCase) || a == "--make-patch-kit")) return;
 
             // Fire-and-forget: a failed check must never block or crash startup.
             _ = CheckForUpdatesAsync();

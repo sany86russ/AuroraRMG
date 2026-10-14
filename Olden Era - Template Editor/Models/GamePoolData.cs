@@ -15,7 +15,7 @@ namespace OldenEraTemplateEditor.Models
     public class PoolGroup : RmgNode
     {
         [JsonPropertyName("weight")]
-        public int Weight { get; set; }
+        public double Weight { get; set; }
         [JsonPropertyName("includeLists")]
         public List<string> IncludeLists { get; set; } = new();
         [JsonPropertyName("content")]
@@ -26,10 +26,20 @@ namespace OldenEraTemplateEditor.Models
     {
         [JsonPropertyName("sid")]
         public string Sid { get; set; } = "";
-        [JsonPropertyName("weight")]
-        public int Weight { get; set; }
+        [JsonIgnore]
+        public double Weight { get => SerializedWeight ?? 1; set => SerializedWeight = value; }
+        // ContentWeight's native constructor uses 1f. Keep omission distinct from an explicit disabled weight of zero.
+        [JsonInclude, JsonPropertyName("weight"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        internal double? SerializedWeight
+        {
+            get => _serializedWeight;
+            set => _serializedWeight = value ?? throw new JsonException("A content weight must be a number; explicit null is invalid.");
+        }
+        private double? _serializedWeight;
         [JsonPropertyName("biome")]
         public string? Biome { get; set; }
+        [JsonPropertyName("variant")]
+        public int? Variant { get; set; }
     }
 
     public class GamePool : RmgNode
@@ -52,12 +62,17 @@ namespace OldenEraTemplateEditor.Models
 
     public class PoolItemInfo
     {
+        public int GroupIndex { get; set; }
         public string ListName { get; set; } = "";
         public string Sid { get; set; } = "";
-        public int Weight { get; set; }
+        public double Weight { get; set; }
         public string? Biome { get; set; }
-        public int GroupWeight { get; set; }
+        public double GroupWeight { get; set; }
         public bool IsMissing { get; set; }
+        public int? Variant { get; set; }
+        /// <summary>Relative configured weight; it does not guarantee a generated object count.</summary>
+        public double? RelativeGroupShare { get; set; }
+        public double? RelativeWithinListShare { get; set; }
     }
 
     /// <summary>
@@ -73,6 +88,12 @@ namespace OldenEraTemplateEditor.Models
         private static List<ContentListEntry>? _allContentLists;
         private static List<GamePool> _customPools = new();
         private static bool _loaded;
+        private static readonly object Gate = new();
+        private static string _sourceIdentity = "";
+        private static GamePoolCatalog _catalog = new();
+        private static List<string> _warnings = [];
+        public static GameInstallation? Source { get { Load(); return _catalog.Source; } }
+        public static IReadOnlyList<string> Warnings { get { Load(); return _warnings.ToArray(); } }
         private static string _statusKey = "";
         private static object[] _statusArgs = [];
         private static void SetStatus(string key, params object[] args) { _statusKey = key; _statusArgs = args; }
@@ -80,88 +101,78 @@ namespace OldenEraTemplateEditor.Models
         public static string Status => LocalizationManager.T(_statusKey, _statusArgs);
 
         private static string CustomPoolsPath =>
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "AuroraRMG", "custom_pools.json");
+            Path.Combine(AppDataPaths.Root, "custom_pools.json");
 
-        private static readonly JsonSerializerOptions ReadOptions = new()
+        private static readonly JsonSerializerOptions ReadOptions = new(Olden_Era___Template_Editor.Services.JsonExport.Options)
         {
             PropertyNameCaseInsensitive = true,
             ReadCommentHandling = JsonCommentHandling.Skip,
             AllowTrailingCommas = true,
         };
 
-        public static void Load()
+        public static void Load(bool forceRefresh = false)
         {
-            if (_loaded) return;
-            _loaded = true;
-
-            _allPools = new List<GamePool>();
-            _allContentLists = new List<ContentListEntry>();
-
-            try
+            lock (Gate)
             {
-                var core = GameCatalogService.Instance.LocateCoreZip();
-                if (core is null || !File.Exists(core))
+                var source = GameInstallationService.Instance.Discover(forceRefresh);
+                var customFile = new FileInfo(CustomPoolsPath);
+                var identity = source?.CoreZipPath + "|" + source?.SourceFingerprint + "|" + source?.SchemaFingerprint + "|" + source?.Profile.Id + "|" + source?.SteamBuildId + "|" + source?.VersionMarker +
+                    "|custom:" + (customFile.Exists ? customFile.LastWriteTimeUtc.Ticks + ":" + customFile.Length : "none");
+                if (_loaded && !forceRefresh && identity == _sourceIdentity) return;
+                _loaded = true;
+                _sourceIdentity = identity;
+                _catalog = new GamePoolCatalog();
+                _warnings = source?.Warnings.ToList() ?? GameInstallationService.Instance.LastWarnings.ToList();
+                try
                 {
-                    SetStatus("S.PV.StatusGameNotFound");
-                }
-                else
-                {
-                    using var zip = ZipFile.OpenRead(core);
-                    foreach (var entry in zip.Entries)
+                    if (source is null) SetStatus("S.PV.StatusGameNotFound");
+                    else
                     {
-                        var name = entry.FullName.Replace('\\', '/');
-                        if (!name.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
-
-                        if (name.StartsWith("generator/content_pools/", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var pools = DeserializeEntry<List<GamePool>>(entry);
-                            if (pools != null) _allPools.AddRange(pools.Where(p => !string.IsNullOrWhiteSpace(p.Name)));
-                        }
-                        else if (name.StartsWith("generator/content_lists/", StringComparison.OrdinalIgnoreCase))
-                        {
-                            var lists = DeserializeEntry<List<ContentListEntry>>(entry);
-                            if (lists != null) _allContentLists.AddRange(lists.Where(l => !string.IsNullOrWhiteSpace(l.Name)));
-                        }
+                        using var coreStream = new FileStream(source.CoreZipPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                        using var zip = new ZipArchive(coreStream, ZipArchiveMode.Read);
+                        _catalog = GamePoolCatalog.Read(zip, source);
+                        _warnings.AddRange(_catalog.Warnings);
+                        SetStatus("S.PV.StatusLoaded", _catalog.Pools.Count, 0, _catalog.ContentLists.Count);
                     }
-
-                    SetStatus("S.PV.StatusLoaded",
-                        _allPools.Count, _customPools.Count, _allContentLists.Count);
                 }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JsonException)
+                {
+                    _loaded = false; // a transient read failure is not a permanent source snapshot
+                    _warnings.Add("Game pools could not be loaded: " + ex.Message);
+                    SetStatus("S.PV.StatusError", ex.Message);
+                }
+                _allPools = _catalog.Pools.ToList();
+                _allContentLists = _catalog.ContentLists.ToList();
+                LoadCustomPools(); // local definitions remain available when the game is absent
+                if (_allContentLists.Count > 0)
+                    SetStatus("S.PV.StatusLoaded", _catalog.Pools.Count, _customPools.Count, _allContentLists.Count);
             }
-            catch (Exception ex)
-            {
-                SetStatus("S.PV.StatusError", ex.Message);
-            }
-            LoadCustomPools(); // local definitions remain available even when the game is not installed
-            if (_allContentLists.Count > 0)
-                SetStatus("S.PV.StatusLoaded", _allPools.Count, _customPools.Count, _allContentLists.Count);
         }
 
-        private static T? DeserializeEntry<T>(ZipArchiveEntry entry) where T : class
+        public static PoolReferenceResolution ResolvePool(string sid, RmgTemplate? template = null)
         {
-            try
-            {
-                using var s = entry.Open();
-                using var reader = new StreamReader(s);
-                return JsonSerializer.Deserialize<T>(reader.ReadToEnd(), ReadOptions);
-            }
-            catch
-            {
-                return null; // skip malformed files, keep going
-            }
+            Load();
+            return _catalog.ResolvePool(sid, template, _customPools);
         }
+        public static IReadOnlyList<string> ValidateReferences(RmgTemplate template)
+        { Load(); return _catalog.ValidateReferences(template, _customPools); }
+        public static void EmbedSelected(RmgTemplate template, IEnumerable<string> selected)
+        { Load(); _catalog.EmbedSelected(template, selected, _customPools); }
 
         public static void AddPool(GamePool pool)
         {
-            Load();
-            _allPools ??= new List<GamePool>();
-            if (_allPools.Any(p => p.Name == pool.Name))
-                throw new InvalidOperationException(LocalizationManager.T("S.PC.Duplicate"));
-            _allPools.Add(pool);
-            _customPools.Add(pool);
-            SaveCustomPools();
+            lock (Gate)
+            {
+                Load();
+                _allPools ??= new List<GamePool>();
+                if (_allPools.Any(p => p.Name == pool.Name))
+                    throw new InvalidOperationException(LocalizationManager.T("S.PC.Duplicate"));
+                var updated = _customPools.Append(pool).ToList();
+                SaveCustomPools(updated); // persist first; a failure must reach the caller
+                _customPools = updated;
+                _allPools.Add(pool);
+                _sourceIdentity = "";
+            }
         }
 
         private static void LoadCustomPools()
@@ -174,22 +185,33 @@ namespace OldenEraTemplateEditor.Models
                 var pools = JsonSerializer.Deserialize<List<GamePool>>(File.ReadAllText(path), ReadOptions);
                 if (pools != null)
                 {
-                    _customPools = pools;
-                    _allPools!.AddRange(_customPools);
+                    _customPools = FilterCustomPools(pools, _warnings);
+                    foreach (var pool in _customPools)
+                    {
+                        _allPools!.RemoveAll(p => p.Name == pool.Name);
+                        _allPools.Add(pool);
+                    }
                 }
             }
-            catch { /* ignore corrupt custom pools */ }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            { _warnings.Add("Custom pools could not be loaded: " + ex.Message); }
         }
 
-        private static void SaveCustomPools()
+        internal static List<GamePool> FilterCustomPools(IEnumerable<GamePool> pools, ICollection<string> warnings)
         {
-            try
-            {
-                var path = CustomPoolsPath;
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                Olden_Era___Template_Editor.Services.AtomicFile.WriteAllText(path, JsonSerializer.Serialize(_customPools, Olden_Era___Template_Editor.Services.JsonExport.Options));
-            }
-            catch { /* best effort */ }
+            var result = new List<GamePool>();
+            foreach (var pool in pools)
+                if (pool is null) warnings.Add("A null custom pool entry was ignored.");
+                else if (string.IsNullOrWhiteSpace(pool.Name)) warnings.Add("A custom pool with no name was ignored.");
+                else result.Add(pool);
+            return result;
+        }
+
+        private static void SaveCustomPools(List<GamePool> pools)
+        {
+            var path = CustomPoolsPath;
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            Olden_Era___Template_Editor.Services.AtomicFile.WriteAllText(path, JsonSerializer.Serialize(pools, Olden_Era___Template_Editor.Services.JsonExport.Options));
         }
 
         public static List<GamePool> GetAllPools()
@@ -210,60 +232,17 @@ namespace OldenEraTemplateEditor.Models
             return _allContentLists?.FirstOrDefault(l => l.Name == name);
         }
 
-        public static List<PoolItemInfo> GetPoolItems(GamePool pool)
+        public static List<PoolItemInfo> GetPoolItems(GamePool pool, RmgTemplate? template = null)
         {
-            var result = new List<PoolItemInfo>();
-            if (pool.Groups == null) return result;
-
-            foreach (var group in pool.Groups)
+            return InspectPool(pool, template).Items.Select(item =>
             {
-                foreach (var listName in group.IncludeLists)
-                {
-                    var list = GetContentList(listName);
-                    if (list != null)
-                    {
-                        foreach (var item in list.Content)
-                        {
-                            result.Add(new PoolItemInfo
-                            {
-                                ListName = listName,
-                                Sid = item.Sid,
-                                Weight = item.Weight,
-                                Biome = item.Biome,
-                                GroupWeight = group.Weight,
-                            });
-                        }
-                    }
-                    else
-                    {
-                        result.Add(new PoolItemInfo
-                        {
-                            ListName = listName,
-                            Sid = LocalizationManager.T("S.PV.ListNotFound"),
-                            Weight = group.Weight,
-                            GroupWeight = group.Weight,
-                            IsMissing = true,
-                        });
-                    }
-                }
-
-                if (group.Content != null)
-                {
-                    foreach (var item in group.Content)
-                    {
-                        result.Add(new PoolItemInfo
-                        {
-                            ListName = LocalizationManager.T("S.PV.GroupWeight", group.Weight),
-                            Sid = item.Sid,
-                            Weight = item.Weight,
-                            Biome = item.Biome,
-                            GroupWeight = group.Weight,
-                        });
-                    }
-                }
-            }
-
-            return result;
+                if (item.IsMissing) item.Sid = LocalizationManager.T("S.PV.ListNotFound");
+                if (item.ListName.Length == 0) item.ListName = LocalizationManager.T("S.PV.GroupWeight", item.GroupWeight);
+                return item;
+            }).ToList();
         }
+
+        public static Olden_Era___Template_Editor.Services.ContentPools.PoolContentInspection InspectPool(GamePool pool, RmgTemplate? template = null)
+        { Load(); return Olden_Era___Template_Editor.Services.ContentPools.PoolContentInspector.Inspect(pool, _catalog, template); }
     }
 }

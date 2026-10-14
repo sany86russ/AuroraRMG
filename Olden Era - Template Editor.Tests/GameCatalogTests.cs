@@ -3,11 +3,14 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using Olden_Era___Template_Editor.Services.GameData;
+using Xunit.Abstractions;
 
 namespace Olden_Era___Template_Editor.Tests;
 
 public class GameCatalogTests
 {
+    private readonly ITestOutputHelper _output;
+    public GameCatalogTests(ITestOutputHelper output) => _output = output;
     private static void AddEntry(ZipArchive zip, string path, string content)
     {
         var entry = zip.CreateEntry(path);
@@ -83,10 +86,16 @@ public class GameCatalogTests
     [Fact]
     public async Task RealGameCatalog_ResolvesKnownHero_WhenInstalled()
     {
-        var svc = GameCatalogService.Instance;
-        if (svc.LocateCoreZip() is null) return; // game not installed (CI) → skip silently
+        using var fixture = new SyntheticInstalledGame();
+        var svc = new GameCatalogService(new GameInstallationService(), Path.Combine(fixture.Root, "live-catalog-cache"));
+        if (svc.LocateCoreZip() is null)
+        {
+            _output.WriteLine("Installed-game corpus is unavailable; only synthetic catalog coverage ran. No game compatibility is claimed.");
+            return;
+        }
 
         var catalog = await svc.GetCatalogAsync("russian");
+        _output.WriteLine($"Read installed Core.zip fingerprint {catalog.Source!.SourceFingerprint}; build {catalog.Source.SteamBuildId ?? "unknown"}. This does not test gameplay.");
         Assert.True(catalog.Heroes.Count > 40, $"expected a sizeable roster, got {catalog.Heroes.Count}");
 
         var edgar = catalog.Heroes.FirstOrDefault(h => h.Sid == "human_hero_8");

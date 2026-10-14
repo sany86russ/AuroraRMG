@@ -17,13 +17,13 @@ namespace OldenEraTemplateEditor.Models
         /// <summary>Official/example-backed map sizes (sizeX = sizeZ).</summary>
         public static readonly int[] MapSizes =
         [
-            64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 240
+            64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 240, 256
         ];
 
         /// <summary>Experimental map sizes above the largest official/example-backed size.</summary>
         public static readonly int[] ExperimentalMapSizes =
         [
-            256, 272, 288, 304, 320, 336, 352, 368, 384,
+            272, 288, 304, 320, 336, 352, 368, 384,
             400, 416, 432, 448, 464, 480, 496, 512
         ];
 
@@ -57,6 +57,7 @@ namespace OldenEraTemplateEditor.Models
             "Правила турнира",     // win_condition_6 — Турнир
             "Решающая битва",      // win_condition_4 — Final Battle (как в Blitz)
             "Удержание столицы",   // win_condition_3 — Capital Hold (как в Crossroads)
+            "Падение стража",      // win_condition_8 — Guardian's Demise
         ];
 
         /// <summary>
@@ -70,6 +71,7 @@ namespace OldenEraTemplateEditor.Models
             "win_condition_6",
             "win_condition_4",
             "win_condition_3",
+            "win_condition_8",
         ];
 
         // ── Game rules ───────────────────────────────────────────────────────────

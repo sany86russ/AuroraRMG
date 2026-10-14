@@ -16,6 +16,15 @@ namespace OldenEraTemplateEditor.Models
         [JsonPropertyName("connectionType")]
         public string? ConnectionType { get; set; }
 
+        [JsonPropertyName("portalFromEnabled")]
+        public bool? PortalFromEnabled { get; set; }
+
+        [JsonPropertyName("portalToEnabled")]
+        public bool? PortalToEnabled { get; set; }
+
+        [JsonPropertyName("guardReaction")]
+        public string? GuardReaction { get; set; }
+
         [JsonPropertyName("guardZone")]
         public string? GuardZone { get; set; }
 

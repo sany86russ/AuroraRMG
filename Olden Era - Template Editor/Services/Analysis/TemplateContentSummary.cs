@@ -13,9 +13,13 @@ namespace Olden_Era___Template_Editor.Services.Analysis
         string Name,
         ZoneRole Role,
         string? Biome,
-        int Treasure,
-        int Resources,
-        int Connections);
+        long Treasure,
+        long Resources,
+        int Connections)
+    {
+        public long TreasureAreaCoefficient { get; init; }
+        public long ResourcesAreaCoefficient { get; init; }
+    }
 
     /// <summary>The result of <see cref="TemplateContentSummary.Analyze"/> — per-zone rows + map totals.</summary>
     public sealed class ContentSummary
@@ -30,6 +34,9 @@ namespace Olden_Era___Template_Editor.Services.Analysis
         public int ConnectionCount { get; init; }
         public long TotalTreasure { get; init; }
         public long TotalResources { get; init; }
+        public bool HasAreaBudgets { get; init; }
+        public long TotalTreasureAreaCoefficient { get; init; }
+        public long TotalResourcesAreaCoefficient { get; init; }
     }
 
     /// <summary>
@@ -65,10 +72,14 @@ namespace Olden_Era___Template_Editor.Services.Analysis
             {
                 if (string.IsNullOrWhiteSpace(z.Name)) continue;
                 ZoneRole role = ClassifyRole(z);
-                int treasure = (z.GuardedContentValue ?? 0) + (z.UnguardedContentValue ?? 0);
+                long treasure = (long)(z.GuardedContentValue ?? 0) + (z.UnguardedContentValue ?? 0);
                 int resources = z.ResourcesValue ?? 0;
                 infos.Add(new ZoneInfo(z.Name, role, ResolveBiome(z), treasure, resources,
-                    degree.GetValueOrDefault(z.Name)));
+                    degree.GetValueOrDefault(z.Name))
+                {
+                    TreasureAreaCoefficient = (long)(z.GuardedContentValuePerArea ?? 0) + (z.UnguardedContentValuePerArea ?? 0),
+                    ResourcesAreaCoefficient = z.ResourcesValuePerArea ?? 0
+                });
             }
 
             return new ContentSummary
@@ -81,6 +92,9 @@ namespace Olden_Era___Template_Editor.Services.Analysis
                 ConnectionCount = connectionCount,
                 TotalTreasure = infos.Sum(i => (long)i.Treasure),
                 TotalResources = infos.Sum(i => (long)i.Resources),
+                HasAreaBudgets = infos.Any(i => i.TreasureAreaCoefficient > 0 || i.ResourcesAreaCoefficient > 0),
+                TotalTreasureAreaCoefficient = infos.Sum(i => i.TreasureAreaCoefficient),
+                TotalResourcesAreaCoefficient = infos.Sum(i => i.ResourcesAreaCoefficient),
             };
         }
 

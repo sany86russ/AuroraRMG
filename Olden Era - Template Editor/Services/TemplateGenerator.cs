@@ -44,6 +44,7 @@ namespace Olden_Era___Template_Editor.Services
 
         public static RmgTemplate Generate(GeneratorSettings settings)
         {
+            settings = GenerationProfileApplier.Prepare(settings);
             _rng = settings.Seed.HasValue ? new Random(settings.Seed.Value) : new Random();
 
             var playerLetters = ZoneLetters.Take(settings.PlayerCount).ToList();
@@ -104,6 +105,7 @@ namespace Olden_Era___Template_Editor.Services
                 ContentLists = []
             };
 
+            GenerationProfileApplier.Apply(template, settings);
             return template;
         }
 
@@ -400,10 +402,22 @@ namespace Olden_Era___Template_Editor.Services
         internal static int EffectiveHeroCountMin(HeroSettings hero) =>
             Math.Max(0, hero.HeroCountMin - hero.HeroCountIncrement);
 
+        /// <summary>Same known arithmetic with an explicit owned-town count; game acceptance remains required for multi-town starts.</summary>
+        internal static int EffectiveHeroCountMin(HeroSettings hero, int startingOwnedTowns)
+        {
+            if (startingOwnedTowns < 1) throw new ArgumentOutOfRangeException(nameof(startingOwnedTowns));
+            long baseline = (long)hero.HeroCountMin - (long)Math.Max(0, hero.HeroCountIncrement) * startingOwnedTowns;
+            return (int)Math.Clamp(baseline, 0, int.MaxValue);
+        }
+
+        private static int StartingHeroBaseline(GeneratorSettings settings) => settings.ProfileOptions.IsCurrentProfile
+            ? EffectiveHeroCountMin(settings.HeroSettings, settings.PlayerStartsWithCastles ? Math.Max(1, settings.ZoneCfg.PlayerZoneCastles) : 1)
+            : EffectiveHeroCountMin(settings.HeroSettings);
+
         private static GameRules BuildGameRules(GeneratorSettings settings, string effectiveVictoryCondition) => new()
         {
-            HeroCountMin = settings.SingleHeroMode ? 1 : EffectiveHeroCountMin(settings.HeroSettings),
-            HeroCountMax = settings.SingleHeroMode ? 1 : Math.Max(settings.HeroSettings.HeroCountMax, EffectiveHeroCountMin(settings.HeroSettings)),
+            HeroCountMin = settings.SingleHeroMode ? 1 : StartingHeroBaseline(settings),
+            HeroCountMax = settings.SingleHeroMode ? 1 : Math.Max(settings.HeroSettings.HeroCountMax, StartingHeroBaseline(settings)),
             HeroCountIncrement = settings.SingleHeroMode ? 1 : Math.Max(0, settings.HeroSettings.HeroCountIncrement),
             HeroHireBan = settings.SingleHeroMode || settings.HeroSettings.HeroHireBan,
             EncounterHoles = settings.EncounterHoles,
@@ -491,7 +505,7 @@ namespace Olden_Era___Template_Editor.Services
                     : 1,
                 LostStartCity = useLostStartCity,
                 LostStartCityDay = Math.Clamp(settings.GameEndConditions.LostStartCityDay, 1, 30),
-                LostStartHero = settings.GameEndConditions.LostStartHero || useGladiator,
+                LostStartHero = settings.GameEndConditions.LostStartHero || useGladiator || effectiveVictoryCondition == "win_condition_8",
                 CityHold = useCityHold,
                 CityHoldDays = Math.Clamp(settings.GameEndConditions.CityHoldDays, 1, 30)
             };
@@ -515,7 +529,7 @@ namespace Olden_Era___Template_Editor.Services
                 int roundCount = pointsToWin * 2 - 1;
                 winConditions.ChampionSelectRule = "StartHero";
                 winConditions.Tournament = true;
-                winConditions.TournamentSaveArmy = true;
+                winConditions.TournamentSaveArmy = settings.TournamentRules.SaveArmy;
 
                 // Announce each round as early as possible:
                 // - Round 0: announced on turn 1 (minimum the game supports), battle on firstTournamentDay.
@@ -3569,15 +3583,16 @@ namespace Olden_Era___Template_Editor.Services
         /// </summary>
         public static List<string> EnsureZoneLayoutsDefined(RmgTemplate template)
         {
+            ArgumentNullException.ThrowIfNull(template);
             var added = new List<string>();
             if (template.Variants is null) return added;
 
             var defined = new HashSet<string>(
-                (template.ZoneLayouts ?? []).Select(l => l.Name).Where(n => !string.IsNullOrEmpty(n))!,
+                (template.ZoneLayouts ?? []).OfType<ZoneLayout>().Select(l => l.Name).Where(n => !string.IsNullOrEmpty(n)),
                 StringComparer.Ordinal);
 
-            foreach (var variant in template.Variants)
-            foreach (var zone in variant.Zones ?? [])
+            foreach (var variant in template.Variants.OfType<Variant>())
+            foreach (var zone in (variant.Zones ?? []).OfType<Zone>())
             {
                 if (string.IsNullOrWhiteSpace(zone.Layout) || !defined.Add(zone.Layout!)) continue;
                 template.ZoneLayouts ??= [];
