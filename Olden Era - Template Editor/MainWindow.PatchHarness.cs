@@ -146,7 +146,14 @@ public partial class MainWindow
     {
         var root = (FrameworkElement)Content;
         await SettlePatchLayoutAsync(root);
-        CaptureRoot(root, directory, name);
+        if (name == "main-advanced")
+        {
+            var previewContainer = (FrameworkElement)VisualTreeHelper.GetParent(ImgPreview);
+            Require(ImgPreview.ActualWidth > 0 && ImgPreview.ActualHeight > 0
+                && ImgPreview.ActualWidth <= previewContainer.ActualWidth + 1 && ImgPreview.ActualHeight <= previewContainer.ActualHeight + 1,
+                "The Advanced preview exceeds its available area.");
+        }
+        CapturePatchRoot(root, directory, name);
     }
 
     private static async Task SettlePatchLayoutAsync(FrameworkElement root)
@@ -174,6 +181,47 @@ public partial class MainWindow
         }
     }
 
+    private static void CapturePatchRoot(FrameworkElement root, string directory, string name)
+    {
+        FrameworkElement surface = Window.GetWindow(root) is { } window ? window : root;
+        Rect bounds = ReferenceEquals(root, surface) ? new Rect(root.RenderSize)
+            : root.TransformToAncestor(surface).TransformBounds(new Rect(root.RenderSize));
+        int left = (int)Math.Floor(bounds.Left), top = (int)Math.Floor(bounds.Top);
+        int right = (int)Math.Ceiling(bounds.Right), bottom = (int)Math.Ceiling(bounds.Bottom);
+        Require(left >= 0 && top >= 0 && right > left && bottom > top, "Invalid capture bounds.");
+        var full = new RenderTargetBitmap((int)Math.Ceiling(Math.Max(surface.ActualWidth, bounds.Right)),
+            (int)Math.Ceiling(Math.Max(surface.ActualHeight, bounds.Bottom)), 96, 96, PixelFormats.Pbgra32);
+        // Render the live surface directly; a cyclic VisualBrush can omit off-screen subtrees.
+        full.Render(surface);
+        var cropped = new CroppedBitmap(full, new Int32Rect(left, top, right - left, bottom - top));
+        const int padding = 16;
+        var visual = new DrawingVisual();
+        using (var drawing = visual.RenderOpen())
+        {
+            drawing.DrawRectangle(Window.GetWindow(root)?.Background ?? Brushes.Transparent, null,
+                new Rect(0, 0, cropped.PixelWidth + padding * 2, cropped.PixelHeight + padding * 2));
+            drawing.DrawImage(cropped, new Rect(padding, padding, cropped.PixelWidth, cropped.PixelHeight));
+        }
+        var bitmap = new RenderTargetBitmap(cropped.PixelWidth + padding * 2, cropped.PixelHeight + padding * 2, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using (var stream = File.Create(Path.Combine(directory, name + ".png"))) encoder.Save(stream);
+        if (Window.GetWindow(root) is not (TemplatePropertiesWindow or GenerationOptionsWindow)) return;
+        foreach (var action in VisualDescendants(root).OfType<Button>().Where(button => button.IsCancel || button.IsDefault))
+        {
+            Rect actionBounds = action.TransformToAncestor(surface).TransformBounds(new Rect(action.RenderSize));
+            int x = padding + (int)Math.Floor(actionBounds.Left) - left, y = padding + (int)Math.Floor(actionBounds.Top) - top;
+            var region = new Int32Rect(x, y, (int)Math.Ceiling(actionBounds.Width), (int)Math.Ceiling(actionBounds.Height));
+            Require(x >= 0 && y >= 0 && x + region.Width <= bitmap.PixelWidth && y + region.Height <= bitmap.PixelHeight,
+                "Dialog action pixels are outside the capture.");
+            byte[] pixels = new byte[region.Width * region.Height * 4]; bitmap.CopyPixels(region, pixels, region.Width * 4, 0);
+            int visibleTextPixels = 0;
+            for (int i = 0; i < pixels.Length; i += 4)
+                if (pixels[i] >= 90 && pixels[i + 1] >= 90 && pixels[i + 2] >= 90 && pixels[i + 3] >= 200) visibleTextPixels++;
+            Require(visibleTextPixels >= 12, "The dialog action text is absent from the capture: " + name);
+        }
+    }
+
     private async Task CapturePatchWindowAsync(Window window, string directory, string name, Action<Window>? verify = null)
     {
         window.ShowActivated = false; window.WindowStartupLocation = WindowStartupLocation.Manual; window.Left = -6000; window.Top = 100;
@@ -188,14 +236,14 @@ public partial class MainWindow
             await Dispatcher.Yield(DispatcherPriority.Background);
             var root = (FrameworkElement)window.Content;
             await SettlePatchLayoutAsync(root); VerifyPatchDialogActions(window, root);
-            CaptureRoot(root, directory, name);
+            CapturePatchRoot(root, directory, name);
             foreach (var tabs in VisualDescendants(root).OfType<TabControl>().Take(1))
             {
                 for (int i = 0; i < tabs.Items.Count; i++)
                 {
                     tabs.SelectedIndex = i;
                     await SettlePatchLayoutAsync(root); VerifyPatchDialogActions(window, root);
-                    CaptureRoot(root, directory, name + "-tab-" + i);
+                    CapturePatchRoot(root, directory, name + "-tab-" + i);
                 }
             }
             Require(new FileInfo(Path.Combine(directory, name + ".png")).Length > 100, "A dialog capture is empty: " + name);

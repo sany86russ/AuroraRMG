@@ -3062,15 +3062,14 @@ ValueChanged="Slider_ValueChanged"/>
                         CornerRadius="4"
                         BorderBrush="{StaticResource BrushBorder}"
                         Background="#0E1117">
-                            <StackPanel VerticalAlignment="Center"
-                            HorizontalAlignment="Center"> 
+                            <Grid>
                                 <Label x:Name="lblNoPreview" Visibility="Collapsed" FontSize="172"></Label>
                                 <Image x:Name="ImgPreview"
                                 Stretch="Uniform"
                                 RenderOptions.BitmapScalingMode="HighQuality"
                                 VerticalAlignment="Center"
                                 HorizontalAlignment="Center"/>
-                            </StackPanel>
+                            </Grid>
                             
                         </Border>
 
