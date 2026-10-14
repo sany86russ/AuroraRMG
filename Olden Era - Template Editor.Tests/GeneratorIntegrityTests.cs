@@ -96,6 +96,12 @@ public class GeneratorIntegrityTests
 
         foreach (GeneratorSettings settings in AdvancedMatrix())
         {
+            if (settings.GameEndConditions.VictoryCondition == "win_condition_6" && settings.PlayerCount != 2)
+            {
+                var error = Assert.Throws<ArgumentException>(() => TemplateGenerator.Generate(settings));
+                Assert.Contains("two opposing", error.Message);
+                continue;
+            }
             RmgTemplate tpl = TemplateGenerator.Generate(settings);
             var adv = settings.ZoneCfg.Advanced;
             int neutralCount = adv.NeutralLowNoCastleCount + adv.NeutralLowCastleCount

@@ -1,3 +1,4 @@
+<a id="auroramrg"></a>
 <div align="center">
 
 <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/banner-en.png" width="100%" alt="AuroraRMG — visual random map template generator for Heroes of Might and Magic: Olden Era"/>
@@ -10,13 +11,23 @@
 
 **Configure your map in a friendly UI instead of hand-editing JSON — then hit "Create template".**
 
-[📥 Download](#-installation) · [🚀 Quick start](#-quick-start) · [🧭 Interface](#-interface-overview) · [⚙️ All settings](#️-all-settings) · [🎲 Presets](#-built-in-presets-43) · [❓ FAQ](#-faq)
+[📥 Download](#-installation) · [🚀 Quick start](#-quick-start) · [🧭 Interface](#-interface-overview) · [⚙️ All settings](#️-all-settings) · [🎲 Presets](#-built-in-presets-53-and-43-legacy) · [❓ FAQ](#-faq)
 
 [Русский](README.md) · 🌍 **English**
 
 </div>
 
-## New in v1.11.0
+## New in v1.12.0
+
+Updated for **Olden Era 0.81.04**: actual alliances and cooperative layouts, **53 current presets** (43 updated + 10 team presets), a separate set of 43 Legacy presets, map richness and challenge, battle calendars, rivers and troop growth. The catalog reads IDs, names and reward variants from your installed game; the editor adds template properties, bulk zone editing and fractional pool weights.
+
+Settings `.oetgs` now retain complete generation snapshots. Template ZIP packages, sequential batches, local diagnostics and a separate `.mrmg.json` native schema editor are available through **Map and tools** in both working modes.
+
+[v1.12.0 RU/EN changelog](docs/release-notes-v1.12.0.md) · [Download v1.12.0](https://github.com/sany86russ/AuroraRMG/releases/tag/v1.12.0) · [Implementation checks and game acceptance](docs/plans/2026-10-14-implementation-status.md)
+
+Automated checks cover the file format and editor behavior. Check actual geometry, object placement, allied victory and calendar behavior in game with several game seeds.
+
+## Previously: v1.11.0
 
 Border and portal guards up to **800%**, neutral-town faction rules without manual JSON editing, and fixes for mirrored references and undo/redo. Window layouts, RU/EN translations, file saving and automatic updates have also been improved.
 
@@ -44,11 +55,17 @@ Border and portal guards up to **800%**, neutral-town faction rules without manu
   - [Tab "Map & Zones"](#tab--map--zones)
   - [Tab "Bonuses & Bans"](#tab--bonuses--bans)
   - [Tab "Extra Content"](#tab--extra-content-exp)
+- [Map and tools: v1.12.0 features](#-map-and-tools-v1120-features)
+  - [Profile, seeds and map options](#profile-seeds-and-map-options)
+  - [Alliances and cooperative play](#alliances-and-cooperative-play)
+  - [Content catalog and pools](#content-catalog-and-pools)
+  - [Native schemas and configuration import](#native-schemas-and-configuration-import)
+  - [ZIP packages, batches and diagnostics](#zip-packages-batches-and-diagnostics)
 - [Preview panel & generation](#-preview-panel--generation)
 - [Map analysis: balance & contents](#-map-analysis-balance--contents)
 - [Visual zone editor](#-visual-zone-editor)
 - [UI language (RU/EN)](#-ui-language-ruen)
-- [Built-in presets (43)](#-built-in-presets-43)
+- [Built-in presets (53 and 43 Legacy)](#-built-in-presets-53-and-43-legacy)
 - [Victory conditions & special modes](#-victory-conditions--special-modes)
 - [Saving & loading settings](#-saving--loading-settings)
 - [Where to save templates](#-where-to-save-templates)
@@ -57,7 +74,7 @@ Border and portal guards up to **800%**, neutral-town faction rules without manu
 - [FAQ](#-faq)
 - [Support the creator](#-support-the-creator)
 - [Credits & origin](#-credits--origin)
-- [Disclaimer & license](#-disclaimer--license)
+- [Disclaimer & license](#disclaimer-license)
 
 ---
 
@@ -72,17 +89,20 @@ A map template is a set of rules the game uses to build a random map when you st
 | | |
 |---|---|
 | ⚡ **Two working modes** | **Simple** — a map in a few clicks (pick a few options → done); **Advanced** — full manual control. Toggle in the header. See [Working modes](#-working-modes-simple-and-advanced). |
-| 🎲 **43 built-in presets** | 1v1 Classic, 1v1 Single-hero, FFA for 3–8 players, **PvE 1×2…1×7**, special modes — one-click load |
+| 🎲 **53 current presets + 43 Legacy** | 43 updated 1v1 / FFA / PvE configurations + 10 team presets; Aurora 1.11 configurations remain in a separate group |
+| 🤝 **Alliances and co-op** | 2v2, 3v3, 4v4, multiple teams and unequal groups; manual assignments and locked slots |
 | 🗺 **Visual zone editor** | interactive canvas: zones, connections, inspector, PNG export — edit the map graph by hand |
 | 🌍 **Two languages (RU/EN)** | instant language switch in the header, no restart; auto-detected from the OS locale |
 | 🚫 **Item, spell & hero bans** | full hero roster with real names (optionally from the game's assets) |
-| 🧩 **Full control** | zone topology, economy, monster strength, terrain, water, victory conditions, map size **up to 512×512** |
+| 🧩 **Map options** | topology, economy, guards, calendar, troop growth, terrain, rivers and victory rules; **256×256 standard**, up to **512×512 experimental** |
+| 📚 **Your game's catalog** | RU/EN/SID search, actual reward variants and pool dependencies; bundled settings work without an installation |
+| 📦 **Sharing and repetition** | complete `.oetgs`, ZIP packages with RU/EN notes, seed/preset batches and local diagnostic archives |
 | ⚖ **Map analysis** | right after generation — a **balance score 0–100** + a "what's inside" breakdown (zones, links, treasure) |
 | 🖼 **Map preview** | a visual schematic of zone placement and connections before you save |
 | 🌑 **Aurora theme** | dark neon UI (violet → cyan) with branded menus |
 | 🔄 **Auto-update** | the app finds and installs new versions from GitHub by itself |
 | 📦 **Single file** | self-contained `.exe`, no installation |
-| 🧭 **Auto-locate game** | finds the Olden Era templates folder via the Steam registry |
+| 🧭 **Game discovery** | Steam libraries and the game manifest, with an explicit install-folder override |
 
 ---
 
@@ -149,16 +169,17 @@ Before installation, the app checks file size, Windows executable format and SHA
 
 1. Launch AuroraRMG — it opens in **Simple Mode** by default (the **Simple / Advanced** toggle is in the header, next to the language).
 2. Pick a few options: players, game type, size, length, victory condition.
-3. Click **"⚔ Create map"** — a preview and a short summary appear on the right.
-4. Click **"💾 Save to game folder"** — enter a name, and the map lands straight in the game.
-5. Launch Olden Era → start a new game → pick your template from the list.
+3. Open **Map and tools → Teams and map options** and select **Olden Era 0.81.04**. For co-op, configure the **Alliances** tab. You can also set the game install path here.
+4. Click **"⚔ Create map"** — preview, summary and warnings appear on the right. Resolve errors before saving.
+5. Click **"💾 Save to game folder"** and enter the template name.
+6. Launch Olden Era → start a new game → pick your template; assign human/AI players, factions, AI difficulty and the game seed in lobby/hotseat.
 
 More in [Working modes](#-working-modes-simple-and-advanced).
 
 **Way 2 — via a preset (Advanced mode):**
 
 1. Switch to **Advanced** mode.
-2. On the **"Map Rules"** tab, in the **TEMPLATE** block, open the **"Preset ▾"** menu and pick a config (e.g. *"Standard"* under *1v1 — Classic*).
+2. On the **"Map Rules"** tab, open **"Preset ▾"** and choose the **Olden Era 0.81.04** group, a team preset, or the separate **Aurora 1.11 / Legacy** group.
 3. Click **"⚔ Create template"** in the right panel, then save.
 4. Launch Olden Era → start a new game → pick the template.
 
@@ -179,20 +200,20 @@ Since **1.2.0**, AuroraRMG has **two working modes**. The **Simple / Advanced** 
 
 <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-simple-en.png" alt="Simple Mode" width="100%"/>
 
-For players who **don't want to learn templates**. You set just a few clear options — everything else is chosen at random within safe values, giving you a ready, playable map right away:
+For players who **don't want to learn templates**. You set a few clear options and Aurora chooses the rest to create a template for the game to generate:
 
 | Option | What it sets |
 |---|---|
 | **Players** | How many players (starting castles) are on the map. |
-| **Game type** | Layout: **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Lanes (corridors)** *(parallel corridors converging on a central arena)*, **Team game** *(this mode isn't in the game yet)*, or **Single player (RPG/PvE, experimental)** *(only your hero roams — no AI opponent; the goal is to capture a neutral city — see [special modes](#-victory-conditions--special-modes))*. |
-| **Map size** | Small / Medium / Large / **Huge (256–400)**. "Huge" goes past the official 240×240 cap (experimental), but the game engine supports it. |
+| **Game type** | **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Lanes (corridors)**, **Team game** with actual alliances, or **Single player (RPG/PvE, experimental)**. Refine team assignments through Map and tools; select human/AI players in game. |
+| **Map size** | Small / Medium / Large / Huge. In the **0.81.04** profile, Huge uses **256×256**; **Legacy** retains its earlier experimental **256–400** band. |
 | **Game length** | Short / Medium / Long — affects size, zone count and guard strength. |
 | **Chaos level** | Tame / Normal / Wild — how wild and unpredictable the map gets. |
-| **Victory condition** | All the real in-game modes — classic, city/capital hold, final battle, tournament (see [Victory conditions](#-victory-conditions--special-modes)). |
+| **Victory condition** | Classic, City Hold, Capital Hold, Final Battle, Tournament and Guardian's Demise; see [conditions and limits](#-victory-conditions--special-modes). |
 | **Border guards** | Strength of the monster guards on the passages between zones: **Weak / Normal / Strong / Fortress / Impassable / 800%**. The new **800%** option sets exactly 800% at any chaos level; existing levels are preserved (in Advanced mode it's the "Border/portal guards" slider). |
 | **Neutral castle faction** | Which faction the **capturable** castles in neutral zones belong to: **Random** or a specific one (Human/Undead/Dungeon/Nature/Demon/Unfrozen). A full town of the chosen faction — unowned until you capture it. Handy for co-op "lanes" maps where you take a town of a chosen faction along the way. |
 | **Extras** | Water, portals, stronger neutrals. |
-| **Seed** 🎲 📋 | The same seed, settings and generator version produce the same **template**. Share them together or send the `.rmg.json`; the game builds the actual world and object placement. 🎲 = new random, 📋 = copy. |
+| **Seed** 🎲 📋 | Reproduces the **Aurora template** together with a complete `.oetgs`, the same generation profile and algorithm version. Set the game seed separately in game. 🎲 = new random, 📋 = copy. |
 
 Then: **"⚔ Create map"** → a **preview** and a short **summary** (including an estimated game length, a **balance score** and a **"what's inside"** breakdown — see [Map analysis](#-map-analysis-balance--contents)) appear on the right → **"💾 Save to game folder"** (asks for a name and drops the map straight into the game) or **"Save as…"**. A **hint for every option** sits at the bottom of the window. Any map can be **"Opened in Advanced mode"** and fine-tuned by hand.
 
@@ -200,7 +221,7 @@ Then: **"⚔ Create map"** → a **preview** and a short **summary** (including 
 
 <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-rules-en.png" alt="Advanced mode — Map Rules tab" width="100%"/>
 
-The classic mode with **every** setting across four tabs (**Map Rules · Zone Setup · Zone Content · Bonuses & Bans**) plus the right-hand generation/preview panel. Everything is here: topology, economy, monster strength, terrain, water, victory conditions, bans, fine neutral-zone distribution, mandatory content and the **visual zone editor**. Details below in [Interface overview](#-interface-overview) and [All settings](#️-all-settings).
+Four main tabs (**Rules · Map & Zones · Bonuses & Bans · Extra Content**) control topology, economy, guards, environment and content. **Map and tools** adds profiles, alliances, calendars, the catalog and file sharing. The **visual zone editor** lets you refine the graph itself. More in [Interface overview](#-interface-overview) and [All settings](#️-all-settings).
 
 > 💡 **Which to pick?** Want a good random map fast — **Simple**. Want to tweak every detail — **Advanced**. You can switch any time, and a Simple-mode result can always be refined in Advanced.
 
@@ -214,7 +235,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.11]  —  file_name    🔄 📂 💾 💾… RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG  [v1.12]  —  file_name    🔄 📂 💾 💾… RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │
@@ -240,6 +261,7 @@ The window has three areas:
 | **Simple** / **Advanced** | Switch the working mode (Simple by default; remembered). See [Working modes](#-working-modes-simple-and-advanced) | — |
 | 🗺 **Editor** | Open the visual zone editor | — |
 | **RU** / **EN** | Switch UI language (instant) | — |
+| **Map and tools** | Profiles, alliances, calendar, catalog, ZIP packages, batches, diagnostics and native schemas | — |
 | `_` `☐` `✕` | Minimize / maximize / close | — |
 
 > "Settings" (💾) is an `.oetgs` file with **all** editor parameters so you can continue later. It is **not** a game template. The game `.rmg.json` is created separately via "Create template" → "Save".
@@ -251,7 +273,7 @@ The window has three areas:
 | **Rules** | Basic map parameters, heroes, victory conditions, environment |
 | **Map & Zones** | Topology (map shape) and detailed zone setup |
 | **Bonuses & Bans** | Starting bonuses for players, banning items, spells and heroes |
-| **Extra Content [EXP.]** | Guaranteed objects in zones (mines, treasures, etc.) |
+| **Extra Content [EXP.]** | Mandatory zone content (mines, treasures, etc.), subject to the game's placement capabilities |
 
 ### How it looks
 
@@ -277,7 +299,7 @@ The window has three areas:
 </details>
 
 <details>
-<summary><b>"Extra Content [EXP.]" tab</b> — guaranteed objects in zones</summary>
+<summary><b>"Extra Content [EXP.]" tab</b> — mandatory zone content</summary>
 
 <img src="https://raw.githubusercontent.com/sany86russ/AuroraRMG/main/docs/ui-extra-content-en.png" alt="Extra Content tab" width="100%"/>
 
@@ -297,22 +319,22 @@ The window has three areas:
 
 | Setting | Description |
 |---|---|
-| **Preset** | A menu of 43 ready configs (grouped by mode type). Picking one fills every field instantly. See [Presets](#-built-in-presets-43). |
+| **Preset** | 53 current configurations and a separate set of 43 Legacy presets. Selecting one transfers its parameters; see [Presets](#-built-in-presets-53-and-43-legacy). |
 | **Template name** | The name the template appears under in the game. |
-| **Map size** | Playfield size. Standard values roughly from 80×80 to 240×240. |
-| 🗺 **Large maps: 256×256 … 512×512** `[EXP.]` | A highlighted checkbox right under the size picker — adds the larger sizes (up to 512×512) to the list. No official template ships this big, so they aren't guaranteed, but the game engine handles them (players run games at 300–400). In **Simple Mode** this corresponds to the **"Huge"** size. |
-| **Players** | Number of players on the map *(2 – 8, default 2)*. |
+| **Map size** | Playfield size. Standard sizes from 80×80 to 256×256. |
+| 🗺 **Large maps: 272×272 … 512×512** `[EXP.]` | Adds sizes above the standard 256×256 in **Advanced mode**. Their generation and performance require separate in-game acceptance. Current Simple mode's Huge is 256×256; only Legacy retains its earlier 256–400 band. |
+| **Players** | Number of starting players *(1 – 8, default 2)*. Single-player scenarios are experimental. |
 
 #### "Heroes" block
 
 | Setting | Description |
 |---|---|
-| **Starting hero limit** | How many heroes you can have at the start *(1 – 12, default 4)*. |
-| **Max hero limit** | The hero cap *(1 – 12, default 8)*. |
-| **Limit gain per town** | How much the cap grows per captured town *(0 – 10, default 1)*. |
+| **Starting hero limit** | Hiring capacity with the player's owned starting towns *(1 – 12, default 4)*; not the number of automatically spawned heroes. |
+| **Max hero limit** | Maximum hiring capacity *(1 – 12, default 8)*. |
+| **Limit gain per town** | Capacity gained per owned town *(0 – 10, default 1)*, including owned starting towns. |
 | **Single-hero mode** | A special mode: a player has only one hero. |
 
-> Each hero value can be set with the slider, the **−/+** buttons, or by typing a number (Enter). The maximum is **12**, matching the official game templates.
+Each hero value can be entered with the slider, **−/+** buttons or a number field. The 0.81.04 profile accounts for owned starting towns when deriving the game's base rule. If those towns already grant more capacity than the requested starting limit, increase the limit or reduce the increment/owned town count. **Template properties** edits the native base minimum directly. Verify the actual number of spawned starting heroes in game.
 
 #### "Game rules" block
 
@@ -321,10 +343,10 @@ The window has three areas:
 | **Faction-laws experience** | Faction-laws XP multiplier *(25% – 200%, step 25, default 100%)*. |
 | **Astrology experience** | Astrology XP multiplier *(25% – 200%, step 25, default 100%)*. |
 | **Main victory condition** | The main win condition (see [table](#-victory-conditions--special-modes)). |
-| **Defeat on losing the starting town** | A player is eliminated after losing their starting town. Extra slider **"Town-loss day"** *(1 – 30)* — from which day the rule is active. |
+| **Defeat on losing the starting town** | Enables loss of the key starting town. **"Town-loss day"** *(1 – 30)* is stored separately; verify the countdown and defeat behavior in game. |
 | **Defeat on losing the starting hero** | A player is eliminated after losing their starting hero. |
 | **Victory by holding a neutral town** | *City Hold* mode: capture and hold a designated town. Slider **"Days to hold"** *(1 – 30, default 6)*. Details in [special modes](#-victory-conditions--special-modes). |
-| **Tournament rules** | 1v1 tournament mode (2 players only). Parameters: **points to win** *(1 – 10)*, **first battle on day** *(3 – 30)*, **days between battles** *(3 – 30)*. See [special modes](#-victory-conditions--special-modes). |
+| **Tournament rules** | 1v1 tournament: points to win, first battle, interval and army preservation. Set explicit dates in Map and tools → Teams and map options → Rules and calendar. See [special modes](#-victory-conditions--special-modes). |
 
 #### "Environment & encounters" block
 
@@ -380,13 +402,13 @@ Base sliders (always available):
 | **Neutral castle faction** | Which faction the **capturable** castles in neutral zones belong to: **Random** or a specific one (Human/Undead/Dungeon/Nature/Demon/Unfrozen). A full town of the chosen faction — unowned until captured. Same as in Simple mode. |
 | **Generate roads** | Adds roads between connected zones *(on by default)*. |
 | **Create remote footholds** | Places remote footholds in every town zone *(on by default)*. |
-| **Create extra portals** | Adds portals between non-adjacent zones. Slider **"Max portal count"** *(1 – 48, default 48)*. |
+| **Create extra portals** | Adds Aurora portal connections between non-adjacent zones. The limit *(1 – 48, default 48)* applies to those additions. Turning this off cannot guarantee zero portals: the game can replace a failed ordinary passage with a portal. |
 
 Advanced settings (the **"Advanced settings"** checkbox in the block header):
 
 | Setting | Description |
 |---|---|
-| **Per-tier neutral zones** | Fine layout of neutral zones: 6 sliders *(each 0 – 30)* — **weak / medium / strong**, each in a **without-town** and **with-town** variant. Replaces the simple "Extra neutral zones" slider. Up to 48 zones total (matching the biggest stock template, Full Hire). |
+| **Per-tier neutral zones** | Fine layout of neutral zones: 6 sliders *(each 0 – 30)* — **weak / medium / strong**, each in a **without-town** and **with-town** variant. Replaces the simple "Extra neutral zones" slider. 48 zones is an interface reference based on Full Hire, not a verified engine limit. |
 | **Min. neutrals between players** | Minimum neutral zones between players *(0 – 8, default 0)*. Works if topology, zone count and portals allow it. |
 | **Player zone size** `[EXP.]` | Relative weight of a player zone *(0.5× – 2×, default 1×)*. |
 | **Neutral zone size** `[EXP.]` | Relative weight of a neutral zone *(0.5× – 2×, default 1×)*. |
@@ -406,7 +428,7 @@ Advanced settings (the **"Advanced settings"** checkbox in the block header):
 | **Banned heroes** | Heroes that won't appear on the map (`globalBans.heroes`). Per-faction colour tags. **`+`** — pick, **`×`** — unban. |
 
 > [!TIP]
-> **Full hero roster with names.** By default a built-in verified list is available. The **"Connect the installed game's assets"** checkbox (with a clear disclaimer) loads the **full 108-hero roster with real names** straight from the installed game's local files (`Core.zip`) — nothing is uploaded to the network. The editor is fully usable without it.
+> **Heroes from your game version.** Aurora has a bundled list by default. **"Connect the installed game's assets"** reads names and IDs from the local `Core.zip`; the count depends on the installed version. These data are not uploaded or bundled in the distribution. The editor remains usable without them.
 
 ---
 
@@ -447,6 +469,114 @@ Buttons: a dropdown + **"Add"** adds a content entry; **`x`** on a row removes t
 
 ---
 
+## 🧰 Map and tools: v1.12.0 features
+
+**Map and tools** is in the header, available in Simple and Advanced modes. **Teams and map options** opens five tabs: **Map · Alliances · Rules and calendar · Environment and content · Game and profile**. **Apply** commits the changes; **Cancel** keeps the previous settings. Generate the template again after changing its inputs.
+
+### Profile, seeds and map options
+
+1. On **Map**, select **Olden Era 0.81.04** for current content tables or **Aurora 1.11** for older configurations.
+2. On **Game and profile**, check the source. An empty path enables Steam-library discovery; an explicit path must point to the game's install root. The dialog shows version, Steam build and data fingerprints. Unknown versions are shown as unknown; bundled settings remain available.
+3. Configure the map, click **Apply**, then **Create template**. The detailed card adds the selected rules and tags to the in-game template picker.
+
+| Option | What it changes |
+|---|---|
+| **Map richness** | Five levels: very poor, poor, normal, rich, very rich. Changes resource and content budgets. |
+| **Map challenge** | Six generator guard levels: easy, normal, hard, unfair, impossible, apocalypse. AI difficulty is selected separately in game. |
+| **Symmetry of conditions** | Asymmetric, equal starts or team symmetry. Aligns settings and graph structure; the game creates geometry and object positions. |
+| **Game pace** | Legacy, early contact, balanced or exploration. Balanced and Exploration build a graph with neutral buffers instead of the selected topology; use Legacy pacing to retain your own topology. The preview and summary show the actual structure. Pacing does not control AI behavior. |
+| **Total neutral towns / maximum per zone** | Distributes the chosen town count among eligible neutral zones. Impossible combinations are rejected. |
+| **Budgets by eligible area** | Budget coefficients per 10 eligible free cells. The actual cell count is known only after the game generates the map. |
+| **Card and description** | Detailed rules and tags in the game picker, plus the author's description. |
+
+The **Aurora template seed** controls `.rmg.json`. In Simple mode and the options dialog, use **hex without `0x`**, such as `000006C1` for decimal 1729. The dialog reads hex first: `1729` means `0x1729` (5929); signed-integer parsing is only a fallback when hex is not recognized. Batch-generation seed lists accept **decimal integers**. **Game seed (for setup notes, hex)** is recorded separately and does not control Aurora's RNG: enter it in game as well. An empty game seed means it was not recorded. Repetition requires the full `.oetgs`, template seed, generation profile and the same algorithm version; repeating a game world additionally depends on the game version and its seed. Importing native settings does not make Aurora's RNG equal to the game's RNG.
+
+### Alliances and cooperative play
+
+1. Open **Alliances**, enable **Configure alliances** and select a composition such as `2v2`, `3v3`, `4v4`, `2v2v2`, `2v6` or `custom`.
+2. For a custom composition, assign each player an alliance number **1–8**. Matching numbers are allies; **−1** is an individual FFA player. Number 0 is not used. This does not assign human/AI roles.
+3. Select **Team regions**, **Team lanes**, **Teams around an arena** or **Keep selected map topology**. Team symmetry requires enabled alliance assignments.
+4. Optionally lock all alliances in lobby or individual custom slots. Random assignment uses the template seed and preserves team sizes; custom slots take precedence.
+5. Generate and save the template. In lobby/hotseat, assign friends and AI, factions and difficulty; check the displayed alliances before starting.
+
+Allied passages, shared rear areas and the front are part of the zone graph. Extra portals are distributed equally in a symmetric team profile; a limit too small to do so must be corrected. A smaller team's resource multiplier is explicit: unequal team sizes do not automatically promise equal difficulty.
+
+**Detailed structure and balance report** lists players and alliances, owned starting towns, resources, area coefficients, minimum opponent hops and guard budgets to towns/guarded content. Different minima may follow different paths. This measures structure, not travel in game turns or identical geometry.
+
+### Rules and calendar
+
+Select the main victory condition in the ordinary rules, then open **Rules and calendar**. Classic victory and resetting the City Hold timer are independent options. Key-object status and starting-town ownership are distinct properties.
+
+For tournaments, enter **comma-separated battle dates**, for example `7, 14, 21`: **2–256**, strictly increasing, up to **19 dates**. Announcement lead time is separate; the app converts dates into announcements and durations. An empty list uses the ordinary first-battle and interval fields. Enable army preservation separately in the main tournament settings.
+
+**Final Battle using the new calendar** and its chosen day are distinct from the older arena parameters. Tournaments and the current profile's Final Battle require **two individual opponents**. Choose another supported victory mode for multiple teams. Check actual announcement boundaries, registration and battle completion in game.
+
+### Environment, troop growth and AI
+
+**Environment and content** controls rivers and tributary spacing, weekly settlement growth, initial troop growth and modifiers restricted to week one. Empty/third-state optional values retain game defaults. Faction laws, the magic guild and custom magic learning can be disabled independently.
+
+Border guard reaction is separate from guard strength. Portal flags control objects at the origin and destination of a connection; they do not establish travel direction or promise zero portals. AI profiles use installed game IDs, excluding campaigns and scripted sets. A profile does not promise passive AI or prevent attacks; verified choices are unavailable without their data source.
+
+### Content catalog and pools
+
+Open **Map and tools → Installed game catalog**. Search Russian/English names, **exact SIDs**, categories and available levels; filter objects, spells or artifacts. **Refresh** rereads the source after a patch. Status distinguishes **present in data**, **referenced by RMG** and unverified placement. An ID in Core does not mean the object can be placed on every map.
+
+The lower table shows actual **reward variant indices**, values, weights and parameters. Scroll choices use configured object variants and linked spells; levels and indices are not invented. An unknown variant of a known object blocks strict export. An absent `variant` and the native default `−1` remain distinct from an explicit configured index.
+
+In the visual editor, open **Pools → Pool contents / Pool creator**. The viewer distinguishes group/item weights, variants, biomes, included lists and missing references. Definitions embedded in the template take precedence over local definitions and installed game data. The creator accepts direct objects and list dependencies; required definitions are embedded in the game file.
+
+A weight is a **relative selection weight**, not an object count. Decimal dots and commas are accepted; nonnumeric, negative, oversized weights and values that become zero as native floats are rejected. Explicit 0 disables selection; an omitted item weight uses the native default 1 and remains omitted after unchanged editing. Mandatory counts and count limits are configured separately. Removed IDs are reported without silently substituting similar objects.
+
+### Template properties and bulk editing
+
+In the editor, **Template properties** changes general settings, alliances, game rules, the card and rivers for each map variant. A card's victory code does not replace actual victory flags. The object inspector exposes key-object status, City Hold targets and hire growth; connections expose portal and guard-reaction options.
+
+For **Bulk zone edits**, choose the map variant, property and target zones. Enter JSON — a number, array, `true`/`false`, or `null` to remove the property — and apply it. Changes are validated, committed together and undone in one Undo step; other zones and variants remain intact. Existing unknown fields are retained. Rename, delete and mirror operations update understood references; unsupported constructions receive warnings. Duplicate JSON properties, including nested and unknown ones, are rejected before import rather than selecting one ambiguous value.
+
+<details>
+<summary><b>Bulk zone editing</b> — properties, selected zones and one-step undo</summary>
+
+<img src="docs/ui-bulk-edit-en.png" alt="Bulk property edits for selected zones" width="100%"/>
+
+</details>
+
+### Native schemas and configuration import
+
+**Map and tools → Procedural generation profiles** opens the separate `.mrmg.json` editor. With an installed game, you can inspect its schema; **Open .mrmg** selects another file. Select a conditional parameter in the tree, edit **AND/OR conditions**, weight, fallback and JSON value, then click **Apply edit**. Apply or revert the current edit before switching nodes. **Raw JSON** retains unknown fields.
+
+**Save a copy** writes a separate validated file **outside the game folder**. Selecting custom schemas in the game's picker is not yet confirmed; saving a file does not register a new in-game menu entry.
+
+**Import game configuration** accepts JSON or a compact code and transfers confirmed options into Advanced mode. Native zero-based dates are converted to human game days. Compact codes contain no hero limits, so existing limits are retained. The original schema, unknown and untransferable inputs remain in the snapshot with warnings; this transfers settings without reproducing native geometry or RNG. See the [format investigation](docs/plans/engine-capabilities-08104.md).
+
+### ZIP packages, batches and diagnostics
+
+| Menu command | Workflow and output |
+|---|---|
+| **Save template package** | Generate a current template first. Choose whether to include its exact `.oetgs` and PNG preview, then save a ZIP outside the game folder. It contains `.rmg.json`, RU/EN setup notes and a manifest with hashes, profile and seeds. Invalid variants/references block saving. |
+| **Generate a seed batch** | Enter unique signed integer seeds and select a separate existing folder. Each seed produces an individually validated `.rmg.json`. |
+| **Batch of 43 patch presets / Team preset batch** | Generates the selected preset group for each seed. The overall limit is **128 results**: for example, 43 presets × 2 seeds = 86. |
+| **Diagnostic package** | Select a ZIP destination and, optionally, specific logs. The archive is created locally; nothing is sent automatically. |
+
+Batches run **sequentially**, show per-case errors and support cancellation. Successful files remain; existing files are not overwritten. Game seeds in packages are setup notes and do not affect template generation. Copy **only `.rmg.json`** into `map_templates`, not the ZIP.
+
+Packages include only selected materials. If exact settings contain known credential fields, including `.oetgs` is blocked: save without settings or remove such data from your own copy. Original private settings are not modified. Author descriptions retain their exact input, so review them before sharing.
+
+Diagnostics contain reduced settings, validation results and bounded portions of explicitly selected logs. Known path and credential patterns are masked; truncated and unreadable logs appear in the receipt. Complete imported native schemas are replaced by **byte size, SHA-256 and an omission reason**; the original `.oetgs` stays intact. Game assets and dumps are not added. Review the archive before manually sharing it; arbitrary unknown text cannot be assumed automatically anonymous.
+
+### New windows
+
+| Map options | Alliances |
+|:---:|:---:|
+| <img src="docs/ui-map-options-en.png" alt="Generation profile and map options" width="100%"/> | <img src="docs/ui-alliances-en.png" alt="Team assignments and alliance locks" width="100%"/> |
+| **Rules and calendar** | **Environment and content** |
+| <img src="docs/ui-calendar-en.png" alt="Victory rules and battle calendar" width="100%"/> | <img src="docs/ui-environment-en.png" alt="Rivers, troop growth and game rules" width="100%"/> |
+| **Game catalog** | **Native schema** |
+| <img src="docs/ui-game-catalog-en.png" alt="IDs and actual reward variants" width="100%"/> | <img src="docs/ui-native-schema-en.png" alt="Conditional native schema editor" width="100%"/> |
+| **Template properties** | **Pool creator** |
+| <img src="docs/ui-template-properties-en.png" alt="Template properties and rules" width="100%"/> | <img src="docs/ui-pool-creator-en.png" alt="Fractional weights and object variants" width="100%"/> |
+
+---
+
 ## 🖼 Preview panel & generation
 
 The right column of the window:
@@ -478,7 +608,7 @@ How equal the players' starting conditions are. For each player it considers: th
 - "Players N and M start close together"
 - "The map is well balanced" — when everything is even
 
-> Symmetry isn't a field in the `.rmg.json` format — it emerges from the topology. So we **measure** balance rather than impose it. For the fairest 1v1 play, pick the **Balanced** topology or the **Tournament** mode.
+> The report measures the resulting graph. **Equal starts** and **Team symmetry** align selected starting conditions and structural settings before generation; they do not guarantee identical geometry or actual object placement.
 
 ### 🔍 What's inside the map
 
@@ -494,7 +624,7 @@ The **"🗺 Editor"** button below Save in the right panel opens an interactive 
 
 - **Canvas:** zones are shown as nodes (🟢 player · 🔵 hub · 🟤/⚪/🟡 neutral by quality), connections as edges (gold = direct, dashed cyan = portal, dashed brown = road). There's a grid, a **legend** and a controls hint.
 - **Navigation:** wheel to zoom (or **−/+** buttons), drag the background to pan, **"Reset view"** and **"Auto-layout"**.
-- **Editing:** drag zones; the **inspector** on the right is grouped into tabs (**Main · Guard · Pools · Content · Biome · Objects**) and edits **every** serializable field of the selected zone (name, size, layout, diplomacy, guard cutoff/randomization/increment, guard reaction, encounter holes, content pools and their value, zone/content/meta-object biomes, roads, castle/outpost, main objects with faction/owner) or connection (name, from/to, type, guard strength and zone, increment, gate, length, road).
+- **Editing:** drag zones; the **inspector** on the right is grouped into tabs (**Main · Guard · Pools · Content · Biome · Objects**) and edits supported fields of the selected zone (name, size, layout, diplomacy, guard cutoff/randomization/increment, guard reaction, encounter holes, content pools and their value, zone/content/meta-object biomes, roads, castle/outpost, main objects with faction/owner) or connection (name, from/to, type, guard strength and zone, increment, gate, length, road). Use the JSON editor for other fields; unknown properties are retained.
 - **⇄ Mirror mode:** edit one half of the map and the other half follows (zones, properties, connections). The vertical axis through the middle of the canvas is drawn dashed; zones on the axis count as the shared middle and are never duplicated. When switching the mode on you can rebuild the right half from the left in one step — starts on the new half take the next free player numbers. A symmetric 1v1 or 2v2 comes together in a couple of minutes.
 - **⬇ Import from .h3t (Heroes III / HotA templates):** reads zones and their roles, sizes, player starts, guarded connections and roads. The **structure** is carried over — content and balance use our own defaults and still need tuning.
 - **Deletion and factions:** deleting a town updates object indices in faction references and roads. A `Match` to a removed source becomes a random faction; a `differentFrom` restriction on it is removed. Deleting a zone handles all its objects. Undo restores the rules and zone position. Mirrored copies reference sources on their own side of the map.
@@ -514,7 +644,7 @@ The **"🗺 Editor"** button below Save in the right panel opens an interactive 
 - **📄 JSON · 🔗 Connections · 🧭 Orientation · ❔ Help** (editor toolbar): **JSON** — preview and directly edit the current template as JSON (Apply / Reformat / Copy buttons); **Connections** — a table of all connections for bulk editing (name, type, guard, road, guard escape); **Orientation** — map orientation and border (water, obstacles, corner radius); **Help** — a built-in editor reference.
 - **Zone copy/paste:** `Ctrl+C` / `Ctrl+V` create a uniquely named copy. A copied player start becomes a neutral town; duplicate player spawns and roads pointing to the original connections are removed.
 - **↶ Undo / ↷ Redo:** `Ctrl+Z` / `Ctrl+Y` roll back and reapply any edit (up to 50 steps) — inspector fields, zone/connection add/delete, paste, JSON edits. Your manual node layout is preserved.
-- **Zone & connection counter** in the status bar; above **48 zones** it turns into a warning: the engine is verified up to 48 (the size of the biggest stock template, Full Hire) — beyond that at your own risk.
+- **Zone & connection counter** in the status bar; above **48 zones** it turns into a warning. This is a reference based on Full Hire, not a proven engine limit; check large graphs separately in game.
 - Keys: `Del` — delete the selection, `Ctrl+C`/`Ctrl+V` — copy/paste a zone, `Ctrl+Z`/`Ctrl+Y` — undo/redo, `Esc` — cancel connecting / clear the selection.
 
 **New editor tools (v1.7):**
@@ -544,7 +674,7 @@ The connection manager commits edits only when you click **Apply**. Closing canc
 - **Capturable faction town.** The **"🏰 Make a capturable faction town"** button in the object inspector leaves the town **unowned** (empty "Owner") and pins it to a chosen faction — a full town of that faction that becomes yours **only once you capture it**. Empty "Owner" = neutral/capturable; a chosen "Owner" = the town belongs to that player from turn one.
 - **Manual biomes (the "Biome" tab).** A zone has three biome fields — **zone biome** (terrain), **content biome** (the look of filler objects) and **meta-objects biome** (decorations). Each is a "type + args" rule: **MatchMainObject** `0` — biome follows the faction of the zone's town (the default for castle zones); **MatchZone** `zone name` — copy the named zone's biome; **FromList** `list of biomes` — a random one from the list (7 biomes: Grass, Snow, Lava, Sand, Dirt, Deathland, Autumn; an empty list = any). Example: to paint the zones next to a player in their faction's biome, set their "Zone biome" = `MatchZone` with the spawn zone's name (`Spawn-A`) — the stock game templates (Blitz) are built exactly like that.
 
-> The editor reuses the same layout as the preview, so the graph matches the generated map. Node positions are for clarity only (the `.rmg.json` stores no coordinates — the game computes them).
+> The editor uses the same diagram as the generator preview. Node positions illustrate the graph and do not set game coordinates: the game computes the actual geometry.
 
 ---
 
@@ -559,9 +689,31 @@ AuroraRMG is **fully bilingual** — Russian and English.
 
 ---
 
-## 🎲 Built-in presets (43)
+## 🎲 Built-in presets (53 and 43 Legacy)
 
-Presets focus first and foremost on fair 1v1 play, but there are also FFA, special modes and **PvE** (one player vs several computers). Each one is tested: an automated test verifies the generated map really matches the description. They open via the **"Preset ▾"** button — presets are grouped by mode type in a dropdown menu.
+**Preset ▾** contains **53 current presets**: 43 updated Olden Era 0.81.04 configurations and 10 team presets. **43 Aurora 1.11 / Legacy presets** remain in a separate group. They retain the earlier content tables and ordinary seed conversion; shared bug fixes and format checks apply to both profiles. The same seed does not promise the same result across different profiles.
+
+The 43 base scenarios below are available in current and Legacy profiles. Automated tests check structure and settings; actual play still requires in-game validation. For PvE, assign human/AI roles and difficulty in lobby, and configure alliances through Teams and map options.
+
+The [ReadyMaps](ReadyMaps) folder contains **53 current `.rmg.json` files** ready to copy into the game's template folder. Older ready-made files are retained in the [v1.11.0 tag](https://github.com/sany86russ/AuroraRMG/tree/v1.11.0/ReadyMaps); the 43 Legacy configurations remain available in the app menu.
+
+<details open>
+<summary><b>🤝 Teams and co-op (10 new presets)</b></summary>
+
+| Preset | Composition and structure |
+|---|---|
+| 2 vs 2 | Two teams, team regions |
+| 3 vs 3 | Two teams, team lanes |
+| 4 vs 4 | Two teams, team regions |
+| Three teams of two | 2v2v2 around a shared arena |
+| Four teams of two | 2v2v2v2 around a shared arena |
+| Two friends vs six | 2v6, team regions |
+| Three friends vs five | 3v5, team lanes |
+| Four friends vs four | 4v4, team lanes |
+| Teams: single hero | 2v2, single-hero mode, shared arena |
+| Long PvE: two friends | 2v6, exploration, more neutral zones |
+
+</details>
 
 <details>
 <summary><b>🗡 1v1 — Classic (20 presets)</b></summary>
@@ -587,7 +739,7 @@ Presets focus first and foremost on fair 1v1 play, but there are also FFA, speci
 | Portals | Player isolation + lots of portals |
 | Mega-rich (sandbox) | Maximum resources/structures, two starting towns |
 | Asceticism (survival) | Few resources, strong neutrals — a fight for every mine |
-| Deep water | Wide water borders and portals — a naval map |
+| Deep water | Wide water borders and portals; no guarantee of naval travel |
 
 </details>
 
@@ -646,14 +798,16 @@ For those who like to fight against computers. One player against several AIs on
 
 **Main victory conditions** (the "Main victory condition" dropdown):
 
-| Condition | Description |
-|---|---|
-| **Standard** | Destroy all opponents. |
-| **Accumulate resources** | Win by accumulating resources. |
-| **Accumulate gold** | Win by accumulating gold. |
-| **Capture a specified town** | Win by capturing a specific town. |
-| **City Hold** | Capture and hold a designated town (City Hold). |
-| **Tournament** | Tournament mode (a series of battles). |
+| Condition | Card code | Behavior |
+|---|---|---|
+| **Classic** | `win_condition_1` | Defeat opponents under classic rules. |
+| **Capital Hold** | `win_condition_3` | Enables loss of the key starting town with the configured countdown. |
+| **Final Battle** | `win_condition_4` | Arena and final fight; the current profile requires two individual opponents. |
+| **City Hold** | `win_condition_5` | Capture the marked neutral town and hold it for the configured number of days. |
+| **Tournament** | `win_condition_6` | A series of battles between two individual opponents. |
+| **Guardian's Demise** | `win_condition_8` | Enables defeat on loss of the key starting hero. |
+
+A card code describes the mode; actual behavior depends on rules and marked objects. Separate Capital Capture/Capital Battle modes with codes 2/7, resource/gold accumulation and 3–8-player tournament brackets are not offered as implemented features.
 
 You can additionally enable **defeat on losing the starting town/hero** — independent of the main condition.
 
@@ -666,17 +820,19 @@ Capture a designated town and hold it for a set number of days.
   - **other topologies** → the highest-quality neutral zone, as equidistant as possible from all players, is chosen.
 - The town is marked with a **gold house icon** on the preview.
 - If a suitable town can't be determined, generation is blocked (you'll see a message in validation).
+- **Resetting the timer on owner changes** and allowing classic victory are configured separately under Rules and calendar. In the editor, towns use a City Hold target flag.
 
 ### ⚔ Tournament
 
 A competitive 1v1 mode with an isolated prep phase.
 
-- Available **only with exactly 2 players** — otherwise generation is blocked.
-- Each player starts in a **fully isolated cluster**; you can't reach the opponent until the tournament begins.
+- Available **only for two individual opponents**. Two players in one alliance and multi-team tournaments are rejected.
+- The graph gives each player an **isolated preparation cluster**; tournament battles are scheduled by the calendar.
 - Neutral zones are **balanced by quality** between the sides.
 - The order of zones in a cluster is **random but mirrored** — both players get the same layout.
 - Supports topologies: **Chain/Ring** (two mirrored chains), **Random** (two mirrored clusters), **Hub** (each gets a private hub).
 - Parameters: **first battle on day**, **days between battles**, **points to win**.
+- **Map and tools → Teams and map options → Rules and calendar** accepts explicit battle dates and announcement lead time; army preservation remains in the main tournament settings.
 
 ### 🧭 Single player (RPG/PvE) `[EXPERIMENTAL]`
 
@@ -685,8 +841,8 @@ For those who want to **roam a map solo** — RPG-campaign style: collecting, fi
 - In **Simple mode** — the **"Single player (RPG/PvE, experimental)"** game type; in **Advanced** — just set the **"Players" slider to 1**.
 - The map has **exactly one spawn** (only your hero(es)); everything else is neutral zones to explore.
 - The goal is to **capture and hold a neutral city** (*City Hold* mode, 1 day to hold → effectively "take the city and you win").
-- ⚠️ **Experimental:** no official template ever shipped a 1-player map, so **be sure to test that the game launches it**. Feedback is very welcome.
-- Winning "by a specific artifact" and a fully scripted playthrough aren't available in the engine — those are hand-authored-map features, not the generator.
+- ⚠️ **Experimental:** check that your installed game can launch and finish this scenario. Feedback is very welcome.
+- Victory by a specific artifact and a complete scripted playthrough are not implemented in AuroraRMG.
 
 ---
 
@@ -696,10 +852,12 @@ Tell the two file types apart:
 
 | File | What it is | How to create |
 |---|---|---|
-| **`.oetgs`** (settings) | Advanced-mode settings — to continue tuning later | 💾 / 💾… in the header (`Ctrl+S` / `Ctrl+Shift+S`) |
+| **`.oetgs`** (settings) | Complete generator, profile and seed snapshot, including imported values and fields not fully represented by ordinary controls | 💾 / 💾… in the header (`Ctrl+S` / `Ctrl+Shift+S`) |
 | **`.rmg.json`** (template) | A finished game map template | **"Create template" → "Save"** |
 
 Open previously saved settings — 📂 (`Ctrl+O`). Reset everything to defaults — 🔄 (`Ctrl+N`).
+
+Loading retains unknown fields and exact snapshot parameters. Editing a represented field changes it without replacing other complex settings with a simplified set. For repetition, share `.oetgs`, the template seed and Aurora/algorithm version; another profile or version may give a different result. Save graphs modified in a separate editor window as `.rmg.json` from that window.
 
 Saving writes a complete temporary file before replacing the destination: a failed write does not truncate the previous template or settings. “Save to game folder” asks before replacing an existing template.
 
@@ -713,7 +871,7 @@ Game templates `.rmg.json` live here:
 <Olden Era install folder>\HeroesOldenEra_Data\StreamingAssets\map_templates
 ```
 
-> AuroraRMG tries to **find** this folder via the Steam registry and open the save dialog right there. If the game is installed in a non-standard place (another drive, a custom Steam library) — just point to the path manually in the dialog.
+> AuroraRMG discovers the game through Steam libraries and its manifest. Set an explicit install path in **Map and tools → Teams and map options → Game and profile**; it is used for the catalog and template-folder discovery. You can also choose a destination manually in the save dialog.
 
 > 💡 In **Simple Mode** the **"💾 Save to game folder"** button drops the map into this folder automatically (it just asks for a name) — no path picking needed.
 
@@ -751,15 +909,15 @@ Tips based on how the generator and the Olden Era engine work — they help you 
 - **Neutral zone quality** = how rich and heavily guarded it is. "Strong" zones give better rewards, but their guards are tougher.
 - **"Towns in neutral zones"** only applies to zones flagged "with town".
 - **The economy** is easiest to tune with three sliders: "Resource frequency", "Structure frequency" and "Neutral army strength". For a sandbox — crank resources up and army strength down; for hardcore — the opposite.
-- **Signature landmarks.** Neutral zones are guaranteed one notable object matching the zone's tier (dragon utopias, research labs, observatories, etc.) — so a map feels designed, not merely random.
+- **Signature landmarks.** Neutral zones request notable mandatory objects matching their quality (dragon utopias, research labs, observatories, etc.). Actual placement depends on the game and available space.
 
 ### Terrain and the engine
 
 > [!NOTE]
-> Olden Era has exactly **7 biomes** (Grass, Snow, Lava, Sand, Dirt, Deathland, Autumn). **There are no underground or multi-level maps.** There's also no "symmetry" field — symmetry emerges naturally from the chosen topology.
+> Aurora offers **7 built-in biomes** (Grass, Snow, Lava, Sand, Dirt, Deathland, Autumn) and builds a single-level graph. Symmetry of conditions aligns player/team settings and structure; it does not guarantee identical world geometry.
 
 - **"Terrain type → By faction"** is the engine's default behaviour: a zone's terrain is determined by its town's faction. There's no separate "faction picker per zone" in the editor — the engine assigns towns itself.
-- **"Water amount"** adds water borders between zones; the water style matches the chosen biome. For naval maps combine water with portals.
+- **"Water amount"** adds water borders between zones; the style follows the biome. Portals can connect separated zones. These options do not promise ships, navigable water or naval gameplay.
 
 ### Special modes
 
@@ -773,31 +931,31 @@ Tips based on how the generator and the Olden Era engine work — they help you 
 
 > [!WARNING]
 > Anything tagged `[EXP.]` isn't fully tested and may produce broken maps:
-> - **Large maps** (256×256 … 512×512): no official template ships this big; the game engine handles them (players run games at 300–400), but behaviour on the very largest (near 512) isn't guaranteed.
+> - **Sizes above 256×256, up to 512×512**: 256×256 is standard; larger values require separate generation, memory and performance checks in your installed game version.
 > - **Zone fine-tuning** (zone sizes, guard spread) and **mandatory "Extra Content"**: the generator places content *where possible* and is limited by free space. Overdoing mandatory content breaks balance, especially on small maps and with small player zones.
 
 > [!CAUTION]
-> The generator only guarantees a valid `.rmg.json`. **In-game playability is not guaranteed** — the project is in active development (hence the "Work in progress" warning in the header). Test new templates in a quick game before playing seriously.
+> The editor validates JSON, known references and template structure. **In-game playability is not guaranteed.** Test new templates in a quick game, including alliances, victory conditions, the next week and save/load.
 
 ### Technical details
 
 - **The `.rmg.json` format** is a template (generation rules), not a finished map. The game builds a concrete map from the template when a game starts, anew each time.
 - **Map sizes** in the dropdown are tagged with letters: S / M / L / XL / H (huge) / G (giant) / C (colossal — experimental).
 - **The `.exe` is self-contained** (single-file, self-contained): the .NET runtime is bundled, nothing to install.
-- **Auto-detecting the game path** goes through the Steam registry; for a non-standard install you can set the path manually in the save dialog.
+- **Game discovery** uses Steam libraries and the manifest; select an explicit install folder under Game and profile. Refresh the local catalog after a patch.
 
 ---
 
 ## ❓ FAQ
 
 **What's the difference between Simple and Advanced mode?**
-**Simple** — pick a few basic options and hit "Create map"; everything else is chosen automatically (great for a quick game). **Advanced** — full manual control over every parameter across four tabs. The toggle is in the header, next to the language; it opens in Simple by default. A Simple-mode map can be "Opened in Advanced" and refined. More: [Working modes](#-working-modes-simple-and-advanced).
+**Simple** — pick a few basic options and hit "Create map"; other parameters are chosen automatically. **Advanced** — manual settings across four tabs and a graph editor. **Map and tools** is available in both modes for profiles, alliances, calendars and file sharing. The mode toggle is in the header; Simple is the default. A result can be "Opened in Advanced" and refined. More: [Working modes](#-working-modes-simple-and-advanced).
 
 **What is the "seed" in Simple Mode?**
-The same seed, settings and generator version produce the same template. Share them together or send the `.rmg.json` file. The game builds the actual world and object placement. The 🎲 button rolls a new random seed, 📋 copies the current one.
+This is the **Aurora template seed**. Retain the full `.oetgs`, profile and algorithm version for repetition. The game seed is separate; recording it in setup notes does not change the game lobby. 🎲 = new random seed, 📋 = copy the current one.
 
-**Can I create maps bigger than 240×240?**
-Yes. In **Simple Mode** pick the **"Huge (256–400)"** size; in **Advanced** tick **"🗺 Large maps: 256×256 … 512×512"** right under the size picker — the larger sizes (up to 512×512) appear in the list. Official templates stop at 240×240, but the game engine handles larger maps (which is why the option is marked experimental).
+**Can I create maps bigger than 256×256?**
+Yes. In **Advanced**, enable **Large maps** under the size picker to select experimental values **272×272 … 512×512**. Current Simple mode's Huge uses the standard 256×256; Legacy keeps its earlier 256–400 band. Sizes above 256 need separate in-game generation and performance checks.
 
 **What does "Balance: NN/100" mean?**
 It's a measure of how equal the players' starting conditions are (wealth, room to expand, distances, castle access). The higher, the fairer the map; specific notes appear alongside. More: [Map analysis](#-map-analysis-balance--contents).
@@ -819,6 +977,15 @@ The check runs at launch and needs internet; with the `--minimized` flag it's di
 
 **Do I need a separate .NET?**
 No. The runtime is bundled in the `.exe`.
+
+**Where do I configure 2v2 or co-op against AI?**
+Map and tools → Teams and map options → Alliances. Assign teams and save the template; choose humans/AI and difficulty in lobby/hotseat. Hero limits control hiring capacity, not the number of automatically spawned heroes.
+
+**I turned portals off, but the game created one.**
+The checkbox disables only extra Aurora portals. The game can replace a failed Direct/Default passage with a portal; there is no strict zero-portal guarantee.
+
+**Can I share diagnostics or a native schema?**
+Diagnostics are local, record truncation and mask known private patterns; inspect the archive before sharing it manually. Native schemas are saved as separate copies outside the game folder; game-picker selection is unconfirmed. Use template ZIP packages to share maps, and copy only `.rmg.json` into the game folder.
 
 ---
 
@@ -886,16 +1053,19 @@ That's where the very idea and the basic approach to programmatically building `
 
 What was added and reworked in AuroraRMG:
 
-- ⚡ **Simple Mode / Quick Generate** — a playable random map in a few clicks (+ a seed for reproducibility and sharing);
+- ⚡ **Simple Mode / Quick Generate** — a random template in a few clicks (+ seed and complete snapshot for repetition);
 - 🛣 the **"Lanes" topology** — parallel bronze→silver→gold corridors converging on a central arena;
 - ⚖ **map analysis** — a balance score 0–100 and a "what's inside" breakdown right after generation;
 - 🛡 **zone border guards** — adjustable guard strength on the passages between zones (a "face-control");
-- 🗺 **large maps** up to **512×512** (beyond the official 240×240 cap);
+- 🗺 **256×256 standard**, experimental sizes above 256 up to **512×512**;
 - 🌑 a new look — the dark neon **Aurora** theme, a new icon/logo and branded menus;
 - 🌍 **full bilingual localization (RU/EN)** with an instant language switch in the header;
 - 🗺 a **visual zone-graph editor** (canvas, inspector, validation, PNG export, castle/outpost, manual control of connections/portals/guards);
 - 🚫 **hero bans** (full roster with names from the game assets) on top of item and spell bans;
-- 🎲 a set of **43 built-in presets** (incl. **PvE 1×2…1×7**) with matching auto-tests, grouped in a menu;
+- 🎲 **53 current presets** (43 updated + 10 team presets) and separate **43 Legacy** configurations, with structural checks;
+- 🤝 actual **alliances and co-op**, battle calendars, rivers, troop growth and detailed structural reports;
+- 📚 live game catalog, template properties, bulk zone editing, fractional weights and unknown-field preservation;
+- 📦 complete `.oetgs`, ZIP packages, seed batches, local diagnostics and a separate native schema editor;
 - ⚙️ expanded environment options (terrain, aggression, water, diplomacy, lakes, holes) and zone fine-tuning;
 - 🦸 reworked hero-limit input (slider + −/+ buttons + field, max 12);
 - 🔄 a built-in **auto-update** system + a CI build with **provenance attestation**.
@@ -913,6 +1083,8 @@ See the full list in [CONTRIBUTORS.md](CONTRIBUTORS.md).
 **[StabiLink Desktop](https://github.com/sany86russ/StabiLink-Desktop)** — if Discord or YouTube are unstable for you and you don't feel like fiddling with manual bypass settings: an access stabiliser + VPN for PC and phones (Android/iOS). A nice bonus — you don't need to switch it off for marketplace or banking apps.
 
 ---
+
+<a id="disclaimer-license"></a>
 
 ## ⚠️ Disclaimer & license
 

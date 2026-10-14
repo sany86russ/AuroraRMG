@@ -24,9 +24,7 @@ namespace Olden_Era___Template_Editor.Services
     /// </summary>
     public static class EditorLayoutStore
     {
-        private static string Dir => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AuroraRMG", "editor-layouts");
+        private static string Dir => Path.Combine(GameData.AppDataPaths.Root, "editor-layouts");
 
         /// <summary>
         /// Sidecar path for a template file: a readable prefix (so the folder can be browsed by hand)

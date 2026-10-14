@@ -856,10 +856,12 @@ public class TemplateGeneratorTests
     [Fact]
     public void KnownValues_ExperimentalMapSizesContinueOfficialIncrementThrough512()
     {
-        Assert.Equal(240, KnownValues.MaxOfficialMapSize);
-        Assert.Equal(256, KnownValues.ExperimentalMapSizes[0]);
+        Assert.Equal(256, KnownValues.MaxOfficialMapSize);
+        Assert.Contains(256, KnownValues.MapSizes);
+        Assert.False(KnownValues.IsExperimentalMapSize(256));
+        Assert.Equal(272, KnownValues.ExperimentalMapSizes[0]);
         Assert.Equal(512, KnownValues.ExperimentalMapSizes[^1]);
-        Assert.Equal(17, KnownValues.ExperimentalMapSizes.Length);
+        Assert.Equal(16, KnownValues.ExperimentalMapSizes.Length);
         Assert.All(KnownValues.ExperimentalMapSizes, size => Assert.Equal(0, size % 16));
         Assert.Equal(KnownValues.MapSizes.Length + KnownValues.ExperimentalMapSizes.Length, KnownValues.AllMapSizes.Length);
     }
@@ -1580,10 +1582,9 @@ public class TemplateGeneratorTests
     }
 
     [Fact]
-    public void QuickGenerate_HugeScale_ProducesLargeExperimentalMap()
+    public void QuickGenerate_LegacyHugeScaleRetainsItsSizeBandAfter256BecomesOfficial()
     {
-        // The Huge scale is the answer to "I want maps bigger than 240×240": it must always land
-        // above the official cap, inside the experimental size set, and stay in the ≈256–400 band.
+        // Legacy keeps its seeded 256–400 band; 256 is now an official size.
         foreach (QuickGameType type in Enum.GetValues<QuickGameType>())
         foreach (QuickGameLength length in Enum.GetValues<QuickGameLength>())
         for (int seed = 0; seed < 8; seed++)
@@ -1596,8 +1597,7 @@ public class TemplateGeneratorTests
             });
             string id = $"{type}/{length} p={players} seed={seed}";
 
-            Assert.True(s.MapSize > KnownValues.MaxOfficialMapSize, $"{id}: {s.MapSize} not above the 240 cap");
-            Assert.True(KnownValues.IsExperimentalMapSize(s.MapSize), $"{id}: {s.MapSize} not an experimental size");
+            Assert.True(KnownValues.MapSizes.Contains(s.MapSize) || KnownValues.IsExperimentalMapSize(s.MapSize), $"{id}: unsupported size {s.MapSize}");
             Assert.InRange(s.MapSize, 256, 400);
         }
     }
@@ -1713,6 +1713,12 @@ public class TemplateGeneratorTests
                 Scale = QuickMapScale.Medium, Length = QuickGameLength.Medium, Chaos = QuickChaos.Normal,
                 VictoryCondition = victory,
             };
+            if (type == QuickGameType.Team && victory == "win_condition_6")
+            {
+                var error = Assert.Throws<ArgumentException>(() => RandomTemplateBuilder.Build(opts));
+                Assert.Contains("two-player", error.Message);
+                continue;
+            }
             GeneratorSettings s = RandomTemplateBuilder.Build(opts);
             string id = $"{victory}/{type} seed={seed}";
 
@@ -2117,7 +2123,7 @@ public class TemplateGeneratorTests
         RmgTemplate template = TemplateGenerator.Generate(new GeneratorSettings());
 
         Zone spawn = FirstSpawnZone(template);
-        Assert.Equal(new[] { 60, 20, 10, 10, 2, 0 }, spawn.GuardReactionDistribution);
+        Assert.Equal(new double[] { 60, 20, 10, 10, 2, 0 }, spawn.GuardReactionDistribution);
     }
 
     [Fact]
@@ -2128,8 +2134,8 @@ public class TemplateGeneratorTests
         Zone aggressive = FirstSpawnZone(TemplateGenerator.Generate(
             new GeneratorSettings { MonsterAggression = MonsterAggression.Aggressive }));
 
-        List<int> passiveDist = passive.GuardReactionDistribution ?? [];
-        List<int> aggressiveDist = aggressive.GuardReactionDistribution ?? [];
+        List<double> passiveDist = passive.GuardReactionDistribution ?? [];
+        List<double> aggressiveDist = aggressive.GuardReactionDistribution ?? [];
 
         // Passive favours the calmest bucket (index 0); aggressive favours the fight buckets (3-5).
         Assert.True(passiveDist[0] > aggressiveDist[0]);

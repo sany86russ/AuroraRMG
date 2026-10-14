@@ -76,9 +76,7 @@ namespace Olden_Era___Template_Editor.Services
         public static IReadOnlyDictionary<EditorAction, string> DefaultsCopy =>
             new Dictionary<EditorAction, string>(Defaults);
 
-        private static string FilePath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AuroraRMG", "editor-hotkeys.json");
+        private static string FilePath => Path.Combine(GameData.AppDataPaths.Root, "editor-hotkeys.json");
 
         private static Dictionary<EditorAction, string> Load()
         {

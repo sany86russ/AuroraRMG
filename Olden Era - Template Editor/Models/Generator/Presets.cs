@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using OldenEraTemplateEditor.Models;
 using OldenEraTemplateEditor.Services.ContentManagement;
+using Olden_Era___Template_Editor.Services;
 
 namespace Olden_Era___Template_Editor.Models
 {
@@ -92,7 +93,7 @@ namespace Olden_Era___Template_Editor.Models
             ["1v1 Классика — Порталы"]                  = "Random layout, players isolated, many portals between zones.",
             ["1v1 Классика — Мега-богатая (песочница)"] = "Maximum resources and structures, passive monsters, two starting towns.",
             ["1v1 Классика — Аскеза (выживание)"]       = "Few resources and structures, strong neutrals — a fight for every mine.",
-            ["1v1 Классика — Глубокая вода"]            = "Wide water borders and portals — a naval map.",
+            ["1v1 Классика — Глубокая вода"]            = "Wide water borders and portals; routes depend on generated land passages and portals.",
             ["FFA 8 игроков — Хаб"]                     = "Eight players around one big central hub.",
         };
 
@@ -610,7 +611,7 @@ namespace Olden_Era___Template_Editor.Models
                 }),
 
             new("1v1 Классика — Глубокая вода",
-                "Широкие водные границы и порталы — морская карта.",
+                "Широкие водные границы и порталы. Маршруты зависят от проходов по суше и порталов.",
                 new SettingsFile
                 {
                     TemplateName = "1v1 Deep Water", PlayerCount = 2, MapSize = 160,
@@ -640,6 +641,8 @@ namespace Olden_Era___Template_Editor.Models
         /// </summary>
         public static GeneratorSettings ToGeneratorSettings(SettingsFile s)
         {
+            System.ArgumentNullException.ThrowIfNull(s);
+            if (SettingsSnapshotMapper.RestoreSnapshot(s) is { } captured) return captured;
             // The generator reads neutral zones ONLY from the per-tier counts. A "simple" preset that
             // uses NeutralZoneCount must be converted to medium-tier zones first (the editor does the
             // same on load), otherwise the map would generate with zero neutral zones.
@@ -655,8 +658,10 @@ namespace Olden_Era___Template_Editor.Models
 
             return new GeneratorSettings
             {
+            Seed = s.Seed ?? s.ProfileOptions?.TemplateSeed,
+            ProfileOptions = s.ProfileOptions?.Clone() ?? new(),
             TemplateName = s.TemplateName,
-            GameMode = "Classic",
+            GameMode = s.GameMode,
             SingleHeroMode = s.SingleHeroMode,
             PlayerCount = s.PlayerCount,
             HeroSettings = new HeroSettings
@@ -705,6 +710,7 @@ namespace Olden_Era___Template_Editor.Models
             },
             MinNeutralZonesBetweenPlayers = s.AdvancedMode ? s.MinNeutralZonesBetweenPlayers : 0,
             MatchPlayerCastleFactions = s.MatchPlayerCastleFactions,
+            MatchSpawnTerrainToFaction = s.MatchSpawnTerrainToFaction,
             PlayerStartsWithCastles = s.PlayerStartsWithCastles,
             NeutralCastleFaction = s.NeutralCastleFaction,
             NoDirectPlayerConnections = s.NoDirectPlayerConn,
@@ -736,7 +742,16 @@ namespace Olden_Era___Template_Editor.Models
                 PointsToWin = s.TournamentPointsToWin,
                 SaveArmy = s.TournamentSaveArmy,
             },
-            PlayerZoneMandatoryContent = DefaultPlayerMines(),
+            BannedItems = s.BannedItems,
+            BannedMagics = s.BannedMagics,
+            BannedHeroes = s.BannedHeroes,
+            ValueOverridesText = s.ValueOverridesText,
+            Bonuses = SettingsSnapshotMapper.ReadBonuses(s.BonusesJson),
+            PlayerZoneMandatoryContent = s.PlayerZoneContentRows is null ? DefaultPlayerMines() : SettingsSnapshotMapper.ExpandRows(s.PlayerZoneContentRows),
+            LowNeutralMandatoryContent = SettingsSnapshotMapper.ExpandRows(s.LowNeutralContentRows),
+            MediumNeutralMandatoryContent = SettingsSnapshotMapper.ExpandRows(s.MediumNeutralContentRows),
+            HighNeutralMandatoryContent = SettingsSnapshotMapper.ExpandRows(s.HighNeutralContentRows),
+            HubZoneMandatoryContent = SettingsSnapshotMapper.ExpandRows(s.HubZoneContentRows),
             };
         }
 

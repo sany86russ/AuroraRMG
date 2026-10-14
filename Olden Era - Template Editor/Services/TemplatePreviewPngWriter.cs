@@ -191,6 +191,26 @@ namespace Olden_Era___Template_Editor.Services
                 DrawZone(dc, zone, positions[zone.Name]);
             foreach (Zone zone in orderedZones.Where(z => z.Name.StartsWith("Spawn-", StringComparison.Ordinal)))
                 DrawZone(dc, zone, positions[zone.Name], playerIcon: isTournamentSingleCluster);
+            DrawAllianceBadges(dc, template, orderedZones, positions);
+        }
+
+        private static readonly Color[] AllianceColors = [
+            Color.FromRgb(90, 180, 255), Color.FromRgb(255, 130, 110), Color.FromRgb(160, 220, 110),
+            Color.FromRgb(215, 150, 255), Color.FromRgb(255, 210, 90), Color.FromRgb(90, 230, 215),
+            Color.FromRgb(255, 140, 210), Color.FromRgb(210, 210, 210)];
+
+        private static void DrawAllianceBadges(DrawingContext dc, RmgTemplate template, List<Zone> zones, Dictionary<string, Point> positions)
+        {
+            var memberships = (template.SpawnInfos ?? []).Where(s => !string.IsNullOrWhiteSpace(s.Spawn) && s.AllianceIndex > 0)
+                .GroupBy(s => s.Spawn, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First().AllianceIndex!.Value, StringComparer.Ordinal);
+            foreach (var zone in zones)
+            {
+                string? spawn = zone.MainObjects?.FirstOrDefault(o => o.Type == "Spawn")?.Spawn;
+                if (spawn is null || !memberships.TryGetValue(spawn, out int team) || !positions.TryGetValue(zone.Name, out var position)) continue;
+                var brush = new SolidColorBrush(AllianceColors[(team - 1) % AllianceColors.Length]);
+                dc.DrawEllipse(null, new Pen(brush, 3), position, _zoneRadius + 5, _zoneRadius + 5);
+                DrawText(dc, "A" + team, new Point(position.X, position.Y - _zoneRadius - 14), Math.Max(10, _zoneRadius * .38), brush, centered: true);
+            }
         }
 
         // ── Zone ordering / layout ───────────────────────────────────────────────

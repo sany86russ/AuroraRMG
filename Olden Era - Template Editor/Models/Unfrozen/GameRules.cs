@@ -20,6 +20,18 @@ namespace OldenEraTemplateEditor.Models
         [JsonPropertyName("encounterHoles")]
         public bool? EncounterHoles { get; set; }
 
+        [JsonPropertyName("disableFactionLaws")]
+        public bool? DisableFactionLaws { get; set; }
+
+        [JsonPropertyName("disableMagicGuild")]
+        public bool? DisableMagicGuild { get; set; }
+
+        [JsonPropertyName("disableMagicCustomLearning")]
+        public bool? DisableMagicCustomLearning { get; set; }
+
+        [JsonPropertyName("customAI")]
+        public string? CustomAI { get; set; }
+
         [JsonPropertyName("tournamentRules")]
         public bool? TournamentRules { get; set; }
 
@@ -85,6 +97,9 @@ namespace OldenEraTemplateEditor.Models
 
         [JsonPropertyName("cityHoldDays")]
         public int? CityHoldDays { get; set; }
+
+        [JsonPropertyName("isResetColdownCityHold")]
+        public bool? IsResetColdownCityHold { get; set; }
 
         [JsonPropertyName("gladiatorArena")]
         public bool? GladiatorArena { get; set; }

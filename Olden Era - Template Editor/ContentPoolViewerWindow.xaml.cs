@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using OldenEraTemplateEditor.Models;
 using Olden_Era___Template_Editor.Services.Localization;
+using Olden_Era___Template_Editor.Services.ContentPools;
 
 namespace Olden_Era___Template_Editor
 {
@@ -14,11 +15,15 @@ namespace Olden_Era___Template_Editor
         private List<GamePool> _allPools = new();
         private Window? _debugWindow;
         private string _placeholder = "";
+        private readonly RmgTemplate? _template;
+        private readonly List<GamePool> _templatePools;
+        private PoolContentInspection? _inspection;
 
         private static string L(string key, params object[] args) => LocalizationManager.T(key, args);
 
-        public ContentPoolViewerWindow(List<string>? allPoolSids = null, List<string>? allSelectedPids = null, IEnumerable<GamePool>? templatePools = null)
+        public ContentPoolViewerWindow(List<string>? allPoolSids = null, List<string>? allSelectedPids = null, IEnumerable<GamePool>? templatePools = null, RmgTemplate? template = null)
         {
+            _template = template; _templatePools = (templatePools ?? []).ToList();
             InitializeComponent();
             LocalizationManager.Instance.LanguageChanged += OnLanguageChanged;
             Closed += (_, _) => LocalizationManager.Instance.LanguageChanged -= OnLanguageChanged;
@@ -28,6 +33,7 @@ namespace Olden_Era___Template_Editor
             ColSid.Header = L("S.PV.ColSid");
             ColWeight.Header = L("S.PV.ColWeight");
             ColBiome.Header = L("S.PV.ColBiome");
+            RefreshExtraHeaders();
 
             // Category filter — items are localised display strings; the filter switches on
             // SelectedIndex so translation never breaks the logic.
@@ -65,9 +71,15 @@ namespace Olden_Era___Template_Editor
             SearchBox.Text = _placeholder;
             SearchBox.Foreground = (Brush)FindResource("BrushTextDim");
 
+            Loaded += async (_, _) => await LoadPoolsAsync();
+        }
+
+        private async System.Threading.Tasks.Task LoadPoolsAsync()
+        {
             try
             {
-                _allPools = GamePoolDataLoader.GetAllPools().Concat(templatePools ?? [])
+                var loaded = await System.Threading.Tasks.Task.Run(() => GamePoolDataLoader.GetAllPools().ToList());
+                _allPools = loaded.Concat(_templatePools)
                     .GroupBy(pool => pool.Name, StringComparer.Ordinal).Select(group => group.Last()).ToList();
                 if (_allPools.Count == 0)
                 {
@@ -114,7 +126,8 @@ namespace Olden_Era___Template_Editor
                 .Select(key => L("S.PV.Cat." + key)).ToList();
             CategoryCombo.SelectedIndex = category;
             FilterPools();
-            if (PoolList.SelectedItem is GamePool pool) PoolDataGrid.ItemsSource = GamePoolDataLoader.GetPoolItems(pool);
+            RefreshExtraHeaders();
+            if (PoolList.SelectedItem is GamePool pool) ShowPool(pool);
             if (_debugWindow?.Content is ScrollViewer { Content: TextBlock text }) { _debugWindow.Title = L("S.PV.Debug"); text.Text = GetDebugInfo(); }
         }
 
@@ -153,7 +166,25 @@ namespace Olden_Era___Template_Editor
         private void PoolList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (PoolList.SelectedItem is GamePool pool)
-                PoolDataGrid.ItemsSource = GamePoolDataLoader.GetPoolItems(pool);
+                ShowPool(pool);
+            else { PoolDataGrid.ItemsSource = null; GroupSummary.Text = ""; _inspection = null; }
+        }
+
+        private void RefreshExtraHeaders()
+        {
+            ColGroup.Header = L("S.PV.ColGroup"); ColGroupWeight.Header = L("S.PV.ColGroupWeight");
+            ColVariant.Header = L("S.PV.ColVariant"); ColMissing.Header = L("S.PV.ColMissing");
+            ColGroupShare.Header = L("S.PV.ColGroupShare"); ColListShare.Header = L("S.PV.ColListShare");
+        }
+
+        private void ShowPool(GamePool pool)
+        {
+            _inspection = GamePoolDataLoader.InspectPool(pool, _template);
+            PoolDataGrid.ItemsSource = GamePoolDataLoader.GetPoolItems(pool, _template);
+            GroupSummary.Text = string.Join("\n", _inspection.Groups.Select(group => L("S.PV.GroupSummary", group.Index, group.Weight,
+                group.DirectItemCount, group.Dependencies.Count == 0 ? L("S.PV.DependenciesEmpty") : string.Join(", ", group.Dependencies.Select(dependency =>
+                    dependency.Name + " [" + L("S.PV.Origin." + dependency.Origin) + "]")))))
+                + (_inspection.Warnings.Count == 0 ? "" : "\n⚠ " + string.Join("\n⚠ ", _inspection.Warnings));
         }
 
         private void DebugBtn_Click(object sender, RoutedEventArgs e)
@@ -193,6 +224,9 @@ namespace Olden_Era___Template_Editor
         {
             var sb = new System.Text.StringBuilder();
             sb.AppendLine(GamePoolDataLoader.Status);
+            foreach (var warning in GamePoolDataLoader.Warnings) sb.AppendLine("⚠ " + warning);
+            if (GamePoolDataLoader.Source is { } source)
+                sb.AppendLine($"Build: {source.SteamBuildId ?? "?"}; version marker: {source.VersionMarker ?? "?"}\nCore SHA256: {source.SourceFingerprint}\nSchema SHA256: {source.SchemaFingerprint}");
             sb.AppendLine();
             sb.AppendLine(L("S.PV.DebugPoolsInMemory", _allPools.Count));
             foreach (var pool in _allPools.Take(20))

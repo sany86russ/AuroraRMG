@@ -13,12 +13,11 @@ namespace Olden_Era___Template_Editor.Services.Generation
     /// <see cref="QuickGenerateOptions"/> (plus a deterministic <see cref="QuickGenerateOptions.Seed"/>)
     /// into a complete <see cref="GeneratorSettings"/> by randomising every advanced knob within
     /// safe, curated ranges keyed to the player's choices — so each seed yields a genuinely
-    /// different but always-playable template, not one of a fixed set of presets.
+    /// different locally validated configuration, not one of a fixed set of presets.
     /// <para>
     /// The mapping is fully deterministic: the same options + seed always produce the same
-    /// <see cref="GeneratorSettings"/>. (Full map-level seed reproducibility additionally requires
-    /// threading the seed into <see cref="TemplateGenerator"/>'s internal placement RNG — a planned
-    /// follow-up; today the structural configuration is reproducible, micro-placement is not.)
+    /// <see cref="GeneratorSettings"/>. The seed also drives <see cref="TemplateGenerator"/>'s own
+    /// placement RNG; this does not reproduce the game's later map-generation randomness.
     /// </para>
     /// </summary>
     public static class RandomTemplateBuilder
@@ -36,14 +35,18 @@ namespace Olden_Era___Template_Editor.Services.Generation
             var rng = new Random(opts.Seed);
 
             bool solo = opts.GameType == QuickGameType.Solo;
-            int playerCount = NormalisePlayerCount(opts.GameType, opts.PlayerCount);
+            int playerCount = opts.GameType == QuickGameType.Team && (opts.ProfileOptions.IsCurrentProfile || opts.ProfileOptions.Alliances.Enabled)
+                ? Math.Clamp(opts.PlayerCount, 2, 8) : NormalisePlayerCount(opts.GameType, opts.PlayerCount);
             // Solo forces the "capture & hold a neutral city" goal — the only RMG win condition that reads as
             // an RPG objective ("take this city and you win"). Everything else stays as the player picked.
             string victory = solo ? "win_condition_5" : ResolveVictory(opts.VictoryCondition);
             bool tournament = victory == "win_condition_6";
-            if (tournament) playerCount = 2; // RMG tournament = two isolated 1v1 clusters
+            if (tournament && opts.ProfileOptions.Alliances.Enabled && (playerCount != 2
+                || AlliancePlan.Resolve(playerCount, opts.ProfileOptions.Alliances, opts.Seed).Groups.Any(g => g.Players.Count != 1)))
+                throw new ArgumentException("Tournament needs two opposing individual players. Select another victory condition for the requested teams.");
+            if (tournament) playerCount = 2; // Legacy tournament = two isolated 1v1 clusters.
 
-            int mapSize = PickMapSize(opts.Scale, opts.Length, playerCount, rng);
+            int mapSize = PickMapSize(opts.Scale, opts.Length, playerCount, rng, opts.ProfileOptions.IsCurrentProfile);
             // Lanes and Solo ARE topology choices, so they bypass the random topology pool (no rng draw for
             // them). Every other type keeps its exact historical draw → existing seeds stay byte-identical.
             MapTopology topology = opts.GameType switch
@@ -55,6 +58,7 @@ namespace Olden_Era___Template_Editor.Services.Generation
 
             var settings = new GeneratorSettings
             {
+                ProfileOptions = opts.ProfileOptions.Clone(),
                 TemplateName = ResolveName(opts),
                 GameMode = "Classic",
                 SingleHeroMode = false,
@@ -91,6 +95,13 @@ namespace Olden_Era___Template_Editor.Services.Generation
             // keeps a given seed's map structure byte-for-byte unchanged vs. before this feature; only
             // the guaranteed landmark content is added on top.
             SeedSignatureLandmarks(settings, rng);
+            if (opts.GameType == QuickGameType.Team)
+            {
+                if (tournament) throw new ArgumentException("Team games cannot use the verified two-player individual tournament profile.");
+                settings.ProfileOptions.Alliances.Enabled = true;
+            }
+            if (opts.ProfileOptions.IsCurrentProfile) settings.HeroSettings.HeroCountMax = Math.Min(10, settings.HeroSettings.HeroCountMax);
+            settings.ProfileOptions.TemplateSeed = opts.Seed;
             return settings;
         }
 
@@ -147,7 +158,7 @@ namespace Olden_Era___Template_Editor.Services.Generation
             };
         }
 
-        private static int PickMapSize(QuickMapScale scale, QuickGameLength length, int playerCount, Random rng)
+        private static int PickMapSize(QuickMapScale scale, QuickGameLength length, int playerCount, Random rng, bool currentProfile = false)
         {
             int[] band = scale switch
             {
@@ -156,7 +167,7 @@ namespace Olden_Era___Template_Editor.Services.Generation
                 // Experimental large maps (above the official 240 cap). Biased to the 300–400
                 // sweet spot players ask for; the game engine handles these even though no
                 // official template ships at this size.
-                QuickMapScale.Huge => [256, 288, 320, 352, 384, 400],
+                QuickMapScale.Huge => currentProfile ? [256] : [256, 288, 320, 352, 384, 400],
                 _ => [112, 128, 144, 160],
             };
             // Game length biases the pick within the band: short → smaller end, long → larger end.

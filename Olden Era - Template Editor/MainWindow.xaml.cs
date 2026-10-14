@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using Olden_Era___Template_Editor.Models;
 using Olden_Era___Template_Editor.Services;
 using OldenEraTemplateEditor.Models;
@@ -92,6 +92,7 @@ namespace Olden_Era___Template_Editor
         public MainWindow()
         {
             InitializeComponent();
+            Services.GameData.GameInstallationService.Instance.ManualInstallPath = Services.GameData.AppSettings.Current.GameInstallPath;
 
             // Launch quietly when started with --minimized (e.g. from a shortcut while gaming):
             // start in the taskbar without grabbing focus, so it never pops over a fullscreen game.
@@ -166,6 +167,9 @@ namespace Olden_Era___Template_Editor
             }
 
             // Clamp startup size to the available work area so the window never
+            InitializePatchHarness(cmdLine);
+
+            // Clamp startup size to the available work area so the window never
             // overflows the screen at high-DPI scaling (e.g. 125 %, 150 %, 200 %).
             var area = SystemParameters.WorkArea;
             if (Height > area.Height) { Height = area.Height; MinHeight = area.Height; }
@@ -211,6 +215,7 @@ namespace Olden_Era___Template_Editor
 
             UpdateLanguageButtons();
             InitSimpleMode();   // populate simple-mode combos/seed + apply the saved Simple/Advanced mode
+            InitializePatchControls();
 
             InitializeZoneContentPresets();
             InitializeDefaultPlayerZoneContents();
@@ -527,6 +532,11 @@ namespace Olden_Era___Template_Editor
             _isDirty = true;
             if (_generatedTemplate is not null)
                 _generatedTemplate.Name = TxtTemplateName.Text.Trim();
+            string name = TxtTemplateName.Text.Trim();
+            if (_generatedSettingsSnapshot is not null) _generatedSettingsSnapshot.TemplateName = name;
+            if (_lastQuickSettings is not null) _lastQuickSettings.TemplateName = name;
+            if (_loadedGeneratorSnapshot is not null) _loadedGeneratorSnapshot.TemplateName = name;
+            if (_loadedSnapshotUiBaseline is not null) _loadedSnapshotUiBaseline.TemplateName = name;
             UpdateTitle();
         }
 
@@ -537,6 +547,9 @@ namespace Olden_Era___Template_Editor
             TxtOutdatedWarning.Visibility = outdated ? Visibility.Visible : Visibility.Hidden;
             if (BtnSaveGenerated != null)
                 BtnSaveGenerated.IsEnabled = _generatedTemplate is not null && !outdated;
+            if (BtnSimpleSave != null) BtnSimpleSave.IsEnabled = _generatedTemplate is not null && !outdated;
+            if (BtnSimpleSaveToGame != null) BtnSimpleSaveToGame.IsEnabled = _generatedTemplate is not null && !outdated;
+            if (BtnSimpleOpenAdvanced != null) BtnSimpleOpenAdvanced.IsEnabled = _lastQuickSettings is not null && !outdated;
         }
 
         private void UpdateTitle()
@@ -1263,6 +1276,18 @@ namespace Olden_Era___Template_Editor
         {
             bool en = L.CurrentLanguage == Services.Localization.AppLanguage.En;
             var menu = new ContextMenu();
+            foreach (var (key, presets) in new[] { ("S.Patch.CurrentPresets", PatchPresets.Current), ("S.Patch.TeamPresets", PatchPresets.Cooperative) })
+            {
+                var section = new MenuItem { Header = L.Get(key) };
+                foreach (var preset in presets)
+                {
+                    var entry = new MenuItem { Header = en ? preset.NameEn : preset.NameRu, ToolTip = en ? preset.DescriptionEn : preset.DescriptionRu };
+                    entry.Click += (_, _) => { ApplySettings(PatchPresets.Clone(preset.Settings)); _currentSettingsPath = null; _isDirty = true; UpdateTitle(); Validate(); };
+                    section.Items.Add(entry);
+                }
+                menu.Items.Add(section);
+            }
+            var legacy = new MenuItem { Header = L.Get("S.Patch.LegacyPresets") };
             foreach (var group in Presets.All.GroupBy(p => p.GroupKey))
             {
                 var groupItem = new MenuItem { Header = L.Get(group.Key) };
@@ -1272,8 +1297,9 @@ namespace Olden_Era___Template_Editor
                     item.Click += PresetMenuItem_Click;
                     groupItem.Items.Add(item);
                 }
-                menu.Items.Add(groupItem);
+                legacy.Items.Add(groupItem);
             }
+            menu.Items.Add(legacy);
             BtnPreset.ContextMenu = menu;
         }
 
@@ -1879,8 +1905,28 @@ namespace Olden_Era___Template_Editor
             }
         }
 
-        private SettingsFile GatherSettings() => new()
+        private SettingsFile GatherSettings()
         {
+            if (SimpleView.Visibility == Visibility.Visible)
+            {
+                if (!ValidateSimpleSelections()) throw new ArgumentException(L.Get("S.Patch.SelectOptions"));
+                var input = !_templateOutdated && _generatedSettingsSnapshot is not null ? _generatedSettingsSnapshot
+                    : Services.Generation.RandomTemplateBuilder.Build(BuildQuickOptions());
+                return RetainSettingsMetadata(SettingsSnapshotMapper.FromGeneratorSettings(input));
+            }
+            var file = GatherSettingsFromUi();
+            var captured = SettingsSnapshotMapper.FromGeneratorSettings(BuildSettings());
+            file.GeneratorSnapshot = captured.GeneratorSnapshot;
+            file.GeneratorSnapshotVersion = captured.GeneratorSnapshotVersion;
+            file.Seed = captured.Seed;
+            return RetainSettingsMetadata(file);
+        }
+
+        private SettingsFile GatherSettingsFromUi() => new()
+        {
+            GameMode = CmbGameMode.SelectedItem as string ?? "Classic",
+            ProfileOptions = _profileOptions.Clone(),
+            Seed = _profileOptions.TemplateSeed,
             TemplateName          = TxtTemplateName.Text.Trim(),
             MapSize               = SelectedMapSize(),
             PlayerCount           = (int)SldPlayers.Value,
@@ -1961,6 +2007,14 @@ namespace Olden_Era___Template_Editor
 
         private void ApplySettings(SettingsFile s)
         {
+            var restoredSnapshot = SettingsSnapshotMapper.RestoreSnapshot(s);
+            var loadedMetadata = s.Extra?.ToDictionary(p => p.Key, p => p.Value.Clone(), StringComparer.Ordinal);
+            if (restoredSnapshot is not null) s = SettingsSnapshotMapper.FromGeneratorSettings(restoredSnapshot);
+            _loadedSettingsMetadata = loadedMetadata;
+            _loadedGeneratorSnapshot = null; _loadedSnapshotUiBaseline = null;
+            CmbGameMode.SelectedItem = s.GameMode;
+            _profileOptions = (s.ProfileOptions ?? new()).Clone();
+            _profileOptions.TemplateSeed = s.Seed ?? _profileOptions.TemplateSeed;
             TxtTemplateName.Text    = s.TemplateName;
             bool hasCustomZoneSizes = Math.Abs(s.PlayerZoneSize - 1.0) > 0.0001 || Math.Abs(s.NeutralZoneSize - 1.0) > 0.0001;
             bool needsExperimentalMapSizes = s.ExperimentalMapSizes || KnownValues.IsExperimentalMapSize(s.MapSize);
@@ -2035,7 +2089,7 @@ namespace Olden_Era___Template_Editor
             SldBorderGuardStrength.Value      = s.BorderGuardStrengthPercent;
             SetAdvCastleFactionFromToken(s.NeutralCastleFaction);
             int victoryIdx = Array.IndexOf(KnownValues.VictoryConditionIds, s.VictoryCondition);
-            CmbVictory.SelectedIndex = victoryIdx >= 0 ? victoryIdx : 0;
+            CmbVictory.SelectedIndex = victoryIdx;
             SldFactionLawsExp.Value = Math.Clamp(s.FactionLawsExpPercent, 20, 200);
             SldAstrologyExp.Value = Math.Clamp(s.AstrologyExpPercent, 20, 200);
             ChkLostStartCity.IsChecked = s.LostStartCity;
@@ -2068,6 +2122,8 @@ namespace Olden_Era___Template_Editor
             UpdateAdvancedZoneSettingsVisibility();
             UpdatePlayerCastleFactionVisibility();
             UpdateWinConditionDetailVisibility();
+            _loadedGeneratorSnapshot = restoredSnapshot;
+            if (_loadedGeneratorSnapshot is not null) _loadedSnapshotUiBaseline = BuildSettingsFromUi();
         }
 
         private bool SaveToPath(string path)
@@ -2189,10 +2245,21 @@ namespace Olden_Era___Template_Editor
 
         private void BtnPreview_Click(object sender, RoutedEventArgs e)
         {
+            if (CmbGameMode.SelectedIndex < 0 || CmbVictory.SelectedIndex < 0)
+            { MessageBox.Show(L.Get("S.Patch.SelectOptions"), Title); return; }
             if (!Validate()) return;
+            _profileOptions.TemplateSeed ??= Random.Shared.Next(int.MinValue, int.MaxValue);
             var settings = BuildSettings();
-            _generatedTemplate = TemplateGenerator.Generate(settings);
-            _generatedTopology = settings.Topology;
+            MapTopology effectiveTopology;
+            try
+            {
+                effectiveTopology = Services.Generation.GenerationProfileApplier.Prepare(settings).Topology;
+                _generatedTemplate = TemplateGenerator.Generate(settings);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException or FormatException or OverflowException or JsonException)
+            { MessageBox.Show(L.Get("S.Patch.OperationFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+            _generatedSettingsSnapshot = SettingsSnapshotMapper.Clone(settings);
+            _generatedTopology = effectiveTopology;
             _templateOutdated = false;
             _lastQuickSettings = null;
             _lastQuickOptions = null;
@@ -2343,11 +2410,14 @@ namespace Olden_Era___Template_Editor
 
         private void ApplySimpleState(Services.GameData.SimpleModeState st)
         {
+            st.MigrateSelections();
+            _profileOptions = st.ProfileOptions!.Clone();
             void SetCombo(System.Windows.Controls.ComboBox cb, int idx)
-            { if (cb.Items.Count > 0) cb.SelectedIndex = Math.Clamp(idx, 0, cb.Items.Count - 1); }
+            { if (cb.Items.Count > 0) cb.SelectedIndex = idx < 0 ? -1 : Math.Clamp(idx, 0, cb.Items.Count - 1); }
 
-            SldSimplePlayers.Value = Math.Clamp(st.Players, (int)SldSimplePlayers.Minimum, (int)SldSimplePlayers.Maximum);
             SetCombo(CmbSimpleType, st.Type);
+            UpdateSimplePlayerLimits();
+            SldSimplePlayers.Value = Math.Clamp(st.Players, (int)SldSimplePlayers.Minimum, (int)SldSimplePlayers.Maximum);
             SetCombo(CmbSimpleScale, st.Scale);
             SetCombo(CmbSimpleLength, st.Length);
             SetCombo(CmbSimpleChaos, st.Chaos);
@@ -2373,6 +2443,8 @@ namespace Olden_Era___Template_Editor
             st.Water          = ChkSimpleWater.IsChecked == true;
             st.Portals        = ChkSimplePortals.IsChecked == true;
             st.StrongNeutrals = ChkSimpleStrong.IsChecked == true;
+            st.ProfileOptions = _profileOptions.Clone();
+            st.CaptureStableIds();
             Services.GameData.AppSettings.Current.Save();
         }
 
@@ -2420,6 +2492,7 @@ namespace Olden_Era___Template_Editor
 
         private QuickGenerateOptions BuildQuickOptions() => new()
         {
+            ProfileOptions = _profileOptions.Clone(),
             PlayerCount    = (int)SldSimplePlayers.Value,
             GameType       = (QuickGameType)Math.Clamp(CmbSimpleType.SelectedIndex, 0, 5),
             Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 3),
@@ -2438,12 +2511,22 @@ namespace Olden_Era___Template_Editor
 
         private void BtnSimpleGenerate_Click(object sender, RoutedEventArgs e)
         {
+            if (!ValidateSimpleSelections()) return;
             var opts = BuildQuickOptions();
             TxtSimpleSeed.Text = ((uint)opts.Seed).ToString("X8"); // normalise display
-            var settings = Olden_Era___Template_Editor.Services.Generation.RandomTemplateBuilder.Build(opts);
-
-            _generatedTemplate = TemplateGenerator.Generate(settings);
-            _generatedTopology = settings.Topology;
+            GeneratorSettings settings;
+            MapTopology effectiveTopology;
+            try
+            {
+                settings = Olden_Era___Template_Editor.Services.Generation.RandomTemplateBuilder.Build(opts);
+                effectiveTopology = Services.Generation.GenerationProfileApplier.Prepare(settings).Topology;
+                _generatedTemplate = TemplateGenerator.Generate(settings);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException or FormatException or OverflowException or JsonException)
+            { MessageBox.Show(L.Get("S.Patch.OperationFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+            _profileOptions.TemplateSeed = settings.Seed;
+            _generatedSettingsSnapshot = SettingsSnapshotMapper.Clone(settings);
+            _generatedTopology = effectiveTopology;
             _templateOutdated  = false;
             _lastQuickSettings = settings;
             _lastQuickOptions = opts;
@@ -2496,7 +2579,8 @@ namespace Olden_Era___Template_Editor
             if (!report.Applicable) return null;
 
             var sb = new System.Text.StringBuilder();
-            sb.Append(L.Get("S.Bal.Score", report.Score));
+            sb.Append(L.Get(report.EconomyComparisonAvailable ? "S.Bal.Score" : "S.Patch.BalanceDensity", report.Score));
+            if (report.Teams.Any(t => t.Players.Count > 1)) sb.Append("\n" + L.Get("S.Patch.BalanceTeams", report.TeamScore));
             foreach (var f in report.Findings
                 .OrderByDescending(f => f.Severity == Services.Analysis.BalanceSeverity.Warning)
                 .Take(3))
@@ -2512,7 +2596,8 @@ namespace Olden_Era___Template_Editor
             var c = Services.Analysis.TemplateContentSummary.Analyze(template);
             if (c.ZoneCount == 0) return null;
             return L.Get("S.Content.Zones", c.ZoneCount, c.PlayerZones, c.NeutralZones, c.CastleZones, c.ConnectionCount)
-                 + "\n" + L.Get("S.Content.Wealth", FormatBig(c.TotalTreasure), FormatBig(c.TotalResources));
+                 + "\n" + L.Get("S.Content.Wealth", FormatBig(c.TotalTreasure), FormatBig(c.TotalResources))
+                 + (c.HasAreaBudgets ? "\n" + L.Get("S.Patch.AreaTotals", c.TotalTreasureAreaCoefficient, c.TotalResourcesAreaCoefficient) : "");
         }
 
         /// <summary>Compact human number: 1234→"1k", 2500000→"2.5M".</summary>
@@ -2546,6 +2631,7 @@ namespace Olden_Era___Template_Editor
 
         private string BuildSimpleSummary(GeneratorSettings s, QuickGenerateOptions opts)
         {
+            s = Services.Generation.GenerationProfileApplier.Prepare(s);
             var topo = TopologyOptions.FirstOrDefault(t => t.Topology == s.Topology);
             string topoLabel = topo.Label != null ? L.Get(topo.Label) : s.Topology.ToString();
             string lengthLabel = L.Get(SimpleLenLabelKeys[EstimateLengthIndex(s.MapSize, opts.Length)]);
@@ -2603,7 +2689,7 @@ namespace Olden_Era___Template_Editor
 
         private void BtnSimpleOpenAdvanced_Click(object sender, RoutedEventArgs e)
         {
-            if (_lastQuickSettings != null) SyncAdvancedFromSettings(_lastQuickSettings);
+            if (_lastQuickSettings != null) ApplySettings(SettingsSnapshotMapper.FromGeneratorSettings(_lastQuickSettings));
             SetMode(advanced: true);
         }
 
@@ -2611,6 +2697,7 @@ namespace Olden_Era___Template_Editor
         /// controls so the user can tweak the random map by hand. Best-effort, not every field.</summary>
         private void SyncAdvancedFromSettings(GeneratorSettings s)
         {
+            _profileOptions = s.ProfileOptions.Clone();
             _suppressTopologySync = true;
             try
             {
@@ -2660,6 +2747,25 @@ namespace Olden_Era___Template_Editor
                 SldMaxPortals.Value           = s.MaxPortalConnections;
                 ChkEncounterHoles.IsChecked   = s.EncounterHoles;
                 ChkNoDirectPlayerConn.IsChecked = s.NoDirectPlayerConnections;
+                ChkSingleHeroMode.IsChecked = s.SingleHeroMode;
+                SldHeroMin.Maximum = Math.Max(SldHeroMin.Maximum, s.HeroSettings.HeroCountMin);
+                SldHeroMax.Maximum = Math.Max(SldHeroMax.Maximum, s.HeroSettings.HeroCountMax);
+                SldHeroIncrement.Maximum = Math.Max(SldHeroIncrement.Maximum, s.HeroSettings.HeroCountIncrement);
+                SldHeroMin.Value = s.HeroSettings.HeroCountMin;
+                SldHeroMax.Value = s.HeroSettings.HeroCountMax;
+                SldHeroIncrement.Value = s.HeroSettings.HeroCountIncrement;
+                ChkHeroHireBan.IsChecked = s.HeroSettings.HeroHireBan;
+                ChkLostStartCity.IsChecked = s.GameEndConditions.LostStartCity;
+                SldLostStartCityDay.Value = s.GameEndConditions.LostStartCityDay;
+                ChkLostStartHero.IsChecked = s.GameEndConditions.LostStartHero;
+                ChkCityHold.IsChecked = s.GameEndConditions.CityHold;
+                SldCityHoldDays.Value = s.GameEndConditions.CityHoldDays;
+                ChkTournament.IsChecked = s.TournamentRules.Enabled;
+                ChkTournamentSaveArmy.IsChecked = s.TournamentRules.SaveArmy;
+                ChkGladiatorArena.IsChecked = s.GladiatorArenaRules.Enabled;
+                ChkPlayerStartsWithCastles.IsChecked = s.PlayerStartsWithCastles;
+                ChkGenerateRoads.IsChecked = s.GenerateRoads;
+                ChkSpawnFootholds.IsChecked = s.SpawnRemoteFootholds;
             }
             finally { _suppressTopologySync = false; }
 
@@ -2686,9 +2792,9 @@ namespace Olden_Era___Template_Editor
         }
 
         /// <summary>One-click save straight into the game's map_templates folder (no dialog).</summary>
-        private void BtnSimpleSaveToGame_Click(object sender, RoutedEventArgs e)
+        private async void BtnSimpleSaveToGame_Click(object sender, RoutedEventArgs e)
         {
-            if (_generatedTemplate is null) return;
+            if (_generatedTemplate is null || _templateOutdated || !await CanExportGeneratedTemplate()) return;
 
             string? gameDir = FindOldenEraTemplatesPath();
             if (string.IsNullOrEmpty(gameDir) || !Directory.Exists(gameDir))
@@ -2731,9 +2837,9 @@ namespace Olden_Era___Template_Editor
             }
         }
 
-        private void BtnSaveGenerated_Click(object sender, RoutedEventArgs e)
+        private async void BtnSaveGenerated_Click(object sender, RoutedEventArgs e)
         {
-            if (_generatedTemplate is null) return;
+            if (_generatedTemplate is null || _templateOutdated || !await CanExportGeneratedTemplate()) return;
 
             string? gameTemplatesPath = FindOldenEraTemplatesPath();
 
@@ -2815,8 +2921,17 @@ namespace Olden_Era___Template_Editor
             MessageBox.Show(savedMsg, L.Get("S.D.SavedTitle"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
-        private GeneratorSettings BuildSettings() => new()
+        private GeneratorSettings BuildSettings()
         {
+            var current = BuildSettingsFromUi();
+            return _loadedGeneratorSnapshot is not null && _loadedSnapshotUiBaseline is not null
+                ? GeneratorSettingsOverlay.Merge(_loadedGeneratorSnapshot, _loadedSnapshotUiBaseline, current) : current;
+        }
+
+        private GeneratorSettings BuildSettingsFromUi() => new()
+        {
+            ProfileOptions = _profileOptions.Clone(),
+            Seed = _profileOptions.TemplateSeed,
             TemplateName = TxtTemplateName.Text.Trim(),
             GameMode = CmbGameMode.SelectedItem as string ?? "Classic",
             SingleHeroMode = ChkSingleHeroMode.IsChecked == true,
@@ -3099,47 +3214,7 @@ namespace Olden_Era___Template_Editor
         /// Returns null if the game installation cannot be found.
         /// </summary>
         private static string? FindOldenEraTemplatesPath()
-        {
-            // Olden Era Steam App ID
-            const string appId = "3105440";
-
-            // Steam stores per-app install paths under this key.
-            string[] registryRoots =
-            [
-                $@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App {appId}",
-                $@"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Steam App {appId}"
-            ];
-
-            foreach (var keyPath in registryRoots)
-            {
-                try
-                {
-                    using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyPath);
-                    if (key?.GetValue("InstallLocation") is string installDir && Directory.Exists(installDir))
-                    {
-                        string templatesDir = Path.Combine(installDir, "HeroesOldenEra_Data", "StreamingAssets", "map_templates");
-                        if (Directory.Exists(templatesDir))
-                            return templatesDir;
-                    }
-                }
-                catch { /* registry access denied — skip */ }
-            }
-
-            // Fallback: check common Steam library locations manually.
-            string[] steamLibraryRoots =
-            [
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam", "steamapps", "common", "Heroes of Might and Magic Olden Era"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),    "Steam", "steamapps", "common", "Heroes of Might and Magic Olden Era"),
-            ];
-
-            foreach (var candidate in steamLibraryRoots)
-            {
-                string templatesDir = Path.Combine(candidate, "HeroesOldenEra_Data", "StreamingAssets", "map_templates");
-                if (Directory.Exists(templatesDir))
-                    return templatesDir;
-            }
-            return null;
-        }
+            => Services.GameData.GameInstallationService.Instance.Discover()?.TemplatesPath;
         private void ChkSavePreviewImage_Click(object sender, RoutedEventArgs e)
         {
             if (ChkSavePreviewImage.IsChecked == true)

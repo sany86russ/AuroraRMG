@@ -21,8 +21,7 @@ namespace Olden_Era___Template_Editor.Services.GameData
         private static readonly object Sync = new();
 
         public static string IconDirectory =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                         "AuroraRMG", "catalog", "icons");
+            Path.Combine(AppDataPaths.Root, "catalog", "icons");
 
         /// <summary>True if at least one icon PNG exists in the cache.</summary>
         public static bool HasAnyIcons

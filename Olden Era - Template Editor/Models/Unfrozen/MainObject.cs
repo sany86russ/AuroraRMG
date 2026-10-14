@@ -56,6 +56,15 @@ namespace OldenEraTemplateEditor.Models
 
         [JsonPropertyName("holdCityWinCon")]
         public bool? HoldCityWinCon { get; set; }
+
+        [JsonPropertyName("enableWeeklyUnitIncrement")]
+        public bool? EnableWeeklyUnitIncrement { get; set; }
+
+        [JsonPropertyName("weekOneOnlyModificatorGrowth")]
+        public bool? WeekOneOnlyModificatorGrowth { get; set; }
+
+        [JsonPropertyName("initialUnitIncrement")]
+        public int? InitialUnitIncrement { get; set; }
     }
 
     public class TypedSelector : RmgNode

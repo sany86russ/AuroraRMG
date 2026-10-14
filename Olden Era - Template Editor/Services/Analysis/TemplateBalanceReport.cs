@@ -20,10 +20,34 @@ namespace Olden_Era___Template_Editor.Services.Analysis
         int PlayerNumber,
         string SpawnId,
         string ZoneName,
-        int StartWealth,
+        long StartWealth,
         double ExpansionValue,
         int NearestOpponentHops,
-        int? CastleHops);
+        int? CastleHops)
+    {
+        public string AllianceKey { get; init; } = "";
+        /// <summary>Sum of connection guardValue on the cheapest path, not a forecast of army strength.</summary>
+        public long? ClosestCastleGuardBudget { get; init; }
+        /// <summary>Minimum zone hops to nonplayer guarded-content budgets; no native treasure-class inference.</summary>
+        public int? TreasureHops { get; init; }
+        /// <summary>Cheapest sum of configured connection guards to any guarded-content target. This can be a different target/path from TreasureHops.</summary>
+        public long? ClosestTreasureGuardBudget { get; init; }
+        public int StartingCities { get; init; }
+        public int StartingResourceValue { get; init; }
+        public long StartingAreaCoefficient { get; init; }
+        public double ExpansionAreaCoefficient { get; init; }
+    }
+
+    public sealed record TeamBalance(string AllianceKey, IReadOnlyList<int> Players,
+        long StartingWealth, long StartingResources, int StartingCities,
+        double AccessibleExpansionValue, int NearestOpponentHops)
+    {
+        public long StartingAreaCoefficient { get; init; }
+        public double AccessibleExpansionAreaCoefficient { get; init; }
+    }
+
+    /// <summary>Configured endpoint flags only. Their presence does not establish one-way hero movement.</summary>
+    public sealed record PortalBalance(string Name, string From, string To, bool? FromEnabled, bool? ToEnabled, long GuardBudget);
 
     /// <summary>The result of <see cref="TemplateBalanceReport.Analyze"/>.</summary>
     public sealed class BalanceReport
@@ -32,7 +56,13 @@ namespace Olden_Era___Template_Editor.Services.Analysis
         public bool Applicable { get; init; }
         /// <summary>Fairness/symmetry score 0–100 (higher = the players' starts are more equal).</summary>
         public int Score { get; init; }
+        /// <summary>Compares opposing alliance totals rather than treating allied slots as opponents.</summary>
+        public int TeamScore { get; init; }
+        /// <summary>False whenever area coefficients are used: the engine's eligible area and full totals are unknown.</summary>
+        public bool EconomyComparisonAvailable { get; init; } = true;
         public IReadOnlyList<PlayerBalance> Players { get; init; } = [];
+        public IReadOnlyList<TeamBalance> Teams { get; init; } = [];
+        public IReadOnlyList<PortalBalance> Portals { get; init; } = [];
         public IReadOnlyList<BalanceFinding> Findings { get; init; } = [];
     }
 
@@ -49,8 +79,12 @@ namespace Olden_Era___Template_Editor.Services.Analysis
         public static BalanceReport Analyze(RmgTemplate? template)
         {
             Variant? variant = template?.Variants?.FirstOrDefault();
-            List<Zone> zones = variant?.Zones ?? [];
-            List<Connection> connections = variant?.Connections ?? [];
+            List<Zone> zones = (variant?.Zones ?? []).OfType<Zone>().ToList();
+            List<Connection> connections = (variant?.Connections ?? []).OfType<Connection>().ToList();
+            var portals = connections.Where(c => c.ConnectionType == "Portal")
+                .Select(c => new PortalBalance(c.Name ?? "", c.From, c.To, c.PortalFromEnabled, c.PortalToEnabled, c.GuardValue ?? 0)).ToArray();
+            bool hasAreaCoefficients = zones.Any(z => ZoneAreaCoefficient(z) > 0);
+            bool areaOnly = hasAreaCoefficients && zones.All(z => ZoneValue(z) == 0);
 
             // Index zones + build an undirected adjacency over valid endpoints.
             var zoneByName = new Dictionary<string, Zone>(StringComparer.Ordinal);
@@ -59,7 +93,10 @@ namespace Olden_Era___Template_Editor.Services.Analysis
 
             var adj = new Dictionary<string, List<string>>(StringComparer.Ordinal);
             foreach (string name in zoneByName.Keys) adj[name] = [];
-            foreach (Connection c in connections)
+            var travelConnections = connections.Where(c => ConnectionRules.AllowsTravel(c)
+                && !string.IsNullOrEmpty(c.From) && !string.IsNullOrEmpty(c.To) && c.From != c.To
+                && adj.ContainsKey(c.From) && adj.ContainsKey(c.To)).ToArray();
+            foreach (Connection c in travelConnections)
             {
                 if (!ConnectionRules.AllowsTravel(c)) continue;
                 if (string.IsNullOrEmpty(c.From) || string.IsNullOrEmpty(c.To) || c.From == c.To) continue;
@@ -72,15 +109,21 @@ namespace Olden_Era___Template_Editor.Services.Analysis
             var playerZones = new List<(string SpawnId, string ZoneName, Zone Zone)>();
             foreach (Zone z in zones)
             {
-                MainObject? spawn = z.MainObjects?.FirstOrDefault(o => string.Equals(o.Type, "Spawn", StringComparison.Ordinal));
+                MainObject? spawn = z.MainObjects?.FirstOrDefault(o => o is not null
+                    && string.Equals(o.Type, "Spawn", StringComparison.Ordinal)
+                    && Array.IndexOf(KnownValues.SpawnPlayers, o.Spawn ?? "") >= 0);
                 if (spawn != null && !string.IsNullOrWhiteSpace(z.Name))
                     playerZones.Add((spawn.Spawn ?? z.Name, z.Name, z));
             }
 
             if (playerZones.Count < 2)
-                return new BalanceReport { Applicable = false, Score = 100, Players = [], Findings = [] };
+                return new BalanceReport { Applicable = false, Score = 100, EconomyComparisonAvailable = !hasAreaCoefficients, Players = [], Portals = portals, Findings = [] };
 
             var playerZoneNames = new HashSet<string>(playerZones.Select(p => p.ZoneName), StringComparer.Ordinal);
+            var assignments = (template?.SpawnInfos ?? []).Where(s => s is not null)
+                .GroupBy(s => s.Spawn, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+            string TeamFor(string spawn) => assignments.TryGetValue(spawn, out var assignment) && assignment.AllianceIndex is > 0
+                ? $"team{assignment.AllianceIndex}" : spawn;
             var zoneValues = zoneByName.ToDictionary(kv => kv.Key, kv => ZoneValue(kv.Value), StringComparer.Ordinal);
 
             // Neutral castle zones: a "City" object in a zone that is NOT a player spawn.
@@ -88,9 +131,14 @@ namespace Olden_Era___Template_Editor.Services.Analysis
             foreach (Zone z in zones)
             {
                 if (string.IsNullOrWhiteSpace(z.Name) || playerZoneNames.Contains(z.Name)) continue;
-                if (z.MainObjects?.Any(o => string.Equals(o.Type, "City", StringComparison.Ordinal)) == true)
+                if (z.MainObjects?.Any(o => o is not null && string.Equals(o.Type, "City", StringComparison.Ordinal)) == true)
                     castleZones.Add(z.Name);
             }
+            // A positive authored budget marks a potential guarded-content target. Actual native
+            // per-area totals and the strength of spawned guards are deliberately not estimated.
+            var treasureZones = zones.Where(z => !string.IsNullOrWhiteSpace(z.Name) && !playerZoneNames.Contains(z.Name)
+                && ((z.GuardedContentValue ?? 0) > 0 || (z.GuardedContentValuePerArea ?? 0) > 0))
+                .Select(z => z.Name).ToHashSet(StringComparer.Ordinal);
 
             // BFS hop distances from every player zone.
             var dist = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
@@ -101,20 +149,24 @@ namespace Olden_Era___Template_Editor.Services.Analysis
             foreach (var p in playerZones)
             {
                 Dictionary<string, int> d = dist[p.ZoneName];
-                int startWealth = ZoneValue(p.Zone);
+                long startWealth = ZoneValue(p.Zone);
 
                 double expansion = 0;
+                double expansionCoefficient = 0;
                 foreach (Zone z in zones)
                 {
                     if (string.IsNullOrWhiteSpace(z.Name) || playerZoneNames.Contains(z.Name)) continue;
                     if (d.TryGetValue(z.Name, out int hops) && hops >= 1)
+                    {
                         expansion += zoneValues[z.Name] / (double)hops; // closer neutral wealth counts more
+                        expansionCoefficient += ZoneAreaCoefficient(z) / (double)hops;
+                    }
                 }
 
                 int nearestOpp = int.MaxValue;
                 foreach (var q in playerZones)
                 {
-                    if (q.ZoneName == p.ZoneName) continue;
+                    if (q.ZoneName == p.ZoneName || TeamFor(p.SpawnId) == TeamFor(q.SpawnId)) continue;
                     if (d.TryGetValue(q.ZoneName, out int hops)) nearestOpp = Math.Min(nearestOpp, hops);
                 }
                 if (nearestOpp == int.MaxValue) nearestOpp = 0;
@@ -123,22 +175,69 @@ namespace Olden_Era___Template_Editor.Services.Analysis
                 foreach (string castle in castleZones)
                     if (d.TryGetValue(castle, out int hops))
                         castleHops = castleHops is null ? hops : Math.Min(castleHops.Value, hops);
+                int? treasureHops = null;
+                foreach (string treasure in treasureZones)
+                    if (d.TryGetValue(treasure, out int hops))
+                        treasureHops = treasureHops is null ? hops : Math.Min(treasureHops.Value, hops);
 
                 players.Add(new PlayerBalance(
                     PlayerNumber(p.SpawnId, players.Count + 1), p.SpawnId, p.ZoneName,
-                    startWealth, Math.Round(expansion, 1), nearestOpp, castleHops));
+                    startWealth, Math.Round(expansion, 1), nearestOpp, castleHops)
+                {
+                    AllianceKey = TeamFor(p.SpawnId),
+                    ClosestCastleGuardBudget = CheapestTargetGuardBudget(p.ZoneName, travelConnections, castleZones),
+                    TreasureHops = treasureHops,
+                    ClosestTreasureGuardBudget = CheapestTargetGuardBudget(p.ZoneName, travelConnections, treasureZones),
+                    StartingCities = p.Zone.MainObjects?.Count(o => o is not null && (o.Type == "Spawn" && o.Spawn == p.SpawnId || o.Type == "City" && o.Owner == p.SpawnId)) ?? 0,
+                    StartingResourceValue = p.Zone.ResourcesValue ?? 0,
+                    StartingAreaCoefficient = ZoneAreaCoefficient(p.Zone),
+                    ExpansionAreaCoefficient = Math.Round(expansionCoefficient, 1),
+                });
             }
 
-            int score = Score(players);
+            int score = areaOnly ? ScoreAreaCoefficients(players) : hasAreaCoefficients
+                ? (int)Math.Round((Score(players) + ScoreAreaCoefficients(players)) / 2.0) : Score(players);
             bool tournamentIslands = playerZones.Count == 2 && template?.GameRules?.WinConditions?.Tournament == true;
             bool disconnected = !tournamentIslands
-                && playerZones.Any(p => playerZones.Any(q => !dist[p.ZoneName].ContainsKey(q.ZoneName)));
+                && playerZones.Any(p => playerZones.Any(q => TeamFor(p.SpawnId) != TeamFor(q.SpawnId) && !dist[p.ZoneName].ContainsKey(q.ZoneName)));
             if (disconnected) score = 0;
             List<BalanceFinding> findings = BuildFindings(players, playerZones, dist, castleZones.Count > 0, score);
             if (disconnected)
                 findings.Insert(0, new BalanceFinding("S.Bal.Find.Disconnected", BalanceSeverity.Warning, []));
+            if (hasAreaCoefficients)
+            {
+                findings.RemoveAll(f => f.Key == "S.Bal.Find.WellBalanced");
+                findings.Insert(0, new BalanceFinding("S.Bal.Find.AreaBudgets", BalanceSeverity.Info, []));
+            }
 
-            return new BalanceReport { Applicable = true, Score = score, Players = players, Findings = findings };
+            var teams = players.GroupBy(p => p.AllianceKey, StringComparer.Ordinal).Select(group =>
+            {
+                double expansion = 0;
+                double expansionCoefficient = 0;
+                foreach (string zone in zoneValues.Keys.Where(n => !playerZoneNames.Contains(n)))
+                {
+                    int hops = group.Select(p => dist[p.ZoneName].GetValueOrDefault(zone, int.MaxValue)).Min();
+                    if (hops is > 0 and < int.MaxValue)
+                    {
+                        expansion += zoneValues[zone] / (double)hops;
+                        expansionCoefficient += ZoneAreaCoefficient(zoneByName[zone]) / (double)hops;
+                    }
+                }
+                return new TeamBalance(group.Key, group.Select(p => p.PlayerNumber).ToArray(),
+                    group.Sum(p => (long)p.StartWealth), group.Sum(p => (long)p.StartingResourceValue),
+                    group.Sum(p => p.StartingCities), Math.Round(expansion, 1), group.Select(p => p.NearestOpponentHops).Where(h => h > 0).DefaultIfEmpty(0).Min())
+                { StartingAreaCoefficient = group.Sum(p => p.StartingAreaCoefficient), AccessibleExpansionAreaCoefficient = Math.Round(expansionCoefficient, 1) };
+            }).ToList();
+            double teamWealth = 1 - RelSpread(teams.Select(t => areaOnly ? (double)t.StartingAreaCoefficient : t.StartingWealth));
+            double teamExpansion = 1 - RelSpread(teams.Select(t => areaOnly ? t.AccessibleExpansionAreaCoefficient : t.AccessibleExpansionValue));
+            if (hasAreaCoefficients && !areaOnly)
+            {
+                teamWealth = (teamWealth + 1 - RelSpread(teams.Select(t => (double)t.StartingAreaCoefficient))) / 2;
+                teamExpansion = (teamExpansion + 1 - RelSpread(teams.Select(t => t.AccessibleExpansionAreaCoefficient))) / 2;
+            }
+            double teamDistance = 1 - RelSpread(teams.Select(t => (double)t.NearestOpponentHops));
+            int teamScore = disconnected ? 0 : (int)Math.Round(100 * Math.Clamp(.5 * teamWealth + .3 * teamExpansion + .2 * teamDistance, 0, 1));
+            return new BalanceReport { Applicable = teams.Count > 1, Score = score, TeamScore = teamScore, EconomyComparisonAvailable = !hasAreaCoefficients, Players = players, Teams = teams, Portals = portals, Findings = findings };
         }
 
         // ── Scoring ───────────────────────────────────────────────────────────────
@@ -151,6 +250,15 @@ namespace Olden_Era___Template_Editor.Services.Analysis
             double castleFair = 1 - RelSpread(players.Select(p => p.CastleHops is > 0 ? 1.0 / p.CastleHops.Value : 0));
             double combined = 0.40 * wealthFair + 0.30 * expansionFair + 0.20 * proximityFair + 0.10 * castleFair;
             return (int)Math.Round(100 * Math.Clamp(combined, 0, 1));
+        }
+
+        private static int ScoreAreaCoefficients(IReadOnlyList<PlayerBalance> players)
+        {
+            double densityFair = 1 - RelSpread(players.Select(p => (double)p.StartingAreaCoefficient));
+            double expansionFair = 1 - RelSpread(players.Select(p => p.ExpansionAreaCoefficient));
+            double proximityFair = 1 - RelSpread(players.Select(p => (double)p.NearestOpponentHops));
+            double castleFair = 1 - RelSpread(players.Select(p => p.CastleHops is > 0 ? 1.0 / p.CastleHops.Value : 0));
+            return (int)Math.Round(100 * Math.Clamp(.4 * densityFair + .3 * expansionFair + .2 * proximityFair + .1 * castleFair, 0, 1));
         }
 
         private static List<BalanceFinding> BuildFindings(
@@ -194,6 +302,7 @@ namespace Olden_Era___Template_Editor.Services.Analysis
                 for (int i = 0; i < playerZones.Count; i++)
                 for (int j = i + 1; j < playerZones.Count; j++)
                 {
+                    if (players[i].AllianceKey == players[j].AllianceKey) continue;
                     if (!dist[playerZones[i].ZoneName].TryGetValue(playerZones[j].ZoneName, out int h)) continue;
                     pairHops.Add(h);
                     if (h < closestHops) { closestHops = h; closestA = i; closestB = j; }
@@ -216,8 +325,31 @@ namespace Olden_Era___Template_Editor.Services.Analysis
 
         // ── Helpers ─────────────────────────────────────────────────────────────────
 
-        private static int ZoneValue(Zone z) =>
-            (z.GuardedContentValue ?? 0) + (z.UnguardedContentValue ?? 0) + (z.ResourcesValue ?? 0);
+        private static long ZoneValue(Zone z) =>
+            (long)(z.GuardedContentValue ?? 0) + (z.UnguardedContentValue ?? 0) + (z.ResourcesValue ?? 0);
+
+        private static long ZoneAreaCoefficient(Zone z) => (long)(z.GuardedContentValuePerArea ?? 0)
+            + (z.UnguardedContentValuePerArea ?? 0) + (z.ResourcesValuePerArea ?? 0);
+
+        private static long? CheapestTargetGuardBudget(string start, IReadOnlyList<Connection> edges, HashSet<string> targets)
+        {
+            var best = new Dictionary<string, long>(StringComparer.Ordinal) { [start] = 0 };
+            var queue = new PriorityQueue<string, long>(); queue.Enqueue(start, 0);
+            while (queue.TryDequeue(out string? current, out long cost))
+            {
+                if (best[current] < cost) continue;
+                if (targets.Contains(current)) return cost;
+                foreach (var edge in edges.Where(ConnectionRules.AllowsTravel))
+                {
+                    string? next = edge.From == current ? edge.To : edge.To == current ? edge.From : null;
+                    if (string.IsNullOrEmpty(next)) continue;
+                    long candidate = cost + Math.Max(0, edge.GuardValue ?? 0);
+                    if (best.TryGetValue(next, out long known) && known <= candidate) continue;
+                    best[next] = candidate; queue.Enqueue(next, candidate);
+                }
+            }
+            return null;
+        }
 
         private static Dictionary<string, int> Bfs(string start, IReadOnlyDictionary<string, List<string>> adj)
         {

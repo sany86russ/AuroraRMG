@@ -56,6 +56,10 @@
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,6" Click="BtnDelete_Click"/>
                         <Button x:Name="BtnValidate" Content="{DynamicResource S.Ed.006}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,6" Click="BtnValidate_Click"/>
+                        <Button Content="{DynamicResource S.TemplateProperties.Title}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,6" Click="BtnProperties_Click"/>
+                        <Button Content="{DynamicResource S.Patch.BulkTitle}"
+                                Style="{StaticResource ToolbarButton}" Margin="0,0,8,6" Click="BtnBulkProperties_Click"/>
                         <Button x:Name="BtnSave" Content="{DynamicResource S.Ed.007}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,6" Click="BtnSave_Click"/>
                         <Button x:Name="BtnExportPng" Content="{DynamicResource S.Ed.ExportPng}"

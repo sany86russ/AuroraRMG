@@ -241,23 +241,29 @@ namespace Olden_Era___Template_Editor
             // All pairs must exist before cross-zone faction references can be mapped.
             foreach (Zone source in left)
                 if (TwinOf(source) is { } twin)
+                {
                     foreach (var obj in twin.MainObjects ?? [])
                         FactionSelectors.RemapZones(obj.Faction, _mirrorMap);
+                    TemplateRefactor.RemapMainObjectPlacementZones(twin, _mirrorMap);
+                }
 
             // Mirror the connections whose BOTH endpoints survived (a link that touched the old right
             // half is gone with it).
+            var copiedConnections = new List<(Connection Source, Connection Copy)>();
             foreach (Connection c in Connections.ToList())
             {
                 if (!kept.Contains(c.From) || !kept.Contains(c.To)) continue;
-                MirrorConnection(c);
+                if (MirrorConnection(c, deferReferences: true) is { } copy) copiedConnections.Add((c, copy));
             }
 
             ReconnectStrandedAxisZones(axis);
+            var referenceWarnings = ApplyMirrorConnectionReferences(copiedConnections);
 
             MarkDirty();
             RebuildGraph();
             BuildInspector();
-            UpdateStatus(L("S.EC.Symmetrized", left.Count, axis.Count));
+            UpdateStatus(L("S.EC.Symmetrized", left.Count, axis.Count)
+                + (referenceWarnings.Count > 0 ? "; " + string.Join("; ", referenceWarnings) : ""));
         }
 
         /// <summary>
@@ -387,8 +393,11 @@ namespace Olden_Era___Template_Editor
         {
             if (!_mirrorMode) return;
             if (CreateTwin(z, pos) is { } twin)
+            {
                 foreach (var obj in twin.MainObjects ?? [])
                     FactionSelectors.RemapZones(obj.Faction, _mirrorMap);
+                TemplateRefactor.RemapMainObjectPlacementZones(twin, _mirrorMap);
+            }
         }
 
         /// <summary>Keeps the twin at the mirrored position while a zone is dragged.</summary>
@@ -420,29 +429,41 @@ namespace Olden_Era___Template_Editor
             MirrorConnection(c);
         }
 
-        private void MirrorConnection(Connection source)
+        private Connection? MirrorConnection(Connection source, bool deferReferences = false)
         {
             string from = _mirrorMap.TryGetValue(source.From, out string? mf) ? mf : source.From;
             string to = _mirrorMap.TryGetValue(source.To, out string? mt) ? mt : source.To;
 
             // Both endpoints on the axis → the link IS its own mirror; nothing to duplicate.
             if (string.Equals(from, source.From, StringComparison.Ordinal)
-             && string.Equals(to, source.To, StringComparison.Ordinal)) return;
-            if (string.Equals(from, to, StringComparison.Ordinal)) return;
+             && string.Equals(to, source.To, StringComparison.Ordinal)) return null;
+            if (string.Equals(from, to, StringComparison.Ordinal)) return null;
 
-            bool exists = Connections.Any(c =>
+            bool exists = Connections.Any(c => c.ConnectionType == source.ConnectionType && (
                 (string.Equals(c.From, from, StringComparison.Ordinal) && string.Equals(c.To, to, StringComparison.Ordinal)) ||
-                (string.Equals(c.From, to, StringComparison.Ordinal) && string.Equals(c.To, from, StringComparison.Ordinal)));
-            if (exists) return;
+                (string.Equals(c.From, to, StringComparison.Ordinal) && string.Equals(c.To, from, StringComparison.Ordinal))));
+            if (exists) return null;
 
             Connection twin = JsonCloneConnection(source);
             twin.From = from;
             twin.To = to;
             twin.Name = MakeUniqueConnectionName($"{StripMirrorSuffix(source.Name ?? "Direct")}-M");
-            if (string.Equals(twin.GuardZone, source.From, StringComparison.Ordinal)) twin.GuardZone = from;
-            else if (string.Equals(twin.GuardZone, source.To, StringComparison.Ordinal)) twin.GuardZone = to;
-
             Connections.Add(twin);
+            if (!deferReferences)
+            {
+                var warnings = ApplyMirrorConnectionReferences([(source, twin)]);
+                if (warnings.Count > 0) UpdateStatus(string.Join("; ", warnings));
+            }
+            return twin;
+        }
+
+        private IReadOnlyList<string> ApplyMirrorConnectionReferences(IReadOnlyList<(Connection Source, Connection Copy)> copies)
+        {
+            var names = TemplateRefactor.MirroredConnectionNames(Connections, _mirrorMap);
+            var warnings = new List<string>();
+            foreach (var (source, copy) in copies)
+                warnings.AddRange(TemplateRefactor.ApplyMirroredConnectionReferences(source, copy, _mirrorMap, names));
+            return warnings;
         }
 
         private static Connection JsonCloneConnection(Connection c) =>
@@ -467,6 +488,7 @@ namespace Olden_Era___Template_Editor
             fresh.Roads = twin.Roads;              // roads point at this side's own connections
             foreach (var obj in fresh.MainObjects ?? [])
                 FactionSelectors.RemapZones(obj.Faction, _mirrorMap);
+            TemplateRefactor.RemapMainObjectPlacementZones(fresh, _mirrorMap);
 
             // Restore the twin's own player identity onto the copied main objects.
             if (fresh.MainObjects is not null)

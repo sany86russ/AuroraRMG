@@ -9,7 +9,7 @@ namespace Olden_Era___Template_Editor.Models
         FreeForAll,
         /// <summary>Player(s) versus strong, aggressive neutrals.</summary>
         Pve,
-        /// <summary>Even teams on a balanced layout.</summary>
+        /// <summary>Explicit or automatic alliances, including uneven team sizes.</summary>
         Team,
         /// <summary>Parallel non-crossing lanes (bronze→silver→gold) that meet only at a shared central arena.</summary>
         Lanes,
@@ -23,8 +23,8 @@ namespace Olden_Era___Template_Editor.Models
     }
 
     /// <summary>Rough map size band; resolved to a concrete <see cref="GeneratorSettings.MapSize"/> within the band.</summary>
-    /// <remarks><see cref="Huge"/> reaches into the experimental sizes above the official 240×240 cap
-    /// (≈256–400) — the game engine handles them, but they aren't backed by official templates.</remarks>
+    /// <remarks>Current Huge uses the official 256 size. Legacy retains its seeded 256–400 band;
+    /// values above 256 remain experimental and require in-game validation.</remarks>
     public enum QuickMapScale { Small, Medium, Large, Huge }
 
     /// <summary>Desired game length — drives size, neutral count, guard strength and content density.</summary>
@@ -49,6 +49,7 @@ namespace Olden_Era___Template_Editor.Models
     /// </summary>
     public class QuickGenerateOptions
     {
+        public GenerationProfileOptions ProfileOptions { get; set; } = new();
         public int PlayerCount { get; set; } = 2;
         public QuickGameType GameType { get; set; } = QuickGameType.FreeForAll;
         public QuickMapScale Scale { get; set; } = QuickMapScale.Medium;

@@ -24,6 +24,13 @@ namespace OldenEraTemplateEditor.Models
         [JsonIgnore]
         public int? GeneratorRing { get; set; }
 
+        /// <summary>Ephemeral team-branch identity used for symmetric generation, never a game JSON field.</summary>
+        [JsonIgnore]
+        public string? GeneratorAllianceKey { get; set; }
+
+        [JsonIgnore]
+        public int? GeneratorBranchDepth { get; set; }
+
         [JsonPropertyName("size")]
         public double? Size { get; set; }
 
@@ -43,7 +50,20 @@ namespace OldenEraTemplateEditor.Models
         public double? GuardWeeklyIncrement { get; set; }
 
         [JsonPropertyName("guardReactionDistribution")]
-        public List<int>? GuardReactionDistribution { get; set; }
+        [JsonConverter(typeof(ScalarOrArrayConverter<double>))]
+        public List<double>? GuardReactionDistribution { get; set; }
+
+        [JsonPropertyName("randomHireEnableWeeklyUnitIncrement")]
+        [JsonConverter(typeof(ScalarOrArrayConverter<bool>))]
+        public List<bool>? RandomHireEnableWeeklyUnitIncrement { get; set; }
+
+        [JsonPropertyName("randomHireEnableModificatorWeeklyUnitIncrement")]
+        [JsonConverter(typeof(ScalarOrArrayConverter<bool>))]
+        public List<bool>? RandomHireEnableModificatorWeeklyUnitIncrement { get; set; }
+
+        [JsonPropertyName("randomHireInitialUnitIncrement")]
+        [JsonConverter(typeof(ScalarOrArrayConverter<int>))]
+        public List<int>? RandomHireInitialUnitIncrement { get; set; }
 
         [JsonPropertyName("diplomacyModifier")]
         public double? DiplomacyModifier { get; set; }

@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Windows;
 using OldenEraTemplateEditor.Models;
 using Olden_Era___Template_Editor.Services.Localization;
+using Olden_Era___Template_Editor.Services;
 
 namespace Olden_Era___Template_Editor
 {
@@ -71,10 +72,15 @@ namespace Olden_Era___Template_Editor
             parsed = new RmgTemplate();
             try
             {
-                var t = JsonSerializer.Deserialize<RmgTemplate>(TxtJson.Text, _display);
+                var t = TemplateJsonReader.Deserialize(TxtJson.Text, _display);
                 if (t is null) { Status("S.JP.ParseError", "null"); return false; }
                 parsed = t;
                 return true;
+            }
+            catch (DuplicateJsonPropertyException ex)
+            {
+                Status("S.TemplateImport.DuplicateProperty", ex.PropertyName, ex.Path ?? "$");
+                return false;
             }
             catch (Exception ex)
             {
