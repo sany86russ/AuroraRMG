@@ -201,6 +201,7 @@ public sealed class NativeSchemaEditorWindow : Window
         var pointer = _selection?.Pointer ?? throw new InvalidOperationException("A conditional row must be selected.");
         var original = Resolve(pointer)?.DeepClone();
         var parent = FindTreeItem(pointer[..^1]);
+        string originalStatus = _status.Text;
         try
         {
             _selectedTreeItem!.IsExpanded = true;
@@ -218,13 +219,16 @@ public sealed class NativeSchemaEditorWindow : Window
 
             int excessiveNesting = MaximumSchemaDepth - pointer.Length + 1;
             _raw.Text = string.Concat(Enumerable.Repeat("{\"child\":", excessiveNesting)) + "0" + new string('}', excessiveNesting);
-            if (ApplyEdit() || !JsonNode.DeepEquals(Resolve(pointer), edited))
+            string depthError = LocalizationManager.T("S.NativeEditor.MaximumDepth", MaximumSchemaDepth);
+            if (ApplyEdit() || !JsonNode.DeepEquals(Resolve(pointer), edited)
+                || _status.Text != LocalizationManager.T("S.NativeEditor.Error", depthError))
                 throw new InvalidOperationException("A native fragment exceeded the schema's overall depth without being rejected.");
         }
         finally
         {
             ApplyReplacement(pointer, document, original, raw: false);
             _dirty = false;
+            _status.Text = originalStatus;
         }
     }
 
@@ -401,7 +405,7 @@ public sealed class NativeSchemaEditorWindow : Window
     private static void ValidateDepth(JsonNode? node, int remaining)
     {
         if (node is not (JsonArray or JsonObject)) return;
-        if (remaining <= 0) throw new JsonException($"A native schema cannot exceed {MaximumSchemaDepth} levels.");
+        if (remaining <= 0) throw new JsonException(LocalizationManager.T("S.NativeEditor.MaximumDepth", MaximumSchemaDepth));
         if (node is JsonArray array)
             foreach (var child in array) ValidateDepth(child, remaining - 1);
         else if (node is JsonObject obj)
