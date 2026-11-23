@@ -165,6 +165,16 @@ jobs:
             $release = Read-Release
           }
           if (!$release -or !$release.isDraft) { throw "Could not verify the draft for $tag." }
+
+          # A failed GitHub upload can leave an empty starter asset that blocks a retry.
+          $existing = @(Find-Asset $release)
+          if ($existing.Count -eq 1 -and $existing[0].state -ceq 'starter' -and $existing[0].size -eq 0) {
+            $assetUrl = '^https://api\.github\.com/repos/' + [regex]::Escape($repo) + '/releases/assets/([1-9][0-9]*)$'
+            if ($existing[0].apiUrl -notmatch $assetUrl) { throw "Could not verify the incomplete asset in $tag." }
+            Invoke-GitHub api --method DELETE "repos/$repo/releases/assets/$($Matches[1])"
+            $release = Read-Release
+            if (!$release -or !$release.isDraft) { throw "Could not verify the draft after removing the incomplete asset for $tag." }
+          }
           if (!(Find-Asset $release)) {
             Invoke-GitHub release upload $tag $asset.FullName --repo $repo
             $release = Read-Release
