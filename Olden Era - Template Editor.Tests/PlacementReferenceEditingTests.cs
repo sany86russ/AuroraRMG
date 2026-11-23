@@ -2,6 +2,7 @@ using System.Text.Json;
 using Olden_Era___Template_Editor.Models;
 using Olden_Era___Template_Editor.Services;
 using Olden_Era___Template_Editor.Services.Analysis;
+using Olden_Era___Template_Editor.Services.Generation;
 using OldenEraTemplateEditor.Models;
 
 namespace Olden_Era___Template_Editor.Tests;
@@ -141,6 +142,117 @@ public sealed class PlacementReferenceEditingTests
         Assert.Single(neutral.MainObjects!);
         var foothold = Assert.Single(FindGroup(template, neutral).Content!, item => item.Sid == "remote_foothold");
         Assert.Equal("0", Assert.Single(foothold.Rules!, rule => rule.Type == "MainObject").Args![0]);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void RedistributingNeutralTownsPreservesOnlyTheApplicableMandatoryAnchors(int townCount)
+    {
+        var settings = new GeneratorSettings
+        {
+            Seed = 1729, ProfileOptions = GenerationProfileOptions.CurrentDefaults(),
+            ZoneCfg = new() { NeutralZoneCastles = 1, Advanced = new() { Enabled = true, NeutralLowCastleCount = 2 } },
+            LowNeutralMandatoryContent =
+            [
+                new() { Name = "Existing", Sid = "mine_wood", Rules = [new() { Type = "MainObject", Args = ["0"] }, new() { Type = "Road" }] }
+            ]
+        };
+        settings.ProfileOptions.Tempo = MapTempo.Legacy;
+        settings.ProfileOptions.NeutralTownCount = townCount;
+        var template = TemplateGenerator.Generate(settings);
+        var zones = Assert.Single(template.Variants!).Zones!.Where(zone => zone.Name.StartsWith("Neutral-", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(2, zones.Length);
+        Assert.Equal(townCount, zones.Sum(zone => zone.MainObjects?.Count ?? 0));
+        foreach (var zone in zones)
+        {
+            var group = FindGroup(template, zone);
+            var encounter = Assert.Single(group.Content!, item => item.Name == "Existing");
+            Assert.Contains(encounter.Rules!, rule => rule.Type == "Road");
+            var anchored = Assert.Single(group.Content!, item => item.Sid == "remote_foothold");
+            foreach (var item in new[] { encounter, anchored })
+            {
+                var anchors = item.Rules!.Where(rule => rule.Type == "MainObject").ToArray();
+                if (zone.MainObjects is { Count: > 0 }) Assert.Equal("0", Assert.Single(anchors).Args![0]);
+                else Assert.Empty(anchors);
+            }
+        }
+        Assert.DoesNotContain(TemplateCompatibilityValidator.Validate(template), issue => issue.Code == "placement.mainObjectTarget");
+    }
+
+    [Fact]
+    public void TournamentGenerationFillsOnlyTheRegionWithoutAccessToAnAuthoredSpire()
+    {
+        var settings = new GeneratorSettings
+        {
+            Seed = 1729, ProfileOptions = GenerationProfileOptions.CurrentDefaults(),
+            ZoneCfg = new() { Advanced = new() { Enabled = true, NeutralLowCastleCount = 1 } },
+            GameEndConditions = new() { VictoryCondition = "win_condition_6" },
+            LowNeutralMandatoryContent = [new() { Name = "AuthoredSpire", Sid = ChampionSpirePlacement.SpireSid }]
+        };
+        settings.ProfileOptions.Tempo = MapTempo.Legacy;
+        settings.ProfileOptions.ChampionSelection = ChampionSelection.HellLightSpire;
+        var template = TemplateGenerator.Generate(settings);
+        var variant = Assert.Single(template.Variants!);
+        var generated = Assert.Single(template.MandatoryContent!, group => group.Name.StartsWith("aurora_champion_spire_", StringComparison.Ordinal));
+        Assert.Single(template.MandatoryContent!.SelectMany(group => group.Content!), item => item.Name == "AuthoredSpire");
+        Assert.Empty(ChampionSpirePlacement.StartsWithoutSpireAccess(template, variant));
+        Assert.DoesNotContain(TemplateCompatibilityValidator.Validate(template), issue => issue.Code == "win.championSpireAccess");
+
+        var unserved = Assert.Single(variant.Zones!, zone => zone.MandatoryContent?.Contains(generated.Name) == true);
+        unserved.MandatoryContent!.Remove(generated.Name);
+        string otherStart = Assert.Single(variant.Zones!, zone => zone.Name != unserved.Name && zone.MainObjects?.Any(obj => obj.Type == "Spawn") == true).Name;
+        variant.Connections!.Add(new() { Name = "Layout hint only", From = otherStart, To = unserved.Name, ConnectionType = "Proximity" });
+        variant.Connections.Add(new() { Name = "Final battle only", From = otherStart, To = unserved.Name, ConnectionType = "GladiatorArena" });
+        Assert.Equal(unserved.Name, Assert.Single(ChampionSpirePlacement.StartsWithoutSpireAccess(template, variant)));
+        Assert.Contains(TemplateCompatibilityValidator.Validate(template), issue => issue is
+            { Code: "win.championSpireAccess", Severity: TemplateIssueSeverity.Error } && issue.Message.Contains(unserved.Name, StringComparison.Ordinal));
+        Assert.Contains(TemplateCompatibilityValidator.Validate(template, TemplateValidationMode.TolerantImport), issue => issue is
+            { Code: "win.championSpireAccess", Severity: TemplateIssueSeverity.Warning });
+    }
+
+    [Fact]
+    public void PastedZoneDropsSourceConnectionAnchorsWithoutChangingEitherOriginalVariant()
+    {
+        var template = SharedFixture();
+        var variant = template.Variants![0];
+        var original = variant.Zones![0];
+        var clone = JsonSerializer.Deserialize<Zone>(JsonSerializer.Serialize(original, JsonExport.Options), JsonExport.Options)!;
+        clone.Name = "Pasted";
+        var source = FindGroup(template, original);
+
+        TemplateRefactor.PreparePastedZone(clone, variant.Zones, original.Name, template);
+        variant.Zones.Add(clone);
+        variant.Connections!.Add(new() { Name = "New", From = clone.Name, To = "Treasure", ConnectionType = "Direct" });
+
+        Assert.Equal("Uniform", clone.MainObjects![1].Placement);
+        Assert.Null(clone.MainObjects[1].PlacementArgs);
+        Assert.Empty(clone.Roads!);
+        var local = FindGroup(template, clone);
+        Assert.NotEqual(source.Name, local.Name);
+        Assert.Equal("2", Assert.Single(Assert.Single(local.Content!).Rules!).Args![0]);
+        Assert.Equal("Player2", Assert.Single(local.Content!).Extra!["owner"].GetString());
+        Assert.Equal("Gate", FindRule(source, "Connection").Args![0]);
+        Assert.Same(source, FindGroup(template, template.Variants[1].Zones![0]));
+        Assert.DoesNotContain(TemplateCompatibilityValidator.Validate(template),
+            issue => issue.Code is "placement.connectionTarget" or "placement.objectConnectionTarget");
+    }
+
+    [Fact]
+    public void PasteRejectsAnAmbiguousContentDefinitionBeforeChangingEitherModel()
+    {
+        var template = SharedFixture();
+        var variant = template.Variants![0];
+        var original = variant.Zones![0];
+        template.MandatoryContent!.Add(FindGroup(template, original));
+        var clone = JsonSerializer.Deserialize<Zone>(JsonSerializer.Serialize(original, JsonExport.Options), JsonExport.Options)!;
+        clone.Name = "Pasted";
+        string templateBefore = JsonSerializer.Serialize(template, JsonExport.Options);
+        string cloneBefore = JsonSerializer.Serialize(clone, JsonExport.Options);
+
+        Assert.Throws<InvalidOperationException>(() => TemplateRefactor.PreparePastedZone(clone, variant.Zones, original.Name, template));
+        Assert.Equal(templateBefore, JsonSerializer.Serialize(template, JsonExport.Options));
+        Assert.Equal(cloneBefore, JsonSerializer.Serialize(clone, JsonExport.Options));
     }
 
     private static MandatoryContentGroup FindGroup(RmgTemplate template, Zone zone) =>

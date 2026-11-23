@@ -273,6 +273,8 @@ public static class PatchAcceptanceSuite
             if (city && !objects.Any(obj => obj.HoldCityWinCon == true && obj.Type is "City" or "Spawn")) Fail("Requested city hold has no marked town.");
             if (championSpire && !ChampionSpirePlacement.HasLinkedSpire(template, variant))
                 Fail("A champion selection variant has no linked Hell Light Spire.");
+            if (championSpire && tournament && ChampionSpirePlacement.StartsWithoutSpireAccess(template, variant).Count > 0)
+                Fail("A tournament start cannot reach a linked Hell Light Spire.");
             foreach (int player in Enumerable.Range(1, settings.PlayerCount))
             {
                 string spawn = "Player" + player;

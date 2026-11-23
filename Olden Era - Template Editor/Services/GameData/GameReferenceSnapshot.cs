@@ -124,10 +124,11 @@ public static class GameReferenceSnapshotBuilder
             snapshot.AiEvidence = "AI identifiers are unavailable: " + ex.Message;
             warnings?.Add(snapshot.AiEvidence);
         }
-        if (source is not null && File.Exists(source.SchemaPath))
+        if (source is not null && (source.SchemaFingerprint.Length > 0 || File.Exists(source.SchemaPath)))
             try
             {
-                using var stream = File.OpenRead(source.SchemaPath); using var doc = JsonDocument.Parse(stream, Options);
+                using var stream = GameInstallationService.OpenVerifiedDataFile(source.SchemaPath, source.SchemaFingerprint);
+                using var doc = JsonDocument.Parse(stream, Options);
                 if (doc.RootElement.ValueKind == JsonValueKind.Object)
                 {
                     snapshot.NativeLayouts = Names(doc.RootElement, "zoneLayouts");
@@ -136,7 +137,7 @@ public static class GameReferenceSnapshotBuilder
                 }
                 else warnings?.Add("Native schema has an unrecognized root shape; its local references are unavailable.");
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+            catch (Exception ex) when (ex is not InstalledGameDataChangedException && ex is (IOException or UnauthorizedAccessException or JsonException))
             { warnings?.Add("Native schema references could not be read: " + ex.Message); }
         return snapshot;
     }

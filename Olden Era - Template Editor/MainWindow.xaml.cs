@@ -9,9 +9,11 @@ using System.Linq;
 using OldenEraTemplateEditor.Services.ContentManagement;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media.Imaging;
 
 namespace Olden_Era___Template_Editor
 {
@@ -1251,13 +1253,13 @@ namespace Olden_Era___Template_Editor
             }
         }
 
-        /// <summary>Loads the game-data catalog off-thread; once ready, upgrades any loaded hero-ban rows to real names.</summary>
+        /// <summary>Refreshes hero names after reading the installed catalog, including the offline fallback.</summary>
         private async Task PrimeGameCatalogAsync()
         {
             try
             {
-                var catalog = await Services.GameData.GameCatalogService.Instance.GetCatalogAsync();
-                if (catalog.Heroes.Count > 0 && _bannedHeroes.Count > 0)
+                await Services.GameData.GameCatalogService.Instance.GetCatalogAsync();
+                if (_bannedHeroes.Count > 0)
                     RefreshBannedHeroNames();
             }
             catch { /* catalog is best-effort */ }
@@ -2273,9 +2275,33 @@ namespace Olden_Era___Template_Editor
                 ApplySettingsWithoutTracking(PrepareAdvancedSettings(advancedBaseline));
             var document = SettingsDocumentFor(simple);
             document.IsDirty = false;
-            document.TemplateOutdated = _generatedTemplate is not null;
+            bool hasResult = _generatedTemplate is not null && (simple ? _lastQuickSettings is not null : _generatedForAdvancedSettings);
+            document.TemplateOutdated = hasResult && !MatchesRestoredSettings(simple);
+            if (simple) UpdateSimpleSummary();
             UpdateOutdatedWarning();
             UpdateTitle();
+        }
+
+        private bool MatchesRestoredSettings(bool simple)
+        {
+            if (_generatedSettingsSnapshot is not { } generated) return false;
+            try
+            {
+                GeneratorSettings? restored;
+                if (!simple) restored = BuildSettings();
+                else if (_savedSimpleSettings?.File is { } saved) restored = SettingsSnapshotMapper.RestoreSnapshot(saved);
+                else if (SimpleSelectionError() is null) restored = Services.Generation.RandomTemplateBuilder.Build(BuildQuickOptions());
+                else return false;
+
+                var snapshotOptions = SettingsSnapshotMapper.SnapshotOptions;
+                return JsonNode.DeepEquals(JsonSerializer.SerializeToNode(restored, snapshotOptions),
+                    JsonSerializer.SerializeToNode(generated, snapshotOptions));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or FormatException or JsonException or NotSupportedException or OverflowException)
+            {
+                // Leave the export unavailable when the restored draft cannot produce the same input.
+                return false;
+            }
         }
 
         private SettingsFile ApplySettingsWithoutTracking(PreparedAdvancedSettings prepared)
@@ -2424,7 +2450,7 @@ namespace Olden_Era___Template_Editor
         // The most recently generated template — used by BtnSaveGenerated_Click
         private RmgTemplate? _generatedTemplate;
         private bool _generatedForAdvancedSettings;
-        private System.Windows.Media.ImageSource? _generatedPreview;
+        private BitmapSource? _generatedPreview;
         private MapTopology  _generatedTopology;
         private bool _templateOutdated => ActiveSettingsDocument.TemplateOutdated;
 
@@ -2497,11 +2523,14 @@ namespace Olden_Era___Template_Editor
         {
             if (_generatedTemplate is not { } template) return;
             if (AdvancedView.Visibility == Visibility.Visible)
-                ImgPreview.Source = _generatedPreview ??= TemplatePreviewPngWriter.Render(template, _generatedTopology);
+                ImgPreview.Source = GetGeneratedPreview(template);
             else if (_lastQuickSettings is not null && SimplePreviewBox.Visibility == Visibility.Visible)
-                ImgSimplePreview.Source = _generatedPreview ??= TemplatePreviewPngWriter.Render(template, _generatedTopology);
+                ImgSimplePreview.Source = GetGeneratedPreview(template);
             TxtSimpleNoPreview.Visibility = _lastQuickSettings is null ? Visibility.Visible : Visibility.Collapsed;
         }
+
+        private BitmapSource GetGeneratedPreview(RmgTemplate template) =>
+            _generatedPreview ??= TemplatePreviewPngWriter.Render(template, _generatedTopology);
 
         private void UpdateSimpleSummary()
         {
@@ -2534,8 +2563,7 @@ namespace Olden_Era___Template_Editor
             RmgTemplate template;
             try
             {
-                effectiveTopology = Services.Generation.GenerationProfileApplier.Prepare(settings).Topology;
-                template = TemplateGenerator.Generate(settings);
+                template = TemplateGenerator.Generate(settings, out effectiveTopology);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException or FormatException or OverflowException or JsonException)
             { MessageBox.Show(L.Get("S.Patch.OperationFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return; }
@@ -2806,8 +2834,7 @@ namespace Olden_Era___Template_Editor
             try
             {
                 settings = Olden_Era___Template_Editor.Services.Generation.RandomTemplateBuilder.Build(opts);
-                effectiveTopology = Services.Generation.GenerationProfileApplier.Prepare(settings).Topology;
-                template = TemplateGenerator.Generate(settings);
+                template = TemplateGenerator.Generate(settings, out effectiveTopology);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException or FormatException or OverflowException or JsonException)
             { MessageBox.Show(L.Get("S.Patch.OperationFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return; }
@@ -3103,7 +3130,7 @@ namespace Olden_Era___Template_Editor
                 _simpleDocument.IsDirty = true;
                 UpdateOutdatedWarning();
                 UpdateTitle();
-                try { TemplatePreviewPngWriter.Save(namedTemplate, TemplatePreviewPngWriter.GetSidecarPath(path), _generatedTopology); }
+                try { TemplatePreviewPngWriter.Save(GetGeneratedPreview(template), TemplatePreviewPngWriter.GetSidecarPath(path)); }
                 catch { /* preview sidecar is best-effort */ }
                 MessageBox.Show(L.Get("S.Simple.SavedToGame", path), L.Get("S.D.SavedTitle"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
@@ -3176,7 +3203,7 @@ namespace Olden_Era___Template_Editor
             {
                 try
                 {
-                    TemplatePreviewPngWriter.Save(template, previewPath, _generatedTopology);
+                    TemplatePreviewPngWriter.Save(GetGeneratedPreview(template), previewPath);
                 }
                 catch (Exception ex)
                 {

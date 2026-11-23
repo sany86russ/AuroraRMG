@@ -11,10 +11,12 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using OldenEraTemplateEditor.Models;
 using Olden_Era___Template_Editor.Models;
 using Olden_Era___Template_Editor.Services;
+using Olden_Era___Template_Editor.Services.Analysis;
 using IOPath = System.IO.Path;
 
 namespace Olden_Era___Template_Editor
@@ -126,6 +128,8 @@ namespace Olden_Era___Template_Editor
         private const int MaxUndoDepth = 50;
         /// <summary>Memory ceiling for the undo history (~16 MB of UTF-16 chars), independent of depth.</summary>
         private const long MaxUndoChars = 8_000_000;
+        private readonly Dictionary<(string Path, int Variant), Dictionary<string, Point>> _pendingLayoutSaves = [];
+        private DispatcherTimer? _layoutSaveTimer;
 
         internal void DebugDiscardAndClose()
         {
@@ -140,7 +144,11 @@ namespace Olden_Era___Template_Editor
             _saveValidationBaseline = new TemplatePropertiesDraft(_template);
             _topology = topology;
             Services.Localization.LocalizationManager.Instance.LanguageChanged += EditorLanguageChanged;
-            Closed += (_, _) => Services.Localization.LocalizationManager.Instance.LanguageChanged -= EditorLanguageChanged;
+            Closed += (_, _) =>
+            {
+                FlushPendingLayoutSaves();
+                Services.Localization.LocalizationManager.Instance.LanguageChanged -= EditorLanguageChanged;
+            };
             Loaded += (_, _) =>
             {
                 RefreshVariantChoices(0);
@@ -2251,7 +2259,10 @@ namespace Olden_Era___Template_Editor
         private void CanvasHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             if (_dragZone is not null && _movedWhileDragging)
+            {
+                QueueLayoutSave();
                 UpdateStatus(L("S.EC.ZoneMoved", _dragZone.Name));
+            }
             _dragZone = null;
             _isPanning = false;
             if (CanvasHost.IsMouseCaptured) CanvasHost.ReleaseMouseCapture();
@@ -2714,9 +2725,24 @@ namespace Olden_Era___Template_Editor
         private void ShowReferenceEditError(InvalidOperationException error) =>
             MessageBox.Show(this, error.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 
-        private void BtnValidate_Click(object sender, RoutedEventArgs e)
+        private async void BtnValidate_Click(object sender, RoutedEventArgs e)
         {
-            var issues = Validate();
+            Keyboard.ClearFocus();
+            var template = _template;
+            BtnValidate.IsEnabled = false;
+            List<string> issues;
+            try
+            {
+                var catalog = await Services.GameData.GameCatalogService.Instance.GetCatalogAsync();
+                if (!IsLoaded || !ReferenceEquals(template, _template)) return;
+                issues = Validate(catalog.GetReferenceCatalog());
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+            {
+                MessageBox.Show(this, ex.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            finally { BtnValidate.IsEnabled = true; }
             if (issues.Count == 0)
             {
                 UpdateStatus(L("S.EC.NoIssues"));
@@ -2729,10 +2755,12 @@ namespace Olden_Era___Template_Editor
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        private List<string> Validate() => ZoneGraphValidator.Validate(Zones, Connections)
-            .Concat(Services.Analysis.TemplateCompatibilityValidator.Validate(_template, Services.Analysis.TemplateValidationMode.TolerantImport)
-                .Where(i => i.Severity != Services.Analysis.TemplateIssueSeverity.Information)
-                .Select(i => i.Path + ": " + i.Message)).Distinct().ToList();
+        private List<string> Validate(TemplateReferenceCatalog? catalog = null) =>
+            FormatValidationIssues(TemplateCompatibilityValidator.Validate(_template, TemplateValidationMode.TolerantImport, catalog));
+
+        private static List<string> FormatValidationIssues(IEnumerable<TemplateValidationIssue> findings) =>
+            findings.Where(issue => issue.Severity != TemplateIssueSeverity.Information)
+                .Select(issue => issue.Path + ": " + issue.Message).Distinct(StringComparer.Ordinal).ToList();
 
         private void BtnRelayout_Click(object sender, RoutedEventArgs e)
         {
@@ -2740,7 +2768,29 @@ namespace Olden_Era___Template_Editor
             if (_mirrorMode) RebuildMirrorPairs();
             RebuildGraph();
             FitToView();
+            QueueLayoutSave();
             UpdateStatus(L("S.EC.Relayout"));
+        }
+
+        private void QueueLayoutSave()
+        {
+            if (_currentPath is not { } path) return;
+            _pendingLayoutSaves[(path, _variantIndex)] = new(_positions, StringComparer.Ordinal);
+            if (_layoutSaveTimer is null)
+            {
+                _layoutSaveTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(250) };
+                _layoutSaveTimer.Tick += (_, _) => FlushPendingLayoutSaves();
+            }
+            _layoutSaveTimer.Stop();
+            _layoutSaveTimer.Start();
+        }
+
+        private void FlushPendingLayoutSaves()
+        {
+            _layoutSaveTimer?.Stop();
+            foreach (var (target, positions) in _pendingLayoutSaves)
+                EditorLayoutStore.SaveVariant(target.Path, target.Variant, positions);
+            _pendingLayoutSaves.Clear();
         }
 
         private void BtnZoomReset_Click(object sender, RoutedEventArgs e) => FitToView();
@@ -2844,7 +2894,9 @@ namespace Olden_Era___Template_Editor
             var clone = CloneZone(_zoneClipboard);
             clone.Name = MakeUniqueZoneName(_zoneClipboardSource);
 
-            bool ownerCleared = TemplateRefactor.PreparePastedZone(clone, Zones, _zoneClipboardSource);
+            bool ownerCleared;
+            try { ownerCleared = TemplateRefactor.PreparePastedZone(clone, Zones, _zoneClipboardSource, _template); }
+            catch (InvalidOperationException ex) { ShowReferenceEditError(ex); return; }
 
             (Variant.Zones ??= []).Add(clone);
             Point basePos = _positions.TryGetValue(_zoneClipboardSource, out var sp) ? sp : new Point(160, 160);
@@ -2899,6 +2951,7 @@ namespace Olden_Era___Template_Editor
                 var json = File.ReadAllText(dlg.FileName);
                 var loaded = TemplateJsonReader.Deserialize(json, JsonOptions);
                 if (loaded is null) { UpdateStatus(L("S.EC.LoadFail")); return; }
+                FlushPendingLayoutSaves();
                 if (_mirrorMode) DisableMirrorMode();
                 _template = loaded;
                 ResetVariantLayouts();
@@ -2979,7 +3032,7 @@ namespace Olden_Era___Template_Editor
 
             RmgTemplate savable;
             IReadOnlyList<string> addedLayouts;
-            IReadOnlyList<Services.Analysis.TemplateValidationIssue> catalogFindings;
+            IReadOnlyList<TemplateValidationIssue> catalogFindings;
             bool wasEnabled = IsEnabled;
             try
             {
@@ -2997,9 +3050,7 @@ namespace Olden_Era___Template_Editor
                 return false;
             }
             finally { IsEnabled = wasEnabled; _saveCheckingReferences = false; }
-            var issues = Validate().Concat(catalogFindings
-                .Where(finding => finding.Severity != Services.Analysis.TemplateIssueSeverity.Information)
-                .Select(finding => finding.Path + ": " + finding.Message)).Distinct(StringComparer.Ordinal).ToList();
+            var issues = FormatValidationIssues(catalogFindings);
             if (issues.Count > 0)
             {
                 var go = MessageBox.Show(this,
@@ -3027,6 +3078,7 @@ namespace Olden_Era___Template_Editor
                 CommitSavedTemplate(savable);
                 // Remember the hand-arranged graph so reopening this template restores it (sidecar in
                 // %LOCALAPPDATA%, never next to the game's template file).
+                FlushPendingLayoutSaves();
                 SaveVariantLayouts(dlg.FileName);
                 _currentPath = dlg.FileName;
                 _dirty = false;
@@ -3283,6 +3335,39 @@ namespace Olden_Era___Template_Editor
         internal void ApproveClose() => _templateCloseApproved = true;
 
         internal void DebugMarkDirtyForClose() => MarkDirty();
+
+        internal void DebugVerifyLayoutOnlySave(string directory)
+        {
+            string path = IOPath.Combine(directory, "layout-verification.rmg.json");
+            string gameplay = JsonSerializer.Serialize(_template, JsonOptions);
+            File.WriteAllText(path, gameplay);
+            var zone = Zones.First();
+            Point initial = _positions[zone.Name];
+            Point moved = new(initial.X + 23, initial.Y + 37);
+            var previousPath = _currentPath;
+            bool wasDirty = _dirty;
+            try
+            {
+                _currentPath = path;
+                _positions[zone.Name] = moved;
+                _dragZone = zone;
+                _movedWhileDragging = true;
+                CanvasHost_MouseLeftButtonUp(this, null!);
+                FlushPendingLayoutSaves();
+                if (EditorLayoutStore.LoadVariant(path, _variantIndex)?.GetValueOrDefault(zone.Name) != moved
+                    || File.ReadAllText(path) != gameplay || _dirty != wasDirty)
+                    throw new InvalidOperationException("A layout-only drag did not save its sidecar independently of the gameplay file.");
+            }
+            finally
+            {
+                _positions[zone.Name] = initial;
+                _currentPath = previousPath;
+                _movedWhileDragging = false;
+                RebuildGraph();
+            }
+        }
+
+        internal List<string> DebugValidateWithReferences(TemplateReferenceCatalog catalog) => Validate(catalog);
 
         private void CommitFocusedInspectorInput()
         {

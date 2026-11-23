@@ -1,11 +1,13 @@
 using System.Globalization;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using Microsoft.Win32;
 using Olden_Era___Template_Editor.Models;
+using Olden_Era___Template_Editor.Services;
 using Olden_Era___Template_Editor.Services.Analysis;
 using Olden_Era___Template_Editor.Services.Export;
 using Olden_Era___Template_Editor.Services.GameData;
@@ -77,23 +79,31 @@ public partial class MainWindow
         SldSimplePlayers.IsEnabled = !solo && !duel;
     }
 
-    private void InvalidatePatchResult(RoutedEventArgs _)
+    private void InvalidatePatchResult(RoutedEventArgs e)
     {
         if (!_patchHooksReady || _refreshingLists || _isRefreshingMapSizes) return;
+        if (ReferenceEquals(e.OriginalSource, ChkSavePreviewImage) || ReferenceEquals(e.OriginalSource, ChkUseGameAssets)) return;
         MarkDirty();
     }
 
     private bool ValidateSimpleSelections(bool validateSeed = true)
     {
+        if (SimpleSelectionError(validateSeed) is not { } error) return true;
+        MessageBox.Show(this, error, Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+        return false;
+    }
+
+    private string? SimpleSelectionError(bool validateSeed = true)
+    {
         if (new[] { CmbSimpleType, CmbSimpleScale, CmbSimpleLength, CmbSimpleChaos, CmbSimpleGuards, CmbSimpleCastleFaction, CmbSimpleVictory }.Any(x => x.SelectedIndex < 0))
-        { MessageBox.Show(L.Get("S.Patch.SelectOptions"), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return false; }
+            return L.Get("S.Patch.SelectOptions");
         var text = TxtSimpleSeed.Text.Trim();
         if (validateSeed && !uint.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _) && !int.TryParse(text, out _))
-        { MessageBox.Show(L.Get("S.Patch.InvalidSeed"), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return false; }
+            return L.Get("S.Patch.InvalidSeed");
         string victory = KnownValues.VictoryConditionIds[CmbSimpleVictory.SelectedIndex];
         if (victory is "win_condition_4" or "win_condition_6" && (int)SldSimplePlayers.Value != 2)
-        { MessageBox.Show(L.Get("S.Patch.TwoPlayers"), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return false; }
-        return true;
+            return L.Get("S.Patch.TwoPlayers");
+        return null;
     }
 
     private async Task<GameCatalog> CurrentPatchCatalog(bool refresh = false)
@@ -191,11 +201,7 @@ public partial class MainWindow
         byte[]? preview = null;
         bool includeSettings = MessageBox.Show(this, L.Get("S.Patch.OptionalSettings"), Title, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
         if (MessageBox.Show(this, L.Get("S.Patch.OptionalPreview"), Title, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
-        {
-            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(Services.TemplatePreviewPngWriter.Render(templateSnapshot, _generatedTopology)));
-            using var stream = new MemoryStream(); encoder.Save(stream); preview = stream.ToArray();
-        }
+            preview = TemplatePreviewPngWriter.Encode(GetGeneratedPreview(template));
         var request = new TemplatePackageRequest(templateSnapshot, Services.SettingsSnapshotMapper.FromGeneratorSettings(inputSnapshot))
         { TemplateSeed = inputSnapshot.Seed, GameSeed = inputSnapshot.ProfileOptions.GameSeed, AlgorithmVersion = inputSnapshot.ProfileOptions.AlgorithmVersion,
             Profile = catalog.Source?.Profile, ValidationCatalog = catalog.GetReferenceCatalog(), PreviewPng = preview, IncludeSettings = includeSettings };
@@ -310,7 +316,8 @@ public partial class MainWindow
         var input = quick is null ? BuildSettings() : Services.Generation.RandomTemplateBuilder.Build(quick);
         var imported = Services.NativeSchema.NativeConfigurationImporter.Import(configuration, input, quick);
         imported.Settings.ProfileOptions.ImportedNativeConfiguration = imported.RawConfiguration;
-        imported.Settings.ProfileOptions.ImportedNativeSchema = imported.RawSchema;
+        imported.Settings.ProfileOptions.ImportedNativeSchema = imported.RawSchema is { } schema
+            ? JsonSerializer.SerializeToElement(schema) : null;
         if (!ResolveUnsavedSettings(simple: false)) return Task.CompletedTask;
         ReplaceSettings(Services.SettingsSnapshotMapper.FromGeneratorSettings(imported.Settings), path: null, dirty: true);
         MessageBox.Show(this, L.Get("S.Patch.ImportWarning", string.Join("\n", imported.Warnings.Select(x => x.Message))), Title, MessageBoxButton.OK, MessageBoxImage.Information);

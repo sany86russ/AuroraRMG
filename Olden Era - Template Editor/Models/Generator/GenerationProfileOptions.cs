@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Olden_Era___Template_Editor.Models;
 
@@ -34,7 +35,17 @@ public sealed partial class GenerationProfileOptions
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
     public System.Text.Json.Nodes.JsonObject? ImportedNativeConfiguration { get; set; }
-    public System.Text.Json.Nodes.JsonObject? ImportedNativeSchema { get; set; }
+    private JsonElement? _importedNativeSchema;
+    public JsonElement? ImportedNativeSchema
+    {
+        get => _importedNativeSchema;
+        set => _importedNativeSchema = value?.ValueKind switch
+        {
+            null or JsonValueKind.Null => null,
+            JsonValueKind.Object => value!.Value.Clone(),
+            _ => throw new JsonException("An imported native schema must be a JSON object.")
+        };
+    }
     public const string LegacyProfile = "aurora-1.11";
     public const string PreviousProfile = "olden-era-0.81.04";
     public const string CurrentGameVersion = "0.82.10";
@@ -84,6 +95,27 @@ public sealed partial class GenerationProfileOptions
         Tempo = MapTempo.Balanced
     };
 
-    public GenerationProfileOptions Clone() => JsonSerializer.Deserialize<GenerationProfileOptions>(JsonSerializer.Serialize(this))
-        ?? throw new InvalidOperationException("Generation options could not be copied.");
+    private static readonly JsonSerializerOptions CloneOptions = CreateCloneOptions();
+
+    internal static JsonSerializerOptions CreateCloneOptions(JsonSerializerOptions? baseline = null)
+    {
+        var options = baseline is null ? new JsonSerializerOptions() : new JsonSerializerOptions(baseline);
+        var resolver = new DefaultJsonTypeInfoResolver();
+        resolver.Modifiers.Add(info =>
+        {
+            if (info.Type != typeof(GenerationProfileOptions)) return;
+            var schema = info.Properties.Single(property => property.Name == nameof(ImportedNativeSchema));
+            schema.ShouldSerialize = static (_, _) => false;
+        });
+        options.TypeInfoResolver = resolver;
+        return options;
+    }
+
+    public GenerationProfileOptions Clone()
+    {
+        var copy = JsonSerializer.Deserialize<GenerationProfileOptions>(JsonSerializer.SerializeToUtf8Bytes(this, CloneOptions), CloneOptions)
+            ?? throw new InvalidOperationException("Generation options could not be copied.");
+        copy._importedNativeSchema = _importedNativeSchema;
+        return copy;
+    }
 }

@@ -395,9 +395,18 @@ public static class TemplateCompatibilityValidator
                 Error("win.cityHoldTarget", path, "City hold needs a City or Spawn marked holdCityWinCon in every variant.");
             if (win?.GladiatorArena == true && !objects.Any(o => o.Type == "GladiatorArena") && !connections.Any(c => c.ConnectionType == "GladiatorArena"))
                 Error("win.arenaTarget", path, "Final battle needs a GladiatorArena object or connection in every variant.");
-            if ((win?.GladiatorArena == true || win?.Tournament == true)
-                && win.ChampionSelectRule == ChampionSpirePlacement.SelectedRule && !ChampionSpirePlacement.HasLinkedSpire(template, variant))
-                Error("win.championSpire", path + ".zones", "Champion selection needs a linked Hell Light Spire in every variant.");
+            if ((win?.GladiatorArena == true || win?.Tournament == true) && win.ChampionSelectRule == ChampionSpirePlacement.SelectedRule)
+            {
+                if (!ChampionSpirePlacement.HasLinkedSpire(template, variant))
+                    Error("win.championSpire", path + ".zones", "Champion selection needs a linked Hell Light Spire in every variant.");
+                else if (win.Tournament == true)
+                {
+                    var inaccessible = ChampionSpirePlacement.StartsWithoutSpireAccess(template, variant);
+                    if (inaccessible.Count > 0)
+                        Error("win.championSpireAccess", path + ".zones",
+                            $"A linked Hell Light Spire is unreachable from tournament starts: {string.Join(", ", inaccessible)}.");
+                }
+            }
             if (win?.LostStartCity == true && !objects.Any(o => o.IsKeyObject == true && IsCity(o)))
                 Warn("win.capitalUnverified", path, "Capital defeat is enabled without a key city; legacy start-city semantics need game verification.");
         }

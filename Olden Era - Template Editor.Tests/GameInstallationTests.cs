@@ -70,6 +70,23 @@ public class GameInstallationTests
     }
 
     [Fact]
+    public void VerifiedArchiveReadsOnlyTheBytesThatMatchTheCapturedFingerprint()
+    {
+        using var game = new SyntheticInstalledGame();
+        var source = Assert.IsType<GameInstallation>(game.Service().Discover());
+        using var opened = GameInstallationService.OpenVerifiedDataFile(source.CoreZipPath, source.SourceFingerprint);
+        File.Move(game.CorePath, Path.Combine(game.Root, "previous-core.zip"));
+        game.WriteCore(pool: "replaced_pool");
+
+        Assert.Throws<InstalledGameDataChangedException>(() =>
+            GameInstallationService.OpenVerifiedDataFile(source.CoreZipPath, source.SourceFingerprint));
+        using var archive = new ZipArchive(opened, ZipArchiveMode.Read, leaveOpen: true);
+        var snapshot = GameReferenceSnapshotBuilder.Build(archive);
+        Assert.Contains("current_pool", snapshot.Pools);
+        Assert.DoesNotContain("replaced_pool", snapshot.Pools);
+    }
+
+    [Fact]
     public void Discover_ReadsSecondarySteamLibraryWithEscapedVdfPath()
     {
         using var game = new SyntheticInstalledGame();

@@ -35,12 +35,13 @@ namespace Olden_Era___Template_Editor.Services.GameData
         [JsonPropertyName("language")]   public string Language { get; set; } = "russian";
         [JsonPropertyName("sourceStamp")] public long  SourceStamp { get; set; }
         [JsonPropertyName("heroes")]     public List<HeroCatalogEntry> Heroes { get; set; } = [];
-        public const int CurrentSnapshotFormatVersion = 7;
+        public const int CurrentSnapshotFormatVersion = 8;
         public int SnapshotFormatVersion { get; set; } = CurrentSnapshotFormatVersion;
         public GameInstallation? Source { get; set; }
         public List<GameContentEntry> Content { get; set; } = [];
         public List<RmgTemplateStamp> RmgTemplateStamps { get; set; } = [];
         public List<string> Warnings { get; set; } = [];
+        public List<string> SharedWarnings { get; set; } = [];
         public GameReferenceSnapshot References { get; set; } = new();
 
         public Analysis.TemplateReferenceCatalog GetReferenceCatalog(bool includeNativeSchemaDefinitions = false)

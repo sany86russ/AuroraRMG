@@ -131,7 +131,10 @@ public static class GenerationProfileApplier
             }
             if (profile.EnableRivers) variant.River = new() { CreateRiverSystem = true, TributarySpacing = profile.RiverTributarySpacing };
             if (profile.NeutralTownCount.HasValue || profile.MaximumTownsPerZone.HasValue)
-            { DistributeNeutralTowns(variant, settings); TeamLayoutBuilder.RebuildConnectionRoads(variant, settings.GenerateRoads); }
+            {
+                ApplyNeutralTownLimits(template, variant, settings);
+                TeamLayoutBuilder.RebuildConnectionRoads(variant, settings.GenerateRoads);
+            }
             var roles = profile.UsesVersionedRules ? ApplyEconomyAndProgression(variant, settings) : null;
             if (profile.Symmetry is MapSymmetry.EqualStarts or MapSymmetry.Teams) EqualizeStarts(variant);
             if (alliance.Enabled && profile.Alliances.SmallerTeamEconomyMultiplier > 1) ApplySmallerTeamSupport(variant, alliance, profile.Alliances.SmallerTeamEconomyMultiplier);
@@ -270,6 +273,41 @@ public static class GenerationProfileApplier
         double scaled = Math.Round(value.Value * multiplier);
         if (!double.IsFinite(scaled) || scaled > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(multiplier), "Content or guard budget exceeds the supported integer range.");
         return Math.Max(0, (int)scaled);
+    }
+
+    private static void ApplyNeutralTownLimits(RmgTemplate template, Variant variant, GeneratorSettings settings)
+    {
+        var before = (variant.Zones ?? []).Where(zone => zone.MainObjects is { Count: > 0 })
+            .ToDictionary(zone => zone, zone => zone.MainObjects!.ToArray());
+        DistributeNeutralTowns(variant, settings);
+        var changes = before.Where(pair => !pair.Value.SequenceEqual(pair.Key.MainObjects ?? []))
+            .ToDictionary(pair => pair.Key, pair => RemapTownSlots(pair.Value, pair.Key.MainObjects ?? []));
+        var edit = MandatoryPlacementEdits.Prepare(template, changes.Keys, (zone, rule) =>
+        {
+            var mapping = changes[zone];
+            if (rule is not { Type: "MainObject", Args.Count: > 0 }
+                || !int.TryParse(rule.Args[0], NumberStyles.None, CultureInfo.InvariantCulture, out int index)
+                || index >= mapping.Length) return default;
+            if (mapping[index] is not { } target) return new(true, null);
+            return target != index ? new(false, target.ToString(CultureInfo.InvariantCulture)) : default;
+        });
+        edit();
+    }
+
+    private static int?[] RemapTownSlots(MainObject[] before, List<MainObject> after)
+    {
+        var previous = before.ToHashSet();
+        var replacements = new Queue<int>(after.Select((obj, index) => (obj, index))
+            .Where(pair => pair.obj.Type == "City" && !previous.Contains(pair.obj)).Select(pair => pair.index));
+        var mapping = new int?[before.Length];
+        for (int index = 0; index < before.Length; index++)
+        {
+            var original = before[index];
+            int retained = after.IndexOf(original);
+            if (retained >= 0) mapping[index] = retained;
+            else if (original.Type == "City" && replacements.TryDequeue(out int replacement)) mapping[index] = replacement;
+        }
+        return mapping;
     }
 
     private static void DistributeNeutralTowns(Variant variant, GeneratorSettings settings)

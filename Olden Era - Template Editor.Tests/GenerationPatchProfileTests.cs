@@ -539,7 +539,8 @@ public class GenerationPatchProfileTests
         Assert.NotSame(settings, prepared); Assert.Equal(361, prepared.Seed);
         Assert.NotSame(settings.Bonuses[0], prepared.Bonuses[0]); Assert.Equal("1250", prepared.Bonuses[0].Param);
         Assert.Null(settings.Seed);
-        var generated = TemplateGenerator.Generate(settings);
+        var generated = TemplateGenerator.Generate(settings, out var effectiveTopology);
+        Assert.Equal(MapTopology.Default, effectiveTopology);
         Assert.Contains(generated.GameRules!.Bonuses!, bonus => bonus.Sid == "add_bonus_res" && bonus.Parameters?.Contains("1250") == true);
         Assert.Equal(JsonSerializer.Serialize(generated, JsonExport.Options), JsonSerializer.Serialize(TemplateGenerator.Generate(settings), JsonExport.Options));
         Assert.Equal(before, JsonSerializer.Serialize(settings, SettingsSnapshotMapper.SnapshotOptions));

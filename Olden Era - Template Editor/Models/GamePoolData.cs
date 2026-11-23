@@ -5,6 +5,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Olden_Era___Template_Editor.Services.ContentPools;
 using Olden_Era___Template_Editor.Services.GameData;
 using Olden_Era___Template_Editor.Services.Localization;
 
@@ -90,7 +91,9 @@ namespace OldenEraTemplateEditor.Models
         private static bool _loaded;
         private static readonly object Gate = new();
         private static string _sourceIdentity = "";
+        private static string _customIdentity = "";
         private static GamePoolCatalog _catalog = new();
+        private static List<string> _installedWarnings = [];
         private static List<string> _warnings = [];
         public static GameInstallation? Source { get { Load(); return _catalog.Source; } }
         public static IReadOnlyList<string> Warnings { get { Load(); return _warnings.ToArray(); } }
@@ -115,38 +118,60 @@ namespace OldenEraTemplateEditor.Models
             lock (Gate)
             {
                 var source = GameInstallationService.Instance.Discover(forceRefresh);
+                bool installedChanged = !_loaded || forceRefresh || SourceIdentity(source) != _sourceIdentity;
                 var customFile = new FileInfo(CustomPoolsPath);
-                var identity = source?.CoreZipPath + "|" + source?.SourceFingerprint + "|" + source?.SchemaFingerprint + "|" + source?.Profile.Id + "|" + source?.SteamBuildId + "|" + source?.VersionMarker +
-                    "|custom:" + (customFile.Exists ? customFile.LastWriteTimeUtc.Ticks + ":" + customFile.Length : "none");
-                if (_loaded && !forceRefresh && identity == _sourceIdentity) return;
-                _loaded = true;
-                _sourceIdentity = identity;
-                _catalog = new GamePoolCatalog();
-                _warnings = source?.Warnings.ToList() ?? GameInstallationService.Instance.LastWarnings.ToList();
-                try
-                {
-                    if (source is null) SetStatus("S.PV.StatusGameNotFound");
-                    else
-                    {
-                        using var coreStream = new FileStream(source.CoreZipPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                        using var zip = new ZipArchive(coreStream, ZipArchiveMode.Read);
-                        _catalog = GamePoolCatalog.Read(zip, source);
-                        _warnings.AddRange(_catalog.Warnings);
-                        SetStatus("S.PV.StatusLoaded", _catalog.Pools.Count, 0, _catalog.ContentLists.Count);
-                    }
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JsonException)
-                {
-                    _loaded = false; // a transient read failure is not a permanent source snapshot
-                    _warnings.Add("Game pools could not be loaded: " + ex.Message);
-                    SetStatus("S.PV.StatusError", ex.Message);
-                }
+                string customIdentity = customFile.FullName + "|" +
+                    (customFile.Exists ? customFile.LastWriteTimeUtc.Ticks + ":" + customFile.Length : "none");
+                if (!installedChanged && customIdentity == _customIdentity) return;
+                if (installedChanged) LoadInstalledPools(source);
+
+                _warnings = _installedWarnings.ToList();
                 _allPools = _catalog.Pools.ToList();
                 _allContentLists = _catalog.ContentLists.ToList();
                 LoadCustomPools(); // local definitions remain available when the game is absent
-                if (_allContentLists.Count > 0)
+                _customIdentity = customIdentity;
+                if (_catalog.Source is not null)
                     SetStatus("S.PV.StatusLoaded", _catalog.Pools.Count, _customPools.Count, _allContentLists.Count);
             }
+        }
+
+        private static string SourceIdentity(GameInstallation? source) =>
+            source?.CoreZipPath + "|" + source?.SourceFingerprint + "|" + source?.SchemaFingerprint + "|" +
+            source?.Profile.Id + "|" + source?.SteamBuildId + "|" + source?.VersionMarker;
+
+        private static void LoadInstalledPools(GameInstallation? source)
+        {
+            var installations = GameInstallationService.Instance;
+            _loaded = false;
+            _catalog = new GamePoolCatalog();
+            try
+            {
+                try { _catalog = ReadInstalledPools(source); }
+                catch (InstalledGameDataChangedException)
+                {
+                    source = installations.Discover(forceRefresh: true);
+                    _catalog = ReadInstalledPools(source);
+                }
+                _sourceIdentity = SourceIdentity(source);
+                _installedWarnings = source?.Warnings.ToList() ?? installations.LastWarnings.ToList();
+                _installedWarnings.AddRange(_catalog.Warnings);
+                _loaded = true;
+                if (source is null) SetStatus("S.PV.StatusGameNotFound");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JsonException)
+            {
+                _installedWarnings = source?.Warnings.ToList() ?? installations.LastWarnings.ToList();
+                _installedWarnings.Add("Game pools could not be loaded: " + ex.Message);
+                SetStatus("S.PV.StatusError", ex.Message);
+            }
+        }
+
+        private static GamePoolCatalog ReadInstalledPools(GameInstallation? source)
+        {
+            if (source is null) return new();
+            using var stream = GameInstallationService.OpenVerifiedDataFile(source.CoreZipPath, source.SourceFingerprint);
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+            return GamePoolCatalog.Read(archive, source);
         }
 
         public static PoolReferenceResolution ResolvePool(string sid, RmgTemplate? template = null)
@@ -171,7 +196,7 @@ namespace OldenEraTemplateEditor.Models
                 SaveCustomPools(updated); // persist first; a failure must reach the caller
                 _customPools = updated;
                 _allPools.Add(pool);
-                _sourceIdentity = "";
+                _customIdentity = "";
             }
         }
 
@@ -232,9 +257,12 @@ namespace OldenEraTemplateEditor.Models
             return _allContentLists?.FirstOrDefault(l => l.Name == name);
         }
 
-        public static List<PoolItemInfo> GetPoolItems(GamePool pool, RmgTemplate? template = null)
+        public static List<PoolItemInfo> GetPoolItems(GamePool pool, RmgTemplate? template = null) =>
+            FormatPoolItems(InspectPool(pool, template));
+
+        internal static List<PoolItemInfo> FormatPoolItems(PoolContentInspection inspection)
         {
-            return InspectPool(pool, template).Items.Select(item =>
+            return inspection.Items.Select(item =>
             {
                 if (item.IsMissing) item.Sid = LocalizationManager.T("S.PV.ListNotFound");
                 if (item.ListName.Length == 0) item.ListName = LocalizationManager.T("S.PV.GroupWeight", item.GroupWeight);
@@ -242,7 +270,7 @@ namespace OldenEraTemplateEditor.Models
             }).ToList();
         }
 
-        public static Olden_Era___Template_Editor.Services.ContentPools.PoolContentInspection InspectPool(GamePool pool, RmgTemplate? template = null)
-        { Load(); return Olden_Era___Template_Editor.Services.ContentPools.PoolContentInspector.Inspect(pool, _catalog, template); }
+        public static PoolContentInspection InspectPool(GamePool pool, RmgTemplate? template = null)
+        { Load(); return PoolContentInspector.Inspect(pool, _catalog, template); }
     }
 }

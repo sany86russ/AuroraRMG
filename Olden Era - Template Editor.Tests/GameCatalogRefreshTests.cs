@@ -40,6 +40,50 @@ public class GameCatalogRefreshTests
     }
 
     [Fact]
+    public async Task CatalogFailedInstallSwitchClearsBothPreviouslyLoadedLanguageViews()
+    {
+        using var first = new SyntheticInstalledGame();
+        using var broken = new SyntheticInstalledGame();
+        var locator = first.Service();
+        var service = new GameCatalogService(locator, Path.Combine(first.Root, "cache"));
+        await service.GetCatalogAsync("english");
+        await service.GetCatalogAsync("russian");
+        Assert.True(service.TryResolveHero("human_hero_8", out _, out _, out _, "english"));
+
+        File.WriteAllText(broken.CorePath, "This file is not a ZIP.");
+        locator.ManualInstallPath = broken.InstallPath;
+        var failed = await service.GetCatalogAsync("russian");
+
+        Assert.True(failed.IsEmpty);
+        Assert.Contains(failed.Warnings, warning => warning.Contains("catalog could not be loaded", StringComparison.Ordinal));
+        Assert.False(service.TryResolveHero("human_hero_8", out _, out _, out _, "english"));
+        Assert.False(service.TryResolveContent("scroll_box", out _, GameContentKind.Object, "english"));
+    }
+
+    [Fact]
+    public async Task CatalogSharesBilingualDataWithoutSharingMutableViewsAcrossLanguages()
+    {
+        using var fixture = new SyntheticInstalledGame();
+        using (var archive = ZipFile.Open(fixture.CorePath, ZipArchiveMode.Update))
+            SyntheticInstalledGame.Add(archive, "Lang/english/texts/heroInfo.json",
+                """{"tokens":[{"sid":"human_hero_8","text":"English hero"}]}""");
+        var service = new GameCatalogService(fixture.Service(), Path.Combine(fixture.Root, "cache"));
+        var ru = await service.GetCatalogAsync("russian");
+        ru.Content.Single(entry => entry.Sid == "scroll_box").RewardVariants[0].Index = 73;
+        ru.References.Pools.Clear();
+        var en = await service.GetCatalogAsync("english");
+        Assert.Equal("English hero", Assert.Single(en.Heroes).Name);
+        Assert.NotEqual(Assert.Single(ru.Heroes).Name, Assert.Single(en.Heroes).Name);
+        Assert.Equal(0, Assert.Single(en.Content.Single(entry => entry.Sid == "scroll_box").RewardVariants).Index);
+        Assert.Contains("current_pool", en.References.Pools);
+
+        await service.GetCatalogAsync("english", forceRefresh: true);
+        var refreshedRu = await service.GetCatalogAsync("russian");
+        Assert.NotSame(ru, refreshedRu);
+        Assert.Equal(0, Assert.Single(refreshedRu.Content.Single(entry => entry.Sid == "scroll_box").RewardVariants).Index);
+    }
+
+    [Fact]
     public async Task Catalog_DiskCacheRemainsBoundToActualSource()
     {
         using var fixture = new SyntheticInstalledGame();
@@ -55,6 +99,7 @@ public class GameCatalogRefreshTests
     [InlineData("heroes", "null")]
     [InlineData("Content", "null")]
     [InlineData("Warnings", "null")]
+    [InlineData("SharedWarnings", "null-row")]
     [InlineData("Source", "null")]
     [InlineData("Source.Profile", "null")]
     [InlineData("Source.Warnings", "null")]
@@ -562,5 +607,49 @@ public class GamePoolCatalogTests
         var warnings = new List<string>();
         var pools = GamePoolDataLoader.FilterCustomPools(parsed, warnings);
         Assert.Equal("valid", Assert.Single(pools).Name); Assert.Equal(2, warnings.Count);
+    }
+}
+
+[CollectionDefinition("Game pool storage", DisableParallelization = true)]
+public sealed class GamePoolStorageCollection { }
+
+[Collection("Game pool storage")]
+public sealed class GamePoolStorageTests
+{
+    [Fact]
+    public void CustomPoolChangesKeepTheInstalledCoreSnapshotAndReloadWhenCoreChanges()
+    {
+        using var game = new SyntheticInstalledGame();
+        const string dataDirectory = "AURORARMG_DATA_DIRECTORY";
+        string? previousData = Environment.GetEnvironmentVariable(dataDirectory);
+        var locator = GameInstallationService.Instance;
+        string? previousInstall = locator.ManualInstallPath;
+        try
+        {
+            Environment.SetEnvironmentVariable(dataDirectory, game.Root);
+            locator.ManualInstallPath = game.InstallPath;
+            GamePoolDataLoader.Load(forceRefresh: true);
+            var installed = Assert.Single(GamePoolDataLoader.GetAllPools());
+            var list = Assert.Single(GamePoolDataLoader.GetAllContentLists());
+            File.WriteAllText(Path.Combine(game.Root, "custom_pools.json"), """[{"name":"custom_probe","groups":[]}]""");
+
+            var afterCustomSave = GamePoolDataLoader.GetAllPools();
+            Assert.Same(installed, afterCustomSave.Single(pool => pool.Name == "current_pool"));
+            Assert.Contains(afterCustomSave, pool => pool.Name == "custom_probe");
+            Assert.Same(list, Assert.Single(GamePoolDataLoader.GetAllContentLists()));
+
+            File.Delete(game.CorePath);
+            game.WriteCore(pool: "replaced_pool");
+            File.SetLastWriteTimeUtc(game.CorePath, DateTime.UtcNow.AddMinutes(2));
+            var afterCoreUpdate = GamePoolDataLoader.GetAllPools();
+            Assert.Contains(afterCoreUpdate, pool => pool.Name == "replaced_pool");
+            Assert.Contains(afterCoreUpdate, pool => pool.Name == "custom_probe");
+            Assert.DoesNotContain(afterCoreUpdate, pool => pool.Name == "current_pool");
+        }
+        finally
+        {
+            locator.ManualInstallPath = previousInstall;
+            Environment.SetEnvironmentVariable(dataDirectory, previousData);
+        }
     }
 }

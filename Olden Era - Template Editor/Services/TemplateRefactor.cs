@@ -76,8 +76,11 @@ namespace Olden_Era___Template_Editor.Services
                 System.Text.Json.JsonSerializer.Serialize(source, JsonExport.Options), JsonExport.Options)!;
 
         /// <summary>A copied start becomes a neutral town instead of duplicating a player side.</summary>
-        public static bool PreparePastedZone(Zone clone, IReadOnlyList<Zone> existingZones, string? sourceName = null)
+        public static bool PreparePastedZone(Zone clone, IReadOnlyList<Zone> existingZones, string? sourceName = null,
+            RmgTemplate? template = null)
         {
+            var applyMandatory = MandatoryPlacementEdits.Prepare(template, [clone],
+                (_, rule) => rule.Type == "Connection" ? new MandatoryPlacementEdits.RuleChange(true, null) : default);
             var taken = new HashSet<string>(StringComparer.Ordinal);
             var availableAnchorTargets = existingZones.Select(zone => zone.Name).Append(clone.Name).ToHashSet(StringComparer.Ordinal);
             foreach (var zone in existingZones)
@@ -95,6 +98,7 @@ namespace Olden_Era___Template_Editor.Services
                     RenameUniformPlacementAnchors(obj, sourceName, clone.Name);
                 }
                 RemoveUniformPlacementAnchors(obj, target => !availableAnchorTargets.Contains(target));
+                if (obj.Placement == "Connection") ClearConnectionPlacement(obj);
                 if (!string.IsNullOrEmpty(obj.Owner) && taken.Contains(obj.Owner))
                 { obj.Owner = null; obj.IsStartCity = false; cleared = true; }
                 if (!string.IsNullOrEmpty(obj.Spawn) && taken.Contains(obj.Spawn))
@@ -107,7 +111,14 @@ namespace Olden_Era___Template_Editor.Services
             }
             // Connections are not pasted with a zone; their road anchors belong to the source zone.
             clone.Roads?.RemoveAll(r => r.From?.Type == "Connection" || r.To?.Type == "Connection");
+            applyMandatory();
             return cleared;
+        }
+
+        private static void ClearConnectionPlacement(MainObject obj)
+        {
+            obj.Placement = "Uniform";
+            obj.PlacementArgs = null;
         }
 
         /// <summary>Renames connection references in one pass, including swaps of two connection names.</summary>
@@ -352,10 +363,7 @@ namespace Olden_Era___Template_Editor.Services
                 zone.Roads?.RemoveAll(r => Points(r.From, connectionName) || Points(r.To, connectionName));
                 foreach (var obj in zone.MainObjects ?? [])
                     if (obj is { Placement: "Connection", PlacementArgs.Count: > 0 } && obj.PlacementArgs[0] == connectionName)
-                    {
-                        obj.Placement = "Uniform";
-                        obj.PlacementArgs = null;
-                    }
+                        ClearConnectionPlacement(obj);
             }
             foreach (var connection in variant.Connections ?? [])
             {

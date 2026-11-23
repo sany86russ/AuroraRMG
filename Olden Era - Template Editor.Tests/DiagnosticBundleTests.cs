@@ -151,10 +151,11 @@ public class DiagnosticBundleTests
     {
         using var fixture = new SyntheticInstalledGame(); string archive = Path.Combine(fixture.Root, "bundle.zip");
         var original = new GeneratorSettings();
-        original.ProfileOptions.ImportedNativeSchema = System.Text.Json.Nodes.JsonNode.Parse("""{"access_token":"hidden-access","CLIENT-SECRET":"hidden-client","password.privateKey":"hidden-private","C:\\Users\\Fixture Owner\\private-a":{"v":1},"C:\\Users\\Fixture Owner\\private-b":{"v":2},"owner@example.invalid":"owner-value","[REDACTED_KEY_1]":"keep"}""")!.AsObject();
+        using var schemaDocument = JsonDocument.Parse("""{"access_token":"hidden-access","CLIENT-SECRET":"hidden-client","password.privateKey":"hidden-private","C:\\Users\\Fixture Owner\\private-a":{"v":1},"C:\\Users\\Fixture Owner\\private-b":{"v":2},"owner@example.invalid":"owner-value","[REDACTED_KEY_1]":"keep"}""");
+        original.ProfileOptions.ImportedNativeSchema = schemaDocument.RootElement;
         original.ProfileOptions.ImportedNativeConfiguration = System.Text.Json.Nodes.JsonNode.Parse("""{"refresh-token":"hidden-refresh","nested":{"db_password":"hidden-db"}}""")!.AsObject();
-        foreach (var property in original.ProfileOptions.ImportedNativeSchema)
-            original.ProfileOptions.ImportedNativeConfiguration[property.Key] = property.Value?.DeepClone();
+        foreach (var property in original.ProfileOptions.ImportedNativeSchema!.Value.EnumerateObject())
+            original.ProfileOptions.ImportedNativeConfiguration[property.Name] = JsonNode.Parse(property.Value.GetRawText());
         var settings = SettingsSnapshotMapper.FromGeneratorSettings(original);
         await DiagnosticBundleService.CreateAsync(archive, new() { Settings = settings });
         using var zip = ZipFile.OpenRead(archive); string json = Read(zip, "settings.sanitized.oetgs");
@@ -164,7 +165,7 @@ public class DiagnosticBundleTests
         Assert.False(profile.TryGetProperty("ImportedNativeSchema", out _));
         var raw = profile.GetProperty("ImportedNativeConfiguration");
         Assert.Equal(9, raw.EnumerateObject().Count()); Assert.Equal("keep", raw.GetProperty("[REDACTED_KEY_1]").GetString());
-        Assert.Equal("hidden-access", original.ProfileOptions.ImportedNativeSchema["access_token"]!.GetValue<string>());
+        Assert.Equal("hidden-access", original.ProfileOptions.ImportedNativeSchema!.Value.GetProperty("access_token").GetString());
         using var manifest = JsonDocument.Parse(Read(zip, "manifest.json"));
         Assert.True(manifest.RootElement.GetProperty("PrivacyReviewRequiredBeforeSharing").GetBoolean());
         Assert.False(manifest.RootElement.TryGetProperty("IncludesMachinePaths", out _));
@@ -181,7 +182,7 @@ public class DiagnosticBundleTests
         };
         var schema = NativeSchemaDocument.Parse(schemaRoot.ToJsonString());
         var imported = NativeConfigurationImporter.Import(NativeConfigurationCodec.ParseJson("""{"flags":4,"size":128,"spawnCount":2}"""), new GeneratorSettings { Seed = 42 }, schema: schema);
-        imported.Settings.ProfileOptions.ImportedNativeSchema = imported.RawSchema;
+        imported.Settings.ProfileOptions.ImportedNativeSchema = JsonSerializer.SerializeToElement(imported.RawSchema);
         imported.Settings.ProfileOptions.ImportedNativeConfiguration = imported.RawConfiguration;
         imported.Settings.ProfileOptions.ImportedNativeConfiguration["access_token"] = "ORDINARY_SETTINGS_CREDENTIAL";
         var settings = SettingsSnapshotMapper.FromGeneratorSettings(imported.Settings);

@@ -29,14 +29,15 @@ internal static class MandatoryPlacementEdits
         Func<Zone, ContentPlacementRule, RuleChange> decide)
     {
         if (template?.MandatoryContent is not { Count: > 0 } definitions) return static () => { };
+        var editedZones = zones.Distinct().ToArray();
         var byName = definitions.Where(group => group is not null).ToLookup(group => group.Name, StringComparer.Ordinal);
         var consumers = (template.Variants ?? []).Where(variant => variant is not null)
-            .SelectMany(variant => variant.Zones ?? []).Where(zone => zone is not null).Distinct()
+            .SelectMany(variant => variant.Zones ?? []).Where(zone => zone is not null).Concat(editedZones).Distinct()
             .SelectMany(zone => (zone.MandatoryContent ?? []).Distinct(StringComparer.Ordinal))
             .Where(name => !string.IsNullOrEmpty(name)).ToLookup(name => name, StringComparer.Ordinal);
         var reserved = byName.Select(group => group.Key).Concat(consumers.Select(group => group.Key)).ToHashSet(StringComparer.Ordinal);
         var plan = new List<Edit>();
-        foreach (var zone in zones)
+        foreach (var zone in editedZones)
         foreach (string name in (zone.MandatoryContent ?? []).Where(name => !string.IsNullOrEmpty(name)).Distinct(StringComparer.Ordinal))
         {
             var matching = byName[name];

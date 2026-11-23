@@ -18,6 +18,7 @@ namespace Olden_Era___Template_Editor;
 public sealed class NativeSchemaEditorWindow : Window
 {
     private const long MaximumBytes = 4 * 1024 * 1024;
+    private const int MaximumSchemaDepth = 128;
     private readonly string? _initialPath;
     private readonly HashSet<string> _gameRoots = new(StringComparer.OrdinalIgnoreCase);
     private readonly TreeView _tree = new();
@@ -194,6 +195,39 @@ public sealed class NativeSchemaEditorWindow : Window
             throw new InvalidOperationException("Selecting a native conditional row did not preserve its source or populate the structured editor.");
     }
 
+    internal void DebugVerifyConditionalParameterEdit()
+    {
+        var document = _document ?? throw new InvalidOperationException("The native schema was not loaded.");
+        var pointer = _selection?.Pointer ?? throw new InvalidOperationException("A conditional row must be selected.");
+        var original = Resolve(pointer)?.DeepClone();
+        var parent = FindTreeItem(pointer[..^1]);
+        try
+        {
+            _selectedTreeItem!.IsExpanded = true;
+            _weight.Text = _weight.Text == "2" ? "1" : "2";
+            if (!ApplyEdit() || !ReferenceEquals(_document, document) || _selection?.Pointer.SequenceEqual(pointer) != true
+                || !ReferenceEquals(FindTreeItem(pointer[..^1]), parent) || !parent.IsExpanded || !_selectedTreeItem.IsExpanded
+                || JsonNode.DeepEquals(Resolve(pointer), original))
+                throw new InvalidOperationException("Applying a native row did not retain its selection, expansion or surrounding document.");
+
+            var edited = Resolve(pointer)?.DeepClone();
+            _tabs.SelectedItem = _source;
+            _raw.Text = """{"value":1,"value":2}""";
+            if (ApplyEdit() || !JsonNode.DeepEquals(Resolve(pointer), edited))
+                throw new InvalidOperationException("An ambiguous native draft changed the saved row.");
+
+            int excessiveNesting = MaximumSchemaDepth - pointer.Length + 1;
+            _raw.Text = string.Concat(Enumerable.Repeat("{\"child\":", excessiveNesting)) + "0" + new string('}', excessiveNesting);
+            if (ApplyEdit() || !JsonNode.DeepEquals(Resolve(pointer), edited))
+                throw new InvalidOperationException("A native fragment exceeded the schema's overall depth without being rejected.");
+        }
+        finally
+        {
+            ApplyReplacement(pointer, document, original, raw: false);
+            _dirty = false;
+        }
+    }
+
     private TreeViewItem NodeItem(string[] pointer, JsonNode? value, object header, string? parentProperty = null)
     {
         bool conditional = value is JsonObject row && row.ContainsKey("value") &&
@@ -215,9 +249,8 @@ public sealed class NativeSchemaEditorWindow : Window
                     for (var index = 0; index < array.Count; index++)
                     {
                         var node = array[index];
-                        string caption = node is JsonObject entry && entry["name"] is JsonValue name && name.TryGetValue<string>(out var id)
-                            ? $"[{index}] {id}" : $"[{index}]";
-                        item.Items.Add(NodeItem([.. pointer, index.ToString(CultureInfo.InvariantCulture)], node, caption, pointer.LastOrDefault()));
+                        item.Items.Add(NodeItem([.. pointer, index.ToString(CultureInfo.InvariantCulture)], node,
+                            ArrayItemCaption(index, node), pointer.LastOrDefault()));
                     }
             };
         }
@@ -258,38 +291,165 @@ public sealed class NativeSchemaEditorWindow : Window
 
     private bool ApplyEdit()
     {
-        if (_document is null || _selection is null) return false;
+        if (_document is null || _selection is null || _selectedTreeItem is null) return false;
         try
         {
-            var replacement = _tabs.SelectedItem == _structured ? EditedRow() : JsonNode.Parse(_raw.Text);
-            var candidate = NativeSchemaDocument.Parse(_document.ToJson(false));
-            if (_selection.Pointer.Length == 0)
-                candidate = NativeSchemaDocument.Parse(replacement?.ToJsonString() ?? "null");
-            else
+            var pointer = _selection.Pointer;
+            bool raw = _tabs.SelectedItem == _source;
+            var candidate = _document;
+            JsonNode? replacement;
+            if (pointer.Length == 0)
             {
-                var parent = Resolve(candidate.Root, _selection.Pointer[..^1]);
-                var last = _selection.Pointer[^1];
-                if (parent is JsonObject obj) obj[last] = replacement;
-                else if (parent is JsonArray array) array[int.Parse(last, CultureInfo.InvariantCulture)] = replacement;
-                else throw new JsonException(LocalizationManager.T("S.NativeEditor.InvalidTarget"));
-                // Prevent removal/retyping of required top-level collections through the raw editor.
-                candidate = NativeSchemaDocument.Parse(candidate.ToJson(false));
+                TemplateJsonReader.GuardBeforeDeserialize(_raw.Text);
+                candidate = NativeSchemaDocument.Parse(_raw.Text);
+                replacement = candidate.Root;
             }
-            _document = candidate; _dirty = true; _pendingEdit = false; _selection = null;
-            RebuildTree(); _status.Text = LocalizationManager.T("S.NativeEditor.Modified");
+            else replacement = raw ? ParseDraftJson(_raw.Text) : EditedRow();
+            ApplyReplacement(pointer, candidate, replacement, raw);
+            _dirty = true;
+            _status.Text = LocalizationManager.T("S.NativeEditor.Modified");
             return true;
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or ArgumentException or NotSupportedException)
         { ShowError(ex.Message); return false; }
     }
 
+    private void ReplaceSubtree(string[] pointer, JsonNode? replacement)
+    {
+        string name = pointer[^1];
+        if (pointer.Length == 1 && name is ("zoneClasses" or "mainObjectClasses") && replacement is not JsonArray)
+            throw new JsonException(LocalizationManager.T("S.NativeEditor.InvalidTarget"));
+        var parent = Resolve(pointer[..^1]);
+        if (parent is JsonObject obj) obj[name] = replacement;
+        else if (parent is JsonArray array) array[int.Parse(name, CultureInfo.InvariantCulture)] = replacement;
+        else throw new JsonException(LocalizationManager.T("S.NativeEditor.InvalidTarget"));
+    }
+
+    private void ApplyReplacement(string[] pointer, NativeSchemaDocument document, JsonNode? value, bool raw)
+    {
+        ValidateDepth(value, MaximumSchemaDepth - pointer.Length);
+        var originalDocument = _document!;
+        var originalValue = Resolve(pointer);
+        var previous = _selectedTreeItem!;
+        var previousSelection = _selection;
+        var expanded = ExpandedPaths(previous).ToArray();
+        var draftTab = _draftTab;
+        bool pending = _pendingEdit;
+        ItemCollection siblings;
+        TreeViewItem replacement;
+        if (pointer.Length == 0)
+        {
+            siblings = _tree.Items;
+            replacement = NodeItem([], document.Root, Label("S.NativeEditor.Root"));
+        }
+        else
+        {
+            var parentPointer = pointer[..^1];
+            var parentItem = FindTreeItem(parentPointer);
+            siblings = parentItem.Items;
+            if (Resolve(parentPointer) is JsonArray)
+                replacement = NodeItem(pointer, value, ArrayItemCaption(int.Parse(pointer[^1], CultureInfo.InvariantCulture), value),
+                    parentPointer.LastOrDefault());
+            else replacement = NodeItem(pointer, value, pointer[^1], pointer[^1]);
+        }
+        int index = siblings.IndexOf(previous);
+        if (index < 0) throw new JsonException(LocalizationManager.T("S.NativeEditor.InvalidTarget"));
+        var previousTab = _tabs.SelectedItem;
+        var previousFields = new[] { _raw.Text, _and.Text, _or.Text, _value.Text, _weight.Text };
+        var previousFallback = _fallback.IsChecked;
+        bool modelChanged = false;
+        _restoringSelection = true;
+        try
+        {
+            if (pointer.Length == 0) _document = document;
+            else ReplaceSubtree(pointer, value);
+            modelChanged = true;
+            siblings.RemoveAt(index);
+            siblings.Insert(index, replacement);
+            RestoreExpansion(replacement, expanded);
+            replacement.IsSelected = true;
+            _restoringSelection = false;
+            _pendingEdit = false;
+            _draftTab = null;
+            SelectNode();
+            if (raw) _tabs.SelectedItem = _source;
+            replacement.BringIntoView();
+        }
+        catch
+        {
+            if (modelChanged)
+            {
+                if (pointer.Length == 0) _document = originalDocument;
+                else ReplaceSubtree(pointer, originalValue);
+            }
+            _restoringSelection = _refreshing = true;
+            if (siblings.Contains(replacement)) siblings.Remove(replacement);
+            if (!siblings.Contains(previous)) siblings.Insert(index, previous);
+            previous.IsSelected = true;
+            _selectedTreeItem = previous;
+            _selection = previousSelection;
+            _raw.Text = previousFields[0]; _and.Text = previousFields[1]; _or.Text = previousFields[2];
+            _value.Text = previousFields[3]; _weight.Text = previousFields[4]; _fallback.IsChecked = previousFallback;
+            _tabs.SelectedItem = previousTab;
+            _draftTab = draftTab;
+            _pendingEdit = pending;
+            throw;
+        }
+        finally { _restoringSelection = _refreshing = false; }
+    }
+
+    private static void ValidateDepth(JsonNode? node, int remaining)
+    {
+        if (node is not (JsonArray or JsonObject)) return;
+        if (remaining <= 0) throw new JsonException($"A native schema cannot exceed {MaximumSchemaDepth} levels.");
+        if (node is JsonArray array)
+            foreach (var child in array) ValidateDepth(child, remaining - 1);
+        else if (node is JsonObject obj)
+            foreach (var child in obj) ValidateDepth(child.Value, remaining - 1);
+    }
+
+    private TreeViewItem FindTreeItem(string[] pointer)
+    {
+        var item = (TreeViewItem)_tree.Items[0];
+        foreach (string part in pointer)
+            item = item.Items.OfType<TreeViewItem>().First(child => child.Tag is Selection selected && selected.Pointer[^1] == part);
+        return item;
+    }
+
+    private static IEnumerable<string[]> ExpandedPaths(TreeViewItem item)
+    {
+        if (!item.IsExpanded || item.Tag is not Selection selected) yield break;
+        yield return selected.Pointer;
+        foreach (var child in item.Items.OfType<TreeViewItem>())
+        foreach (var path in ExpandedPaths(child))
+            yield return path;
+    }
+
+    private static void RestoreExpansion(TreeViewItem item, IReadOnlyList<string[]> expanded)
+    {
+        if (item.Tag is not Selection selected || !expanded.Any(path => path.SequenceEqual(selected.Pointer))) return;
+        item.IsExpanded = true;
+        foreach (var child in item.Items.OfType<TreeViewItem>())
+            RestoreExpansion(child, expanded);
+    }
+
+    private static string ArrayItemCaption(int index, JsonNode? node) =>
+        node is JsonObject entry && entry["name"] is JsonValue name && name.TryGetValue<string>(out var id)
+            ? $"[{index}] {id}" : $"[{index}]";
+
+    private static JsonNode? ParseDraftJson(string text)
+    {
+        TemplateJsonReader.GuardBeforeDeserialize(text);
+        return JsonNode.Parse(text, documentOptions: new JsonDocumentOptions { MaxDepth = MaximumSchemaDepth });
+    }
+
     private JsonObject EditedRow()
     {
         if (Resolve(_selection!.Pointer) is not JsonObject original) throw new JsonException(LocalizationManager.T("S.NativeEditor.InvalidTarget"));
         var edited = original.DeepClone().AsObject();
-        var and = JsonNode.Parse(_and.Text) as JsonObject ?? throw new JsonException(LocalizationManager.T("S.NativeEditor.ConditionsObject"));
-        var or = JsonNode.Parse(_or.Text) as JsonObject ?? throw new JsonException(LocalizationManager.T("S.NativeEditor.ConditionsObject"));
-        var value = JsonNode.Parse(_value.Text);
+        var and = ParseDraftJson(_and.Text) as JsonObject ?? throw new JsonException(LocalizationManager.T("S.NativeEditor.ConditionsObject"));
+        var or = ParseDraftJson(_or.Text) as JsonObject ?? throw new JsonException(LocalizationManager.T("S.NativeEditor.ConditionsObject"));
+        var value = ParseDraftJson(_value.Text);
         if (!double.TryParse(_weight.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var weight) || !NativeSchemaWeight.IsRepresentable(weight))
             throw new JsonException(LocalizationManager.T("S.NativeEditor.InvalidWeight"));
         if (!JsonNode.DeepEquals(original["conditionsAnd"] ?? new JsonObject(), and)) edited["conditionsAnd"] = and;

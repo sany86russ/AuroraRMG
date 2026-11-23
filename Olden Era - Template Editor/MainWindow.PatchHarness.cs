@@ -141,6 +141,30 @@ public partial class MainWindow
         Require(JsonSerializer.Serialize(_generatedTemplate, JsonExport.Options) == JsonSerializer.Serialize(regenerated, JsonExport.Options),
             "Advanced generation changed the captured Simple input.");
         checks.Add("Advanced: restored inputs generate the same current template and preview.");
+
+        var bitmap = _generatedPreview ?? throw new InvalidOperationException("Advanced did not cache its rendered preview.");
+        bool previewWasEnabled = ChkSavePreviewImage.IsChecked == true;
+        bool wasDirty = _advancedDocument.IsDirty;
+        ChkSavePreviewImage.IsChecked = !previewWasEnabled;
+        ChkSavePreviewImage_Click(ChkSavePreviewImage, new());
+        Require(CurrentGeneratedTemplate is not null && BtnSaveGenerated.IsEnabled && _advancedDocument.IsDirty == wasDirty,
+            "Changing preview visibility/PNG output invalidated the template.");
+        ChkSavePreviewImage.IsChecked = previewWasEnabled;
+        ChkSavePreviewImage_Click(ChkSavePreviewImage, new());
+        var cached = GetGeneratedPreview(_generatedTemplate!);
+        string cachedPng = Path.Combine(directory, "cached-preview.png");
+        TemplatePreviewPngWriter.Save(cached, cachedPng);
+        Require(ReferenceEquals(bitmap, cached) && File.ReadAllBytes(cachedPng).SequenceEqual(TemplatePreviewPngWriter.Encode(cached)),
+            "The display bitmap was replaced or direct and package previews encoded different pixels.");
+        checks.Add("Preview: visibility/PNG options keep the generated result current and both outputs reuse the display bitmap.");
+
+        _advancedProfileOptions.TemplateSeed = 424242;
+        MarkDirty();
+        Require(CurrentGeneratedTemplate is null, "Changing the Advanced seed did not mark its result stale.");
+        Require(ApplySettingsDecision(simple: false, MessageBoxResult.No, restoreOnDiscard: true)
+            && CurrentGeneratedTemplate is not null && BtnSaveGenerated.IsEnabled && ReferenceEquals(_generatedPreview, bitmap),
+            "Discard did not reactivate the already-generated result after restoring the same settings.");
+        checks.Add("Settings: discarding an edit reactivates the existing Advanced result when its complete input matches.");
         await CaptureMainPatchAsync(directory, "main-advanced");
 
         var previousPreview = ImgPreview.Source;
@@ -259,8 +283,14 @@ public partial class MainWindow
         await CapturePatchWindowAsync(new GameContentCatalogWindow(catalog), directory, "catalog", window => ((GameContentCatalogWindow)window).DebugSelectRewardObject(rewardObject.Sid));
         checks.Add("Catalog: RMG-only object search selects the actual configured reward variants.");
         await CapturePatchWindowAsync(new NativeSchemaEditorWindow(catalog.Source?.SchemaPath, catalog.Source?.InstallPath), directory, "native",
-            window => ((NativeSchemaEditorWindow)window).DebugSelectConditionalParameter());
+            window =>
+            {
+                var native = (NativeSchemaEditorWindow)window;
+                native.DebugSelectConditionalParameter();
+                native.DebugVerifyConditionalParameterEdit();
+            });
         checks.Add("Native editor: selecting the actual conditional row fills controls without changing source JSON.");
+        checks.Add("Native editor: applying a real conditional row preserves its selection and branches; duplicate raw properties are rejected.");
         await CapturePatchWindowAsync(new TemplatePropertiesWindow(regenerated), directory, "properties");
         await CapturePatchWindowAsync(new TemplateBulkEditWindow(regenerated), directory, "bulk");
         var examplePool = new OldenEraTemplateEditor.Models.GamePool { Name = "UI verification pool", Groups = [new() { Weight = 1.5, Content = [new() { Sid = rewardObject.Sid, Weight = .25, Variant = -1 }] }] };
@@ -271,10 +301,28 @@ public partial class MainWindow
             editor.DebugVerifySavedInspectorEditing();
             editor.DebugVerifyJsonFieldDuplicateRejection();
             editor.DebugVerifyVariantEditing();
+            editor.DebugVerifyLayoutOnlySave(directory);
         });
         checks.Add("Editor: committing the saved copy retains live inspector bindings for subsequent edits.");
         checks.Add("Editor: duplicate raw portal JSON is rejected; correcting it clears the save blocker.");
         checks.Add("Editor: selected variant edits and history are scoped to the active graph.");
+        checks.Add("Editor: a graph-only drag saves the active layout sidecar without touching gameplay JSON.");
+
+        var tournamentSettings = new GeneratorSettings
+        {
+            Seed = 1729, PlayerCount = 2, ProfileOptions = GenerationProfileOptions.CurrentDefaults(),
+            GameEndConditions = new() { VictoryCondition = "win_condition_6" }
+        };
+        tournamentSettings.ZoneCfg.Advanced.Enabled = true;
+        tournamentSettings.ZoneCfg.Advanced.NeutralMediumNoCastleCount = 2;
+        var tournamentEditor = new TemplateEditorWindow(TemplateGenerator.Generate(tournamentSettings));
+        try
+        {
+            var findings = tournamentEditor.DebugValidateWithReferences(catalog.GetReferenceCatalog());
+            Require(findings.Count == 0, "The editor warned on an intact tournament with installed reference data: " + string.Join("; ", findings));
+        }
+        finally { tournamentEditor.DebugDiscardAndClose(); }
+        checks.Add("Editor: validation uses installed identifiers and respects separate tournament starts.");
         if (catalog.Source is { Profile.Id: GenerationProfileOptions.CurrentProfile } source)
         {
             var pandora = catalog.Search("pandora_box", GameContentKind.Object, rmgReferenced: true).Single(entry => entry.Sid == "pandora_box");

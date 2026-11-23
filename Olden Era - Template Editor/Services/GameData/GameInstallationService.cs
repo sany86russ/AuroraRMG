@@ -64,6 +64,9 @@ public sealed record GameInstallation
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
 }
 
+internal sealed class InstalledGameDataChangedException(string path)
+    : IOException($"Installed game data changed while it was being read: {Path.GetFileName(path)}.") { }
+
 /// <summary>One read-only installation locator shared by catalog loading and export.</summary>
 public sealed class GameInstallationService
 {
@@ -169,6 +172,32 @@ public sealed class GameInstallationService
     }
 
     public GameCompatibilityProfile GetProfile() => Discover()?.Profile ?? GameCompatibilityProfile.Legacy;
+
+    internal static FileStream OpenVerifiedDataFile(string path, string fingerprint)
+    {
+        FileStream stream;
+        try
+        {
+            // A replacement may change the path, but writes to the opened file cannot change the bytes being read.
+            stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            throw new InstalledGameDataChangedException(path);
+        }
+        try
+        {
+            if (!string.Equals(Convert.ToHexString(SHA256.HashData(stream)), fingerprint, StringComparison.OrdinalIgnoreCase))
+                throw new InstalledGameDataChangedException(path);
+            stream.Position = 0;
+            return stream;
+        }
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
+    }
     private static string CorePath(string install) => Path.Combine(install, "HeroesOldenEra_Data", "StreamingAssets", "Core.zip");
     private static string Stamp(string? path)
     { var f = path is null ? null : new FileInfo(path); return f?.Exists == true ? f.Length + ":" + f.LastWriteTimeUtc.Ticks : "missing"; }

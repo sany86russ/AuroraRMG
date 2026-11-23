@@ -34,17 +34,20 @@ namespace Olden_Era___Template_Editor.Services
         ];
         /// <summary>
         /// Per-generation RNG for all placement randomisation. Seeded from
-        /// <see cref="GeneratorSettings.Seed"/> at the start of <see cref="Generate"/> so a given seed
+        /// <see cref="GeneratorSettings.Seed"/> at the start of <see cref="Generate(GeneratorSettings)"/> so a given seed
         /// reproduces the same map; falls back to a time-based RNG when no seed is set (manual mode).
-        /// <c>[ThreadStatic]</c> keeps parallel test runs isolated — a single <see cref="Generate"/>
+        /// <c>[ThreadStatic]</c> keeps parallel test runs isolated — a single <see cref="Generate(GeneratorSettings)"/>
         /// call runs entirely on one thread.
         /// </summary>
         [System.ThreadStatic] private static Random? _rng;
         private static Random Rng => _rng ??= new Random();
 
-        public static RmgTemplate Generate(GeneratorSettings settings)
+        public static RmgTemplate Generate(GeneratorSettings settings) => Generate(settings, out _);
+
+        internal static RmgTemplate Generate(GeneratorSettings settings, out MapTopology effectiveTopology)
         {
             settings = GenerationProfileApplier.Prepare(settings);
+            effectiveTopology = settings.Topology;
             _rng = settings.Seed.HasValue ? new Random(settings.Seed.Value) : new Random();
 
             var playerLetters = ZoneLetters.Take(settings.PlayerCount).ToList();

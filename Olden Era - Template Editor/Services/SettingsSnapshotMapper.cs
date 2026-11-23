@@ -18,11 +18,14 @@ public static class SettingsSnapshotMapper
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
     };
 
+    private static readonly JsonSerializerOptions CloneOptions = GenerationProfileOptions.CreateCloneOptions(SnapshotOptions);
+
     public static GeneratorSettings Clone(GeneratorSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        var clone = JsonSerializer.Deserialize<GeneratorSettings>(JsonSerializer.SerializeToUtf8Bytes(settings, SnapshotOptions), SnapshotOptions)
+        var clone = JsonSerializer.Deserialize<GeneratorSettings>(JsonSerializer.SerializeToUtf8Bytes(settings, CloneOptions), CloneOptions)
             ?? throw new JsonException("Generator settings could not be copied.");
+        if (clone.ProfileOptions is { } options) options.ImportedNativeSchema = settings.ProfileOptions?.ImportedNativeSchema;
         clone.Seed ??= clone.ProfileOptions?.TemplateSeed;
         return clone;
     }
