@@ -24,4 +24,26 @@ public class TemplateBulkEditorTests
         Assert.ThrowsAny<Exception>(() => TemplateBulkEditor.Apply(source, 0, ["a"], "guardReactionDistribution", "[1,-2]"));
         Assert.Null(source.Variants![0].Zones![0].GuardReactionDistribution);
     }
+
+    [Fact]
+    public void BulkEditCanUseASecondVariantWhenTheFirstIsNull()
+    {
+        var source = TemplateJsonReader.Deserialize("""{"name":"Variant gap","sizeX":32,"sizeZ":32,"variants":[null,{"zones":[{"name":"Second"}]}]}""", JsonExport.Options)!;
+
+        Assert.Equal([1], TemplateBulkEditor.GetEditableVariants(source));
+        var result = TemplateBulkEditor.Apply(source, 1, ["Second"], "guardMultiplier", "1.25");
+        Assert.Null(result.Variants![0]);
+        Assert.Equal(1.25, result.Variants[1].Zones![0].GuardMultiplier);
+        Assert.Null(source.Variants![1].Zones![0].GuardMultiplier);
+    }
+
+    [Fact]
+    public void DuplicateZonesCannotMaskAMissingSelectedZone()
+    {
+        var source = new RmgTemplate { Name = "Ambiguous", SizeX = 32, SizeZ = 32,
+            Variants = [new() { Zones = [new() { Name = "a" }, new() { Name = "a" }] }] };
+
+        Assert.Throws<ArgumentException>(() => TemplateBulkEditor.Apply(source, 0, ["a", "b"], "guardMultiplier", "2"));
+        Assert.All(source.Variants![0].Zones!, zone => Assert.Null(zone.GuardMultiplier));
+    }
 }

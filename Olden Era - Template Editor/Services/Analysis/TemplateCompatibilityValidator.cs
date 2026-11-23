@@ -64,6 +64,8 @@ public static class TemplateCompatibilityValidator
         private readonly HashSet<string> localLists = new(StringComparer.Ordinal);
         private readonly HashSet<string> localLayouts = new(StringComparer.Ordinal);
         private readonly HashSet<string> localMandatory = new(StringComparer.Ordinal);
+        private readonly ILookup<string, MandatoryContentGroup> mandatoryGroups = (template.MandatoryContent ?? [])
+            .Where(group => group is not null).ToLookup(group => group.Name, StringComparer.Ordinal);
         private readonly HashSet<string> localLimits = new(StringComparer.Ordinal);
         private readonly List<HashSet<string>> variantSpawns = [];
 
@@ -171,13 +173,15 @@ public static class TemplateCompatibilityValidator
                     }
                 }
             }
-            foreach (var value in template.ValueOverrides ?? [])
-                if (value is not null)
-                {
-                    ObjectSid(value.Sid, "valueOverrides.sid");
-                    Nonnegative(value.GuardValue, "valueOverrides.guardValue");
-                    if (value.Variant is < -1) Error("number.variant", "valueOverrides.variant", "An override variant must be -1 (all variants) or nonnegative.");
-                }
+            for (int i = 0; i < (template.ValueOverrides?.Count ?? 0); i++)
+            {
+                if (template.ValueOverrides![i] is not { } value) continue;
+                string path = $"valueOverrides[{i}]";
+                ObjectSid(value.Sid, path + ".sid");
+                Nonnegative(value.GuardValue, path + ".guardValue");
+                if (value.Variant is < -1) Error("number.variant", path + ".variant", "An override variant must be -1 (all variants) or nonnegative.");
+                ConfiguredRewardVariant(value.Sid, value.Variant, path + ".variant");
+            }
         }
 
         private void ValidateCountLimitTarget(string? sid, int? variant, List<string>? includeLists, string path, bool hasInlineContent = false)
@@ -343,7 +347,11 @@ public static class TemplateCompatibilityValidator
                     Error("graph.invalid", path, graphIssue);
             }
             var zoneNames = zones.Select(z => z.Name).ToHashSet(StringComparer.Ordinal);
-            var connectionNames = connections.Where(c => c.Name is not null).Select(c => c.Name!).ToHashSet(StringComparer.Ordinal);
+            var connectionsByZone = connections.Where(connection => !string.IsNullOrEmpty(connection.Name))
+                .SelectMany(connection => new[] { (Zone: connection.From, Name: connection.Name!), (Zone: connection.To, Name: connection.Name!) })
+                .ToLookup(connection => connection.Zone, connection => connection.Name, StringComparer.Ordinal);
+            var connectionNames = connections.Where(connection => connection.Name is not null)
+                .Select(connection => connection.Name!).ToHashSet(StringComparer.Ordinal);
             var spawns = new HashSet<string>(StringComparer.Ordinal);
             var objects = zones.SelectMany(z => z.MainObjects ?? []).Where(o => o is not null).ToList();
             foreach (var obj in objects)
@@ -378,7 +386,9 @@ public static class TemplateCompatibilityValidator
                 if (river.CreateRiverSystem == true && river.TributarySpacing is <= 0)
                     Error("river.spacing", path + ".river.tributarySpacing", "Enabled rivers require positive tributary spacing.");
             }
-            for (int i = 0; i < zones.Count; i++) ValidateZone(zones[i], $"{path}.zones[{i}]", zoneNames, connectionNames, spawns);
+            for (int i = 0; i < zones.Count; i++)
+                ValidateZone(zones[i], $"{path}.zones[{i}]", zoneNames,
+                    connectionNames, connectionsByZone[zones[i].Name].ToHashSet(StringComparer.Ordinal), spawns);
             for (int i = 0; i < connections.Count; i++) ValidateConnection(connections[i], $"{path}.connections[{i}]", zoneNames);
             var win = template.GameRules?.WinConditions;
             if (win?.CityHold == true && !objects.Any(o => o.HoldCityWinCon == true && IsCity(o)))
@@ -392,7 +402,8 @@ public static class TemplateCompatibilityValidator
                 Warn("win.capitalUnverified", path, "Capital defeat is enabled without a key city; legacy start-city semantics need game verification.");
         }
 
-        private void ValidateZone(Zone zone, string path, HashSet<string> names, HashSet<string> connectionNames, HashSet<string> spawns)
+        private void ValidateZone(Zone zone, string path, HashSet<string> names, HashSet<string> connectionNames,
+            HashSet<string> localConnectionNames, HashSet<string> spawns)
         {
             if (zone.Size.HasValue) Positive(zone.Size, path + ".size");
             Reference(zone.Layout, localLayouts, catalog.Layouts, path + ".layout");
@@ -400,6 +411,7 @@ public static class TemplateCompatibilityValidator
             ReferenceList(zone.UnguardedContentPool, localPools, catalog.Pools, path + ".unguardedContentPool");
             ReferenceList(zone.ResourcesContentPool, localPools, catalog.Pools, path + ".resourcesContentPool");
             ReferenceList(zone.MandatoryContent, localMandatory, catalog.Mandatory, path + ".mandatoryContent");
+            ValidateMandatoryPlacementTargets(zone, path, localConnectionNames);
             ReferenceList(zone.ContentCountLimits, localLimits, catalog.CountLimits, path + ".contentCountLimits");
             Nonnegative(zone.GuardedContentValue, path + ".guardedContentValue");
             Nonnegative(zone.GuardedContentValuePerArea, path + ".guardedContentValuePerArea");
@@ -459,10 +471,41 @@ public static class TemplateCompatibilityValidator
                     if (obj.HoldCityWinCon == true && !IsCity(obj))
                         Error("win.holdNonCity", child + ".holdCityWinCon", "A City or Spawn is required for a city-hold objective.");
                     if (obj.Placement == "NearZone") RequiredTarget(obj.PlacementArgs, names, child + ".placementArgs", "zone");
-                    if (obj.Placement == "Connection") RequiredTarget(obj.PlacementArgs, connectionNames, child + ".placementArgs", "connection");
+                    if (obj.Placement == "Connection")
+                    {
+                        RequiredTarget(obj.PlacementArgs, connectionNames, child + ".placementArgs", "connection");
+                        if (obj.PlacementArgs?.FirstOrDefault() is { } target && connectionNames.Contains(target) && !localConnectionNames.Contains(target))
+                            Warn("placement.objectConnectionTarget", child + ".placementArgs",
+                                $"Placement refers to connection '{target}' outside zone '{zone.Name}'.");
+                    }
                     ValidateUniformPlacementAnchors(obj.UniformPlacementAnchors, names, child + ".uniformPlacementAnchors");
                 }
                 else Error("node.null", $"{path}.mainObjects[{i}]", "A main object cannot be null.");
+        }
+
+        private void ValidateMandatoryPlacementTargets(Zone zone, string path, HashSet<string> connectionNames)
+        {
+            for (int groupIndex = 0; groupIndex < (zone.MandatoryContent?.Count ?? 0); groupIndex++)
+            {
+                string name = zone.MandatoryContent![groupIndex];
+                var groups = mandatoryGroups[name];
+                if (groups.Skip(1).Any() || groups.FirstOrDefault() is not { } group) continue;
+                string groupPath = $"{path}.mandatoryContent[{groupIndex}]";
+                foreach (var item in group.Content ?? [])
+                foreach (var rule in item?.Rules ?? [])
+                {
+                    string? target = rule?.Args?.FirstOrDefault();
+                    if (rule?.Type == "Connection" && (string.IsNullOrEmpty(target) || !connectionNames.Contains(target)))
+                        Warn("placement.connectionTarget", groupPath,
+                            $"Placement of '{item?.Name ?? item?.Sid}' in '{name}' refers to connection '{target}' outside zone '{zone.Name}'.");
+                    // Some stock groups include optional town anchors even in zones without towns.
+                    // Report the unresolved preference without treating it as a definitive engine failure.
+                    if (rule?.Type == "MainObject" && (!int.TryParse(target, NumberStyles.None, CultureInfo.InvariantCulture, out int index)
+                        || index >= (zone.MainObjects?.Count ?? 0)))
+                        Warn("placement.mainObjectTarget", groupPath,
+                            $"Placement of '{item?.Name ?? item?.Sid}' in '{name}' refers to main object '{target}' missing from zone '{zone.Name}'.");
+                }
+            }
         }
 
         private void ValidateUniformPlacementAnchors(List<UniformPlacementAnchor>? anchors, HashSet<string> zones, string path)

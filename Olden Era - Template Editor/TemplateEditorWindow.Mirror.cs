@@ -225,12 +225,10 @@ namespace Olden_Era___Template_Editor
             }
 
             RememberCurrentLayout();
+            try { TemplateRefactor.RemoveZones(Variant, right, _template); }
+            catch (InvalidOperationException ex) { ShowReferenceEditError(ex); return; }
             foreach (Zone z in right)
-            {
-                TemplateRefactor.RemoveZoneReferences(Variant, z.Name);
-                Zones.Remove(z);
                 _positions.Remove(z.Name);
-            }
 
             _mirrorMap.Clear();
             var kept = new HashSet<string>(left.Concat(axis).Select(z => z.Name), StringComparer.Ordinal);
@@ -409,17 +407,6 @@ namespace Olden_Era___Template_Editor
             Point mirrored = MirrorPoint(pos);
             _positions[twin.Name] = mirrored;
             RepositionZone(twin, mirrored);
-        }
-
-        /// <summary>Returns the twin that should be deleted alongside <paramref name="z"/>.</summary>
-        private Zone? MirrorTwinToDelete(Zone z)
-        {
-            if (!_mirrorMode) return null;
-            Zone? twin = TwinOf(z);
-            if (twin is null) return null;
-            _mirrorMap.Remove(z.Name);
-            _mirrorMap.Remove(twin.Name);
-            return twin;
         }
 
         /// <summary>Duplicates a freshly created connection between the two twins.</summary>

@@ -34,12 +34,12 @@ public static class ZoneContentManager
     /// Kerberos connector zones, and Madness side zones from the template corpus.
     /// No high-end encounters (no dragon utopias, research labs, unstable ruins).
     /// </summary>
-    public static List<ContentItem> BuildLowNeutralMandatoryContent(GeneratorSettings settings)
+    public static List<ContentItem> BuildLowNeutralMandatoryContent(GeneratorSettings settings, int castleCount)
     {
         var content = new List<ContentItem>();
 
         if (settings.SpawnRemoteFootholds)
-            content.Add(ContentPresets.RemoteFoothold(settings.ZoneCfg.PlayerZoneCastles));
+            content.Add(ContentPresets.RemoteFoothold(castleCount));
 
         content.AddRange(settings.LowNeutralMandatoryContent);       
 
@@ -52,12 +52,12 @@ public static class ZoneContentManager
     /// Based on t3-pool side/treasure zones found in Staircase, Shamrock, Blitz, Kerberos, and similar templates.
     /// No high-end encounters (no dragon utopias, research labs, unstable ruins).
     /// </summary>
-    public static List<ContentItem> BuildMediumNeutralMandatoryContent(GeneratorSettings settings)
+    public static List<ContentItem> BuildMediumNeutralMandatoryContent(GeneratorSettings settings, int castleCount)
     {
         var content = new List<ContentItem>();
 
         if (settings.SpawnRemoteFootholds)
-            content.Add(ContentPresets.RemoteFoothold(settings.ZoneCfg.PlayerZoneCastles));
+            content.Add(ContentPresets.RemoteFoothold(castleCount));
 
         content.AddRange(settings.MediumNeutralMandatoryContent);
 
@@ -72,12 +72,12 @@ public static class ZoneContentManager
     /// high-zone mandatory content across the example template corpus.
     /// Only this tier spawns dragon utopias, unstable ruins, and research laboratories.
     /// </summary>
-    public static List<ContentItem> BuildHighNeutralMandatoryContent(GeneratorSettings settings)
+    public static List<ContentItem> BuildHighNeutralMandatoryContent(GeneratorSettings settings, int castleCount)
     {
         var content = new List<ContentItem>();
 
         if (settings.SpawnRemoteFootholds)
-            content.Add(ContentPresets.RemoteFoothold(settings.ZoneCfg.PlayerZoneCastles));
+            content.Add(ContentPresets.RemoteFoothold(castleCount));
 
         content.AddRange(settings.HighNeutralMandatoryContent);
 
@@ -107,6 +107,7 @@ public static class ZoneContentManager
                 IsMine = item.IsMine,
                 SoloEncounter = item.SoloEncounter,
                 IncludeLists = item.IncludeLists,
+                Extra = item.Extra is null ? null : new(item.Extra, StringComparer.Ordinal),
                 Rules = item.Rules.Where(r => r.Type != "MainObject").ToList()
             };
             if (stripped.Rules.Count == 0)

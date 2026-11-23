@@ -1,14 +1,14 @@
 {
   "name": "1v1 Mega Rich",
   "gameMode": "Classic",
-  "description": "Игроки: 2; альянсы: FFA. Размер: 176 × 176. Победа: Стандартные условия. Герои: 5–12. Богатство: Обычная; опасность карты: Обычная; темп: Прежний профиль. Seed: 000006C1; профиль: olden-era-0.81.04; алгоритм: aurora-generator-2.",
+  "description": "Игроки: 2; альянсы: FFA. Размер: 176 × 176. Победа: Стандартные условия. Герои: 5–12. Богатство: Обычная; опасность карты: Обычная; темп: Прежний профиль. Seed: 000006C1; профиль: olden-era-0.82.10; алгоритм: aurora-generator-2.",
   "displayWinCondition": "win_condition_1",
   "descBlocks": {
     "blocks": [
       {
         "type": "text",
         "p": [
-          "Игроки: 2; альянсы: FFA. Размер: 176 × 176. Победа: Стандартные условия. Герои: 5–12. Богатство: Обычная; опасность карты: Обычная; темп: Прежний профиль. Seed: 000006C1; профиль: olden-era-0.81.04; алгоритм: aurora-generator-2."
+          "Игроки: 2; альянсы: FFA. Размер: 176 × 176. Победа: Стандартные условия. Герои: 5–12. Богатство: Обычная; опасность карты: Обычная; темп: Прежний профиль. Seed: 000006C1; профиль: olden-era-0.82.10; алгоритм: aurora-generator-2."
         ]
       },
       {
@@ -1398,15 +1398,6 @@
               "targetMin": 0.2,
               "targetMax": 0.4,
               "weight": 0
-            },
-            {
-              "type": "MainObject",
-              "args": [
-                "1"
-              ],
-              "targetMin": 0.5,
-              "targetMax": 0.5,
-              "weight": 2
             }
           ]
         }
@@ -1436,15 +1427,6 @@
               "targetMin": 0.2,
               "targetMax": 0.4,
               "weight": 0
-            },
-            {
-              "type": "MainObject",
-              "args": [
-                "1"
-              ],
-              "targetMin": 0.5,
-              "targetMax": 0.5,
-              "weight": 2
             }
           ]
         }
@@ -1474,15 +1456,6 @@
               "targetMin": 0.2,
               "targetMax": 0.4,
               "weight": 0
-            },
-            {
-              "type": "MainObject",
-              "args": [
-                "1"
-              ],
-              "targetMin": 0.5,
-              "targetMax": 0.5,
-              "weight": 2
             }
           ]
         }
@@ -1512,15 +1485,6 @@
               "targetMin": 0.2,
               "targetMax": 0.4,
               "weight": 0
-            },
-            {
-              "type": "MainObject",
-              "args": [
-                "1"
-              ],
-              "targetMin": 0.5,
-              "targetMax": 0.5,
-              "weight": 2
             }
           ]
         }

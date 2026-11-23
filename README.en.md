@@ -17,14 +17,17 @@
 
 </div>
 
-## Olden Era 0.82.10 in the current source
+## New in v1.13.0 · Olden Era 0.82.10
 
 - **Map and tools → Teams and map options** offers the **Olden Era 0.82.10** profile. **0.81.04** and **Aurora 1.11** are available for previously saved settings. Aurora checks installed game data by version, Steam build, and checksums.
 - In **Rules and calendar**, you can ban skills from the installed catalog and enable champion selection at the Hell Light Spire for tournaments and final battles. Template properties can add spires near player starts in variants that do not have them.
 - The Pandora catalog identifies rewards that let the player choose one option and marks entries with zero roll weight. The RMG filter includes mandatory objects from stock templates. The graph editor can switch among map variants, edit them, and save their layouts separately.
 - Aurora applies the extra portal limit to the entire template. Each seed in a Simple batch follows the same path as a single generation. The main window offers to save changed settings before replacing them or closing.
+- Simple and Advanced keep separate settings. Bulk editing starts on the active variant. The editor validates connection and object references before saving. The artifact picker includes entries from the installed game.
 
-Project checks cover the format and export rules. The separate game acceptance run covers spire placement, champion selection, skill availability, and several in-game seeds. Run the built EXE with `--make-patch-kit <new-folder>` outside the game directory to prepare templates, settings, and a manual results log.
+[v1.13.0 RU/EN changelog](docs/release-notes-v1.13.0.md) · [Report a generator or in-game issue](https://github.com/sany86russ/AuroraRMG/issues/new?template=aurorarmg-bug.yml)
+
+Run the built EXE with `--make-patch-kit <new-folder>` outside the game directory to prepare in-game scenarios. Use `--gen-readymaps <folder> --lang ru` to reproduce the 53 checked-in ReadyMaps, including team presets.
 
 ## New in v1.12.0
 
@@ -547,6 +550,8 @@ For **Bulk zone edits**, choose the map variant, property and target zones. Ente
 
 <img src="docs/ui-bulk-edit-en.png" alt="Bulk property edits for selected zones" width="100%"/>
 
+<img src="docs/ui-editor-variants-en.png" alt="Map variant picker in the graph editor" width="100%"/>
+
 </details>
 
 ### Native schemas and configuration import
@@ -581,6 +586,8 @@ Diagnostics contain reduced settings, validation results and bounded portions of
 | <img src="docs/ui-calendar-en.png" alt="Victory rules and battle calendar" width="100%"/> | <img src="docs/ui-environment-en.png" alt="Rivers, troop growth and game rules" width="100%"/> |
 | **Game catalog** | **Native schema** |
 | <img src="docs/ui-game-catalog-en.png" alt="IDs and actual reward variants" width="100%"/> | <img src="docs/ui-native-schema-en.png" alt="Conditional native schema editor" width="100%"/> |
+
+<img src="docs/ui-artifact-picker-en.png" alt="Banning an artifact from the installed catalog" width="65%"/>
 | **Template properties** | **Pool creator** |
 | <img src="docs/ui-template-properties-en.png" alt="Template properties and rules" width="100%"/> | <img src="docs/ui-pool-creator-en.png" alt="Fractional weights and object variants" width="100%"/> |
 

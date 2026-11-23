@@ -25,12 +25,24 @@ namespace Olden_Era___Template_Editor
         // Literal UTF-8 (no \uXXXX), UTF-8 no-BOM via File.WriteAllText. See Services.JsonExport.
         private static readonly JsonSerializerOptions JsonOptions = Services.JsonExport.Options;
 
-        // Currently open settings file path (null = unsaved / untitled)
-        private string? _currentSettingsPath = null;
-        private bool _savedSettingsFromSimple;
-        private bool _isDirty = false;
+        private readonly SettingsDocument _simpleDocument = new();
+        private readonly SettingsDocument _advancedDocument = new();
+        private SettingsFile? _savedAdvancedSettings;
+        private (Services.GameData.SimpleModeState Options, string Seed, SettingsFile? File)? _savedSimpleSettings;
+        private bool IsSimpleMode => SimpleView?.Visibility == Visibility.Visible;
+        private SettingsDocument ActiveSettingsDocument => SettingsDocumentFor(IsSimpleMode);
+        private SettingsDocument SettingsDocumentFor(bool simple) => simple ? _simpleDocument : _advancedDocument;
+
+        private sealed class SettingsDocument
+        {
+            public string? Path { get; set; }
+            public bool IsDirty { get; set; }
+            public bool TemplateOutdated { get; set; }
+        }
+
         private bool _applyingSettings;
         private bool _settingsCloseApproved;
+        private bool _shutdownInProgress;
 
         // Ban lists
         private readonly ObservableCollection<BanEntry>   _bannedItems  = [];
@@ -100,7 +112,7 @@ namespace Olden_Era___Template_Editor
             // Launch quietly when started with --minimized (e.g. from a shortcut while gaming):
             // start in the taskbar without grabbing focus, so it never pops over a fullscreen game.
             var cmdLine = Environment.GetCommandLineArgs();
-            _settingsCloseApproved = cmdLine.Any(arg => arg.StartsWith("--shoot", StringComparison.OrdinalIgnoreCase) || arg == "--make-patch-kit");
+            _settingsCloseApproved = cmdLine.Any(arg => arg.StartsWith("--shoot", StringComparison.OrdinalIgnoreCase) || App.IsPatchVerificationCommand(arg));
             bool startMinimized = cmdLine.Any(a =>
                 a.Equals("--minimized", StringComparison.OrdinalIgnoreCase) ||
                 a.Equals("-m", StringComparison.OrdinalIgnoreCase) ||
@@ -157,17 +169,6 @@ namespace Olden_Era___Template_Editor
                 Left = -5000; Top = 100;
                 string toolsShotDir = cmdLine[shootToolsIdx + 1];
                 ContentRendered += async (_, _) => await ShootToolsAsync(toolsShotDir);
-            }
-
-            // --gen-readymaps <dir>: headless regen of the built-in presets to .rmg.json, then exit.
-            int genIdx = Array.FindIndex(cmdLine, a => a.Equals("--gen-readymaps", StringComparison.OrdinalIgnoreCase));
-            if (genIdx >= 0 && genIdx + 1 < cmdLine.Length)
-            {
-                ShowActivated = false;
-                WindowStartupLocation = WindowStartupLocation.Manual;
-                Left = -5000; Top = 100;
-                string genDir = cmdLine[genIdx + 1];
-                ContentRendered += (_, _) => GenerateReadyMaps(genDir);
             }
 
             // Clamp startup size to the available work area so the window never
@@ -262,7 +263,9 @@ namespace Olden_Era___Template_Editor
             };
 
             TxtTemplateName.TextChanged += (_, _) => { MarkDirtyNameOnly(); Validate(); };
-            _isDirty = false;
+            _simpleDocument.IsDirty = _advancedDocument.IsDirty = false;
+            _savedAdvancedSettings = GatherSettings(simple: false);
+            _savedSimpleSettings = (CaptureSimpleSettings(), TxtSimpleSeed.Text, null);
             UpdateTitle();
             TxtWindowTitle.Text = Title;
 
@@ -524,9 +527,9 @@ namespace Olden_Era___Template_Editor
         private void MarkDirty()
         {
             if (!IsInitialized || _refreshingLists || _applyingSettings) return;
-            _isDirty = true;
-            if (_generatedTemplate is not null)
-                _templateOutdated = true;
+            var document = ActiveSettingsDocument;
+            document.IsDirty = true;
+            document.TemplateOutdated = _generatedTemplate is not null;
             UpdateOutdatedWarning();
             UpdateTitle();
         }
@@ -534,37 +537,40 @@ namespace Olden_Era___Template_Editor
         private void MarkDirtyNameOnly()
         {
             if (!IsInitialized || _applyingSettings) return;
-            _isDirty = true;
+            _advancedDocument.IsDirty = true;
             string name = TxtTemplateName.Text.Trim();
-            if (_generatedForAdvancedSettings && !_templateOutdated) RenameGeneratedTemplate(name);
-            if (_loadedGeneratorSnapshot is not null) _loadedGeneratorSnapshot.TemplateName = name;
-            if (_loadedSnapshotUiBaseline is not null) _loadedSnapshotUiBaseline.TemplateName = name;
+            if (_generatedForAdvancedSettings && !_advancedDocument.TemplateOutdated && _lastQuickSettings is null)
+                RenameGeneratedTemplate(name);
+            else if (_generatedForAdvancedSettings && _lastQuickSettings is not null)
+                _advancedDocument.TemplateOutdated = true;
+            UpdateOutdatedWarning();
             UpdateTitle();
         }
 
         private void UpdateOutdatedWarning()
         {
             if (TxtOutdatedWarning == null) return;
-            bool hasAdvancedResult = _generatedForAdvancedSettings && !_templateOutdated;
-            bool hasSimpleResult = _lastQuickSettings is not null && !_templateOutdated;
+            bool hasAdvancedResult = _generatedForAdvancedSettings && !_advancedDocument.TemplateOutdated;
+            bool hasSimpleResult = _lastQuickSettings is not null && !_simpleDocument.TemplateOutdated;
             TxtOutdatedWarning.Visibility = _generatedTemplate is not null && !hasAdvancedResult ? Visibility.Visible : Visibility.Hidden;
             TxtOutdatedWarning.SetResourceReference(TextBlock.TextProperty,
-                _templateOutdated ? "S.M.113" : "S.Settings.PreviewFromSimple");
+                _advancedDocument.TemplateOutdated ? "S.M.113" : "S.Settings.PreviewFromSimple");
             if (BtnSaveGenerated != null)
                 BtnSaveGenerated.IsEnabled = hasAdvancedResult;
             if (BtnSimpleSave != null) BtnSimpleSave.IsEnabled = hasSimpleResult;
             if (BtnSimpleSaveToGame != null) BtnSimpleSaveToGame.IsEnabled = hasSimpleResult;
             if (BtnSimpleOpenAdvanced != null) BtnSimpleOpenAdvanced.IsEnabled = hasSimpleResult;
-            if (_templateOutdated && _lastQuickSettings is not null && TxtSimpleSummary != null)
+            if (_simpleDocument.TemplateOutdated && _lastQuickSettings is not null && TxtSimpleSummary != null)
                 TxtSimpleSummary.Text = L.Get("S.M.113");
         }
 
         private void UpdateTitle()
         {
-            string file = ReusableSettingsPath is { } path
+            var document = ActiveSettingsDocument;
+            string file = document.Path is { } path
                 ? System.IO.Path.GetFileName(path)
                 : L.Get("S.CB.Untitled");
-            string fileLabel = _isDirty ? $"{file}*" : file;
+            string fileLabel = document.IsDirty ? $"{file}*" : file;
             // Taskbar / OS window title keeps the full brand + version + file.
             Title = $"{_baseTitle}  —  {fileLabel}";
             // In-app header shows only the current file (brand & version are separate elements).
@@ -612,7 +618,24 @@ namespace Olden_Era___Template_Editor
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            if (!_settingsCloseApproved && !ResolveUnsavedSettings()) e.Cancel = true;
+            if (!_settingsCloseApproved)
+            {
+                e.Cancel = true;
+                if (!_shutdownInProgress)
+                {
+                    _shutdownInProgress = true;
+                    Dispatcher.BeginInvoke(new Action(async () =>
+                    {
+                        try
+                        {
+                            if (await RequestShutdownApprovalAsync() is not { } approval) return;
+                            CommitShutdownApproval(approval);
+                            Close();
+                        }
+                        finally { _shutdownInProgress = false; }
+                    }));
+                }
+            }
             base.OnClosing(e);
         }
 
@@ -1079,18 +1102,48 @@ namespace Olden_Era___Template_Editor
             }
         }
 
-        private void BtnAddBannedItem_Click(object sender, RoutedEventArgs e)
+        private bool _openingArtifactPicker;
+
+        internal static IReadOnlyDictionary<string, BanEntry> BuildArtifactBanEntries(Services.GameData.GameCatalog catalog)
         {
-            var entries = KnownValues.BannableItems
-                .Select(b => new BanEntry { Id = b.Id, DisplayName = b.DisplayName, Category = b.Category });
-            var picker = new ItemPickerWindow(entries, _bannedItems.Select(b => b.Id), "S.CB.BanItems") { Owner = this };
-            if (picker.ShowDialog() == true)
+            var entries = KnownValues.BannableItems.ToDictionary(item => item.Id,
+                item => new BanEntry { Id = item.Id, DisplayName = item.DisplayName, Category = item.Category }, StringComparer.Ordinal);
+            foreach (var artifact in catalog.GetMapArtifacts())
             {
+                entries.TryGetValue(artifact.Sid, out var existing);
+                bool disabledInCurrentGame = catalog.Source?.Profile.Id == GenerationProfileOptions.CurrentProfile
+                    && artifact.Sid is ("ambassadors_word_ambassadors_robe_artifact" or "ambassadors_word_ambassadors_sash_artifact"
+                        or "ambassadors_word_diplomatic_gifts_artifact");
+                entries[artifact.Sid] = new BanEntry
+                {
+                    Id = artifact.Sid,
+                    DisplayName = existing?.DisplayName ?? KnownValues.SidToDisplayName(artifact.Sid),
+                    GameNameRu = artifact.NameRu,
+                    GameNameEn = artifact.NameEn,
+                    Category = existing?.Category ?? "InstalledArtifacts",
+                    AvailabilityResource = disabledInCurrentGame ? "S.Patch08210.ArtifactExcludedFromRandomMaps" : null,
+                };
+            }
+            return entries;
+        }
+
+        private async void BtnAddBannedItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (_openingArtifactPicker) return;
+            _openingArtifactPicker = true;
+            try
+            {
+                var catalog = await Services.GameData.GameCatalogService.Instance.GetCatalogAsync();
+                if (!IsLoaded) return;
+                var entries = BuildArtifactBanEntries(catalog);
+                var picker = new ItemPickerWindow(entries.Values, _bannedItems.Select(b => b.Id), "S.CB.BanItems") { Owner = this };
+                if (picker.ShowDialog() != true) return;
                 foreach (var id in picker.SelectedIds)
                     if (!_bannedItems.Any(e => e.Id == id))
-                        _bannedItems.Add(ItemEntryFromId(id));
+                        _bannedItems.Add(entries.TryGetValue(id, out var entry) ? entry : ItemEntryFromId(id));
                 MarkDirty();
             }
+            finally { _openingArtifactPicker = false; }
         }
 
         private void BtnAddBannedMagic_Click(object sender, RoutedEventArgs e)
@@ -1335,7 +1388,7 @@ namespace Olden_Era___Template_Editor
         /// <summary>Loads a built-in quick-start preset into the whole UI.</summary>
         private void ApplyPresetSettings(SettingsFile settings)
         {
-            if (!IsInitialized || !ResolveUnsavedSettings()) return;
+            if (!IsInitialized || !ResolveUnsavedSettings(simple: false)) return;
             ReplaceSettings(settings, path: null, dirty: true);
             Validate();
         }
@@ -1915,14 +1968,17 @@ namespace Olden_Era___Template_Editor
             }
         }
 
-        private SettingsFile GatherSettings()
+        private SettingsFile GatherSettings() => GatherSettings(IsSimpleMode);
+
+        private SettingsFile GatherSettings(bool simple)
         {
-            if (SimpleView.Visibility == Visibility.Visible)
+            if (simple)
             {
+                if (!_simpleDocument.IsDirty && _savedSimpleSettings?.File is { } saved) return saved;
                 if (!ValidateSimpleSelections()) throw new ArgumentException(L.Get("S.Patch.SelectOptions"));
-                var input = CurrentGeneratedTemplate is not null && _generatedSettingsSnapshot is not null ? _generatedSettingsSnapshot
+                var input = !_simpleDocument.TemplateOutdated && _lastQuickSettings is not null ? _lastQuickSettings
                     : Services.Generation.RandomTemplateBuilder.Build(BuildQuickOptions());
-                return RetainSettingsMetadata(SettingsSnapshotMapper.FromGeneratorSettings(input));
+                return SettingsSnapshotMapper.FromGeneratorSettings(input);
             }
             var file = GatherSettingsFromUi();
             var captured = SettingsSnapshotMapper.FromGeneratorSettings(BuildSettings());
@@ -1935,8 +1991,8 @@ namespace Olden_Era___Template_Editor
         private SettingsFile GatherSettingsFromUi() => new()
         {
             GameMode = CmbGameMode.SelectedItem as string ?? "Classic",
-            ProfileOptions = _profileOptions.Clone(),
-            Seed = _profileOptions.TemplateSeed,
+            ProfileOptions = _advancedProfileOptions.Clone(),
+            Seed = _advancedProfileOptions.TemplateSeed,
             TemplateName          = TxtTemplateName.Text.Trim(),
             MapSize               = SelectedMapSize(),
             PlayerCount           = (int)SldPlayers.Value,
@@ -2015,16 +2071,32 @@ namespace Olden_Era___Template_Editor
             HubZoneContentRows         = BuildZoneContentRows(_hubZoneMandatoryContent),
         };
 
-        private void ApplySettings(SettingsFile s)
+        private sealed record PreparedAdvancedSettings(SettingsFile Display, GeneratorSettings? Snapshot,
+            Dictionary<string, JsonElement>? Metadata, GenerationProfileOptions Profile);
+
+        private static PreparedAdvancedSettings PrepareAdvancedSettings(SettingsFile settings)
         {
-            var restoredSnapshot = SettingsSnapshotMapper.RestoreSnapshot(s);
-            var loadedMetadata = s.Extra?.ToDictionary(p => p.Key, p => p.Value.Clone(), StringComparer.Ordinal);
-            if (restoredSnapshot is not null) s = SettingsSnapshotMapper.FromGeneratorSettings(restoredSnapshot);
-            _loadedSettingsMetadata = loadedMetadata;
+            var rows = new[] { settings.PlayerZoneContentRows, settings.LowNeutralContentRows, settings.MediumNeutralContentRows,
+                settings.HighNeutralContentRows, settings.HubZoneContentRows };
+            if (rows.Any(group => group?.Any(row => row is null) == true))
+                throw new JsonException(L.Get("S.Settings.NullContentRow"));
+            var snapshot = SettingsSnapshotMapper.RestoreSnapshot(settings);
+            var metadata = settings.Extra?.ToDictionary(p => p.Key, p => p.Value.Clone(), StringComparer.Ordinal);
+            var display = snapshot is null ? settings : SettingsSnapshotMapper.FromGeneratorSettings(snapshot);
+            var profile = (display.ProfileOptions ?? new()).Clone();
+            profile.TemplateSeed = display.Seed ?? profile.TemplateSeed;
+            return new(display, snapshot, metadata, profile);
+        }
+
+        private void ApplySettings(SettingsFile settings) => ApplySettingsWithoutTracking(PrepareAdvancedSettings(settings));
+
+        private void ApplyPreparedSettings(PreparedAdvancedSettings prepared)
+        {
+            var s = prepared.Display;
+            _loadedSettingsMetadata = prepared.Metadata;
             _loadedGeneratorSnapshot = null; _loadedSnapshotUiBaseline = null;
             CmbGameMode.SelectedItem = s.GameMode;
-            _profileOptions = (s.ProfileOptions ?? new()).Clone();
-            _profileOptions.TemplateSeed = s.Seed ?? _profileOptions.TemplateSeed;
+            _advancedProfileOptions = prepared.Profile;
             TxtTemplateName.Text    = s.TemplateName;
             bool hasCustomZoneSizes = Math.Abs(s.PlayerZoneSize - 1.0) > 0.0001 || Math.Abs(s.NeutralZoneSize - 1.0) > 0.0001;
             bool needsExperimentalMapSizes = s.ExperimentalMapSizes || KnownValues.IsExperimentalMapSize(s.MapSize);
@@ -2132,15 +2204,15 @@ namespace Olden_Era___Template_Editor
             UpdateAdvancedZoneSettingsVisibility();
             UpdatePlayerCastleFactionVisibility();
             UpdateWinConditionDetailVisibility();
-            _loadedGeneratorSnapshot = restoredSnapshot;
+            _loadedGeneratorSnapshot = prepared.Snapshot;
             if (_loadedGeneratorSnapshot is not null) _loadedSnapshotUiBaseline = BuildSettingsFromUi();
         }
 
-        private bool SaveToPath(string path)
+        private bool SaveToPath(string path, bool simple)
         {
             try
             {
-                WriteSettingsDocument(path);
+                WriteSettingsDocument(path, simple);
                 return true;
             }
             catch (Exception ex)
@@ -2151,55 +2223,99 @@ namespace Olden_Era___Template_Editor
             }
         }
 
-        private void WriteSettingsDocument(string path)
+        private void WriteSettingsDocument(string path, bool simple)
         {
-            var json = JsonSerializer.Serialize(GatherSettings(), JsonOptions);
+            var settings = GatherSettings(simple);
+            var json = JsonSerializer.Serialize(settings, JsonOptions);
             AtomicFile.WriteAllText(path, json);
-            _currentSettingsPath = path;
-            _savedSettingsFromSimple = SimpleView.Visibility == Visibility.Visible;
-            _isDirty = false;
+            var document = SettingsDocumentFor(simple);
+            AssociateSettingsPath(simple, path);
+            document.IsDirty = false;
+            if (simple)
+            {
+                _savedSimpleSettings = (CaptureSimpleSettings(), TxtSimpleSeed.Text, settings);
+                SaveSimpleState();
+            }
+            else _savedAdvancedSettings = settings;
             UpdateTitle();
         }
 
-        private bool ResolveUnsavedSettings()
+        private MessageBoxResult RequestSettingsDecision(bool simple)
         {
-            if (!_isDirty) return true;
-            var choice = MessageBox.Show(this, L.Get("S.Settings.SaveBeforeReplacing"),
+            var document = SettingsDocumentFor(simple);
+            if (!document.IsDirty) return MessageBoxResult.OK;
+            string label = document.Path is { } path ? Path.GetFileName(path) : L.Get("S.CB.Untitled");
+            string mode = L.Get(simple ? "S.Mode.Simple" : "S.Mode.Advanced");
+            return MessageBox.Show(this, L.Get("S.Settings.SaveDocument", mode, label),
                 L.Get("S.Settings.UnsavedTitle"), MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel);
-            return AcceptSettingsTransition(choice, SaveCurrentSettings);
+        }
+
+        private bool ResolveUnsavedSettings(bool simple, bool restoreOnDiscard = false) =>
+            ApplySettingsDecision(simple, RequestSettingsDecision(simple), restoreOnDiscard);
+
+        private bool ApplySettingsDecision(bool simple, MessageBoxResult choice, bool restoreOnDiscard = false)
+        {
+            if (choice == MessageBoxResult.No && restoreOnDiscard) RestoreSettingsDocument(simple);
+            return AcceptSettingsTransition(choice, () => SaveCurrentSettings(simple));
         }
 
         private static bool AcceptSettingsTransition(MessageBoxResult choice, Func<bool> save) =>
-            choice == MessageBoxResult.No || (choice == MessageBoxResult.Yes && save());
+            choice is MessageBoxResult.OK or MessageBoxResult.No || (choice == MessageBoxResult.Yes && save());
 
-        private void ApplySettingsWithoutTracking(SettingsFile settings)
+        private void RestoreSettingsDocument(bool simple)
         {
+            if (simple && _savedSimpleSettings is { } simpleBaseline)
+            {
+                ApplySimpleSettingsWithoutTracking(simpleBaseline.Options, simpleBaseline.Seed);
+                SaveSimpleState();
+            }
+            else if (!simple && _savedAdvancedSettings is { } advancedBaseline)
+                ApplySettingsWithoutTracking(PrepareAdvancedSettings(advancedBaseline));
+            var document = SettingsDocumentFor(simple);
+            document.IsDirty = false;
+            document.TemplateOutdated = _generatedTemplate is not null;
+            UpdateOutdatedWarning();
+            UpdateTitle();
+        }
+
+        private SettingsFile ApplySettingsWithoutTracking(PreparedAdvancedSettings prepared)
+        {
+            // Prepare incoming fields before touching controls. Keep a complete copy in case a control rejects its projection.
+            var rollback = PrepareAdvancedSettings(GatherSettings(simple: false));
             _applyingSettings = true;
-            try { ApplySettings(settings); }
+            try
+            {
+                ApplyPreparedSettings(prepared);
+                return GatherSettings(simple: false);
+            }
+            catch
+            {
+                ApplyPreparedSettings(rollback);
+                throw;
+            }
             finally { _applyingSettings = false; }
         }
 
         private void ReplaceSettings(SettingsFile settings, string? path, bool dirty)
         {
-            ApplySettingsWithoutTracking(settings);
-            SetSettingsDocument(path, dirty);
-            SetMode(advanced: true);
+            ReplaceAdvancedSettings(PrepareAdvancedSettings(settings), path, dirty);
         }
 
-        private void SetSettingsDocument(string? path, bool dirty)
+        private void ReplaceAdvancedSettings(PreparedAdvancedSettings prepared, string? path, bool dirty)
         {
-            _currentSettingsPath = path;
-            _savedSettingsFromSimple = false;
-            _isDirty = dirty;
-            ClearGeneratedResult();
-            UpdateTitle();
+            _savedAdvancedSettings = ApplySettingsWithoutTracking(prepared);
+            AssociateSettingsPath(simple: false, path);
+            _advancedDocument.IsDirty = dirty;
+            InvalidateReplacedResult(simple: false);
+            SetMode(advanced: true);
         }
 
         private void BtnNew_Click(object sender, RoutedEventArgs e)
         {
-            if (_isDirty)
+            bool simple = IsSimpleMode;
+            if (SettingsDocumentFor(simple).IsDirty)
             {
-                if (!ResolveUnsavedSettings()) return;
+                if (!ResolveUnsavedSettings(simple)) return;
             }
             else if (MessageBox.Show(this, L.Get("S.D.ResetConfirm"), L.Get("S.D.ResetTitle"),
                 MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
@@ -2209,7 +2325,7 @@ namespace Olden_Era___Template_Editor
 
             // Simple Mode has its own controls (the Advanced ApplySettings does not touch them),
             // so the reset must be routed to whichever view is currently shown.
-            if (SimpleView != null && SimpleView.Visibility == Visibility.Visible)
+            if (simple)
             {
                 ResetSimpleToDefaults();
                 return;
@@ -2222,18 +2338,25 @@ namespace Olden_Era___Template_Editor
         /// mirroring what BtnNew does for the Advanced view. Used by the header "Reset settings" in Simple mode.</summary>
         private void ResetSimpleToDefaults()
         {
+            var defaults = new Services.GameData.SimpleModeState { ProfileOptions = GenerationProfileOptions.CurrentDefaults() };
+            ApplySimpleSettingsWithoutTracking(defaults, unchecked((uint)NewSeed()).ToString("X8"));
+            SaveSimpleState();
+            _savedSimpleSettings = (CaptureSimpleSettings(), TxtSimpleSeed.Text, null);
+            _simpleDocument.Path = null;
+            _simpleDocument.IsDirty = false;
+            InvalidateReplacedResult(simple: true);
+            UpdateTitle();
+        }
+
+        private void ApplySimpleSettingsWithoutTracking(Services.GameData.SimpleModeState state, string seed)
+        {
             _applyingSettings = true;
             try
             {
-                ApplySimpleState(new Services.GameData.SimpleModeState());
-                TxtSimpleSeed.Text = unchecked((uint)NewSeed()).ToString("X8");
+                ApplySimpleState(state);
+                TxtSimpleSeed.Text = seed;
             }
             finally { _applyingSettings = false; }
-            _loadedGeneratorSnapshot = null;
-            _loadedSnapshotUiBaseline = null;
-            _loadedSettingsMetadata = null;
-            SaveSimpleState();
-            SetSettingsDocument(path: null, dirty: false);
         }
 
         private void BtnOpen_Click(object sender, RoutedEventArgs e)
@@ -2244,13 +2367,14 @@ namespace Olden_Era___Template_Editor
                 Filter = L.Get("S.D.SettingsFilter"),
             };
             if (dlg.ShowDialog(this) != true) return;
-            if (!ResolveUnsavedSettings()) return;
             try
             {
-                var json = File.ReadAllText(dlg.FileName);
-                var s = JsonSerializer.Deserialize<SettingsFile>(json, JsonOptions);
-                if (s is null) throw new InvalidDataException(L.Get("S.D.FileEmpty"));
-                ReplaceSettings(s, dlg.FileName, dirty: false);
+                var prepared = ReadAdvancedSettings(dlg.FileName);
+                bool replacesAfterSave = _advancedDocument.IsDirty;
+                if (!ResolveUnsavedSettings(simple: false)) return;
+                if (replacesAfterSave && _advancedDocument.Path is { } currentPath && SameSettingsPath(currentPath, dlg.FileName))
+                    prepared = ReadAdvancedSettings(dlg.FileName);
+                ReplaceAdvancedSettings(prepared, dlg.FileName, dirty: false);
             }
             catch (Exception ex)
             {
@@ -2259,19 +2383,32 @@ namespace Olden_Era___Template_Editor
             }
         }
 
-        private void BtnSave_Click(object sender, RoutedEventArgs e) => SaveCurrentSettings();
-
-        private bool SaveCurrentSettings() =>
-            ReusableSettingsPath is { } path ? SaveToPath(path) : SaveSettingsAs();
-
-        private string? ReusableSettingsPath =>
-            _savedSettingsFromSimple == (SimpleView?.Visibility == Visibility.Visible) ? _currentSettingsPath : null;
-
-        private void BtnSaveAs_Click(object sender, RoutedEventArgs e) => SaveSettingsAs();
-
-        private bool SaveSettingsAs()
+        private static PreparedAdvancedSettings ReadAdvancedSettings(string path)
         {
-            string name = CurrentGeneratedTemplate?.Name ?? TxtTemplateName.Text.Trim();
+            var settings = JsonSerializer.Deserialize<SettingsFile>(File.ReadAllText(path), JsonOptions)
+                ?? throw new InvalidDataException(L.Get("S.D.FileEmpty"));
+            return PrepareAdvancedSettings(settings);
+        }
+
+        private static bool SameSettingsPath(string left, string right) =>
+            string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), StringComparison.OrdinalIgnoreCase);
+
+        private void AssociateSettingsPath(bool simple, string? path)
+        {
+            var other = SettingsDocumentFor(!simple);
+            if (path is not null && other.Path is { } otherPath && SameSettingsPath(path, otherPath)) other.Path = null;
+            SettingsDocumentFor(simple).Path = path;
+        }
+
+        private void BtnSave_Click(object sender, RoutedEventArgs e) => SaveCurrentSettings(IsSimpleMode);
+        private bool SaveCurrentSettings(bool simple) =>
+            SettingsDocumentFor(simple).Path is { } path ? SaveToPath(path, simple) : SaveSettingsAs(simple);
+
+        private void BtnSaveAs_Click(object sender, RoutedEventArgs e) => SaveSettingsAs(IsSimpleMode);
+
+        private bool SaveSettingsAs(bool simple)
+        {
+            string name = simple ? _lastQuickSettings?.TemplateName ?? "" : TxtTemplateName.Text.Trim();
             var dlg = new SaveFileDialog
             {
                 Title      = L.Get("S.D.SaveAsTitle"),
@@ -2279,7 +2416,7 @@ namespace Olden_Era___Template_Editor
                 FileName   = name.Length > 0 ? name : L.Get("S.D.MySettings"),
                 DefaultExt = ".oetgs",
             };
-            return dlg.ShowDialog(this) == true && SaveToPath(dlg.FileName);
+            return dlg.ShowDialog(this) == true && SaveToPath(dlg.FileName, simple);
         }
 
         // -- Generate ----------------------------------------------------------
@@ -2289,7 +2426,7 @@ namespace Olden_Era___Template_Editor
         private bool _generatedForAdvancedSettings;
         private System.Windows.Media.ImageSource? _generatedPreview;
         private MapTopology  _generatedTopology;
-        private bool _templateOutdated = false;
+        private bool _templateOutdated => ActiveSettingsDocument.TemplateOutdated;
 
         private RmgTemplate? CurrentGeneratedTemplate => !_templateOutdated &&
             (SimpleView.Visibility == Visibility.Visible ? _lastQuickSettings is not null : _generatedForAdvancedSettings)
@@ -2301,7 +2438,7 @@ namespace Olden_Era___Template_Editor
             _generatedSettingsSnapshot = SettingsSnapshotMapper.Clone(settings);
             _generatedTopology = topology;
             _generatedForAdvancedSettings = quickOptions is null;
-            _templateOutdated = false;
+            _simpleDocument.TemplateOutdated = _advancedDocument.TemplateOutdated = false;
             _lastQuickSettings = quickOptions is null ? null : settings;
             _lastQuickOptions = quickOptions;
             RefreshGeneratedResult();
@@ -2312,10 +2449,34 @@ namespace Olden_Era___Template_Editor
             _generatedTemplate = null;
             _generatedSettingsSnapshot = null;
             _generatedForAdvancedSettings = false;
-            _templateOutdated = false;
+            _simpleDocument.TemplateOutdated = _advancedDocument.TemplateOutdated = false;
             _lastQuickSettings = null;
             _lastQuickOptions = null;
             RefreshGeneratedResult();
+        }
+
+        private void InvalidateReplacedResult(bool simple)
+        {
+            SettingsDocumentFor(simple).TemplateOutdated = false;
+            if (simple && _lastQuickSettings is not null)
+            {
+                if (!_generatedForAdvancedSettings) ClearGeneratedResult();
+                else
+                {
+                    _lastQuickSettings = null;
+                    _lastQuickOptions = null;
+                    RefreshGeneratedResult();
+                }
+            }
+            else if (!simple && _generatedForAdvancedSettings)
+            {
+                if (_lastQuickSettings is null) ClearGeneratedResult();
+                else
+                {
+                    _generatedForAdvancedSettings = false;
+                    RefreshGeneratedResult();
+                }
+            }
         }
 
         private void RefreshGeneratedResult()
@@ -2345,7 +2506,7 @@ namespace Olden_Era___Template_Editor
         private void UpdateSimpleSummary()
         {
             TxtSimpleSummary.Text = _lastQuickSettings is { } settings && _lastQuickOptions is { } options
-                ? (_templateOutdated ? L.Get("S.M.113") : BuildSimpleSummary(settings, options))
+                ? (_simpleDocument.TemplateOutdated ? L.Get("S.M.113") : BuildSimpleSummary(settings, options))
                 : L.Get("S.Simple.NoPreview");
         }
 
@@ -2381,8 +2542,8 @@ namespace Olden_Era___Template_Editor
             SetGeneratedResult(template, settings, effectiveTopology);
             if (choseSeed)
             {
-                _profileOptions.TemplateSeed = settings.Seed;
-                _isDirty = true;
+                _advancedProfileOptions.TemplateSeed = settings.Seed;
+                _advancedDocument.IsDirty = true;
                 UpdateTitle();
             }
             Validate(); // refresh warnings now that template is up to date
@@ -2527,7 +2688,7 @@ namespace Olden_Era___Template_Editor
         private void ApplySimpleState(Services.GameData.SimpleModeState st)
         {
             st.MigrateSelections();
-            _profileOptions = st.ProfileOptions!.Clone();
+            _simpleProfileOptions = st.ProfileOptions!.Clone();
             void SetCombo(System.Windows.Controls.ComboBox cb, int idx)
             { if (cb.Items.Count > 0) cb.SelectedIndex = idx < 0 ? -1 : Math.Clamp(idx, 0, cb.Items.Count - 1); }
 
@@ -2545,22 +2706,26 @@ namespace Olden_Era___Template_Editor
             ChkSimpleStrong.IsChecked = st.StrongNeutrals;
         }
 
+        private Services.GameData.SimpleModeState CaptureSimpleSettings()
+        {
+            var current = Services.GameData.AppSettings.Current.Simple;
+            var st = new Services.GameData.SimpleModeState
+            {
+                TypeId = current.TypeId, ScaleId = current.ScaleId, LengthId = current.LengthId, ChaosId = current.ChaosId,
+                GuardsId = current.GuardsId, CastleFactionId = current.CastleFactionId, VictoryId = current.VictoryId,
+                Players = (int)SldSimplePlayers.Value, Type = CmbSimpleType.SelectedIndex, Scale = CmbSimpleScale.SelectedIndex,
+                Length = CmbSimpleLength.SelectedIndex, Chaos = CmbSimpleChaos.SelectedIndex, Guards = CmbSimpleGuards.SelectedIndex,
+                CastleFaction = CmbSimpleCastleFaction.SelectedIndex, Victory = CmbSimpleVictory.SelectedIndex,
+                Water = ChkSimpleWater.IsChecked == true, Portals = ChkSimplePortals.IsChecked == true,
+                StrongNeutrals = ChkSimpleStrong.IsChecked == true, ProfileOptions = _simpleProfileOptions.Clone()
+            };
+            st.CaptureStableIds();
+            return st;
+        }
+
         private void SaveSimpleState()
         {
-            var st = Services.GameData.AppSettings.Current.Simple;
-            st.Players        = (int)SldSimplePlayers.Value;
-            st.Type           = CmbSimpleType.SelectedIndex;
-            st.Scale          = CmbSimpleScale.SelectedIndex;
-            st.Length         = CmbSimpleLength.SelectedIndex;
-            st.Chaos          = CmbSimpleChaos.SelectedIndex;
-            st.Guards         = CmbSimpleGuards.SelectedIndex;
-            st.CastleFaction  = CmbSimpleCastleFaction.SelectedIndex;
-            st.Victory        = CmbSimpleVictory.SelectedIndex;
-            st.Water          = ChkSimpleWater.IsChecked == true;
-            st.Portals        = ChkSimplePortals.IsChecked == true;
-            st.StrongNeutrals = ChkSimpleStrong.IsChecked == true;
-            st.ProfileOptions = _profileOptions.Clone();
-            st.CaptureStableIds();
+            Services.GameData.AppSettings.Current.Simple = CaptureSimpleSettings();
             Services.GameData.AppSettings.Current.Save();
         }
 
@@ -2592,8 +2757,8 @@ namespace Olden_Era___Template_Editor
         {
             if (sender is not Button { Tag: string tag }) return;
             bool advanced = tag == "advanced";
-            if (advanced == (AdvancedView.Visibility == Visibility.Visible) || !ResolveUnsavedSettings()) return;
-            _isDirty = false;
+            if (advanced == (AdvancedView.Visibility == Visibility.Visible) ||
+                !ResolveUnsavedSettings(IsSimpleMode, restoreOnDiscard: true)) return;
             SetMode(advanced);
         }
 
@@ -2613,7 +2778,7 @@ namespace Olden_Era___Template_Editor
 
         private QuickGenerateOptions BuildQuickOptions(int? seed = null) => new()
         {
-            ProfileOptions = _profileOptions.Clone(),
+            ProfileOptions = _simpleProfileOptions.Clone(),
             PlayerCount    = (int)SldSimplePlayers.Value,
             GameType       = (QuickGameType)Math.Clamp(CmbSimpleType.SelectedIndex, 0, 5),
             Scale          = (QuickMapScale)Math.Clamp(CmbSimpleScale.SelectedIndex, 0, 3),
@@ -2646,10 +2811,10 @@ namespace Olden_Era___Template_Editor
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException or FormatException or OverflowException or JsonException)
             { MessageBox.Show(L.Get("S.Patch.OperationFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-            bool changedSeed = _profileOptions.TemplateSeed != settings.Seed;
-            _profileOptions.TemplateSeed = settings.Seed;
+            bool changedSeed = _simpleProfileOptions.TemplateSeed != settings.Seed;
+            _simpleProfileOptions.TemplateSeed = settings.Seed;
             SetGeneratedResult(template, settings, effectiveTopology, opts);
-            if (changedSeed) { _isDirty = true; UpdateTitle(); }
+            if (changedSeed) { _simpleDocument.IsDirty = true; UpdateTitle(); }
             SaveSimpleState();                                 // remember these selections for next launch
         }
 
@@ -2796,12 +2961,13 @@ namespace Olden_Era___Template_Editor
         private void BtnSimpleOpenAdvanced_Click(object sender, RoutedEventArgs e)
         {
             if (CurrentGeneratedTemplate is null || _lastQuickSettings is null) return;
-            var settings = RetainSettingsMetadata(SettingsSnapshotMapper.FromGeneratorSettings(_lastQuickSettings));
-            ApplySettingsWithoutTracking(settings);
-            if (!_savedSettingsFromSimple) _currentSettingsPath = null;
-            _savedSettingsFromSimple = false;
+            if (!ResolveUnsavedSettings(simple: false)) return;
+            var settings = SettingsSnapshotMapper.FromGeneratorSettings(_lastQuickSettings);
+            _savedAdvancedSettings = ApplySettingsWithoutTracking(PrepareAdvancedSettings(settings));
+            _advancedDocument.Path = null;
             _generatedForAdvancedSettings = true;
-            _isDirty = true;
+            _advancedDocument.IsDirty = true;
+            _advancedDocument.TemplateOutdated = false;
             SetMode(advanced: true);
             UpdateOutdatedWarning();
             UpdateTitle();
@@ -2811,7 +2977,7 @@ namespace Olden_Era___Template_Editor
         /// controls so the user can tweak the random map by hand. Best-effort, not every field.</summary>
         private void SyncAdvancedFromSettings(GeneratorSettings s)
         {
-            _profileOptions = s.ProfileOptions.Clone();
+            _advancedProfileOptions = s.ProfileOptions.Clone();
             _suppressTopologySync = true;
             try
             {
@@ -2933,8 +3099,9 @@ namespace Olden_Era___Template_Editor
                 namedTemplate.Name = chosen;
                 AtomicFile.WriteAllText(path, JsonSerializer.Serialize(namedTemplate, JsonOptions));
                 RenameGeneratedTemplate(chosen);
-                if (_generatedForAdvancedSettings) TxtTemplateName.Text = chosen;
-                _isDirty = true;
+                if (_generatedForAdvancedSettings) _advancedDocument.TemplateOutdated = true;
+                _simpleDocument.IsDirty = true;
+                UpdateOutdatedWarning();
                 UpdateTitle();
                 try { TemplatePreviewPngWriter.Save(namedTemplate, TemplatePreviewPngWriter.GetSidecarPath(path), _generatedTopology); }
                 catch { /* preview sidecar is best-effort */ }
@@ -3040,8 +3207,8 @@ namespace Olden_Era___Template_Editor
 
         private GeneratorSettings BuildSettingsFromUi() => new()
         {
-            ProfileOptions = _profileOptions.Clone(),
-            Seed = _profileOptions.TemplateSeed,
+            ProfileOptions = _advancedProfileOptions.Clone(),
+            Seed = _advancedProfileOptions.TemplateSeed,
             TemplateName = TxtTemplateName.Text.Trim(),
             GameMode = CmbGameMode.SelectedItem as string ?? "Classic",
             SingleHeroMode = ChkSingleHeroMode.IsChecked == true,

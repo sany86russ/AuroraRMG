@@ -153,6 +153,7 @@ public sealed class GameCatalogService
             if (!Members(content, ("Sid", JsonValueKind.String), ("Kind", JsonValueKind.Number), ("NameRu", JsonValueKind.String),
                 ("NameEn", JsonValueKind.String), ("Category", JsonValueKind.String), ("Faction", JsonValueKind.String),
                 ("SourceEntry", JsonValueKind.String), ("RewardVariants", JsonValueKind.Array), ("GrantedSpells", JsonValueKind.Array))) return false;
+            if (!content.TryGetProperty("HasMapPickup", out var pickup) || pickup.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
             foreach (var variant in content.GetProperty("RewardVariants").EnumerateArray())
             {
                 if (!Members(variant, ("Index", JsonValueKind.Number), ("RewardApplyType", JsonValueKind.String),
@@ -177,7 +178,8 @@ public sealed class GameCatalogService
             || catalog.References is not { } references) return false;
         if (catalog.Heroes.Any(h => h is null || h.Sid.Length == 0)
             || catalog.Heroes.Select(h => h.Sid).Distinct(StringComparer.Ordinal).Count() != catalog.Heroes.Count) return false;
-        if (catalog.Content.Any(c => c is null || c.Sid.Length == 0 || !Enum.IsDefined(c.Kind) || c.PlacementVerified || !Strings(c.GrantedSpells)
+        if (catalog.Content.Any(c => c is null || c.Sid.Length == 0 || !Enum.IsDefined(c.Kind) || c.PlacementVerified ||
+            c.HasMapPickup && c.Kind != GameContentKind.Artifact || !Strings(c.GrantedSpells)
             || c.RewardVariants is null || c.RewardVariants.Any(v => v is null || v.Index < 0 ||
                 v.Rewards is null || v.Rewards.Any(r => r is null || r.Type.Length == 0 || !Strings(r.Parameters))
                 || v.RollChance is { } chance && !double.IsFinite(chance) || v.Value is { } value && !double.IsFinite(value)

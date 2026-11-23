@@ -15,7 +15,9 @@ namespace Olden_Era___Template_Editor;
 
 public partial class MainWindow
 {
-    private GenerationProfileOptions _profileOptions = new();
+    private GenerationProfileOptions _simpleProfileOptions = GenerationProfileOptions.CurrentDefaults();
+    private GenerationProfileOptions _advancedProfileOptions = new();
+    private GenerationProfileOptions ActiveProfileOptions => IsSimpleMode ? _simpleProfileOptions : _advancedProfileOptions;
     private GameCatalog? _patchCatalog;
     private bool _patchHooksReady;
     private bool _patchOperationRunning;
@@ -123,7 +125,7 @@ public partial class MainWindow
     {
         var catalog = await CurrentPatchCatalog();
         var source = catalog.Source;
-        var projected = _profileOptions.Clone();
+        var projected = ActiveProfileOptions.Clone();
         if (SimpleView.Visibility == Visibility.Visible)
         {
             var text = TxtSimpleSeed.Text.Trim();
@@ -135,16 +137,21 @@ public partial class MainWindow
             AppSettings.Current.GameInstallPath, source, catalog.GetReferenceCatalog().CustomAI,
             availableSkills: catalog.Search(kind: GameContentKind.Skill).ToArray()) { Owner = this };
         if (window.ShowDialog() != true) return;
-        _profileOptions = window.ResultOptions.Clone();
         AppSettings.Current.GameInstallPath = window.ResultGameInstallPath;
         GameInstallationService.Instance.ManualInstallPath = window.ResultGameInstallPath;
         if (SimpleView.Visibility == Visibility.Visible)
         {
-            ApplySimplePlayerSelection(window.ResultPlayerCount, _profileOptions.Alliances.Enabled);
-            if (_profileOptions.TemplateSeed is int seed) TxtSimpleSeed.Text = unchecked((uint)seed).ToString("X8");
+            _simpleProfileOptions = window.ResultOptions.Clone();
+            ApplySimplePlayerSelection(window.ResultPlayerCount, _simpleProfileOptions.Alliances.Enabled);
+            if (_simpleProfileOptions.TemplateSeed is int seed) TxtSimpleSeed.Text = unchecked((uint)seed).ToString("X8");
             SaveSimpleState();
         }
-        else { SldPlayers.Value = window.ResultPlayerCount; AppSettings.Current.Save(); }
+        else
+        {
+            _advancedProfileOptions = window.ResultOptions.Clone();
+            SldPlayers.Value = window.ResultPlayerCount;
+            AppSettings.Current.Save();
+        }
         MarkDirty(); _patchCatalog = null;
     }
 
@@ -207,12 +214,13 @@ public partial class MainWindow
             var selected = new OpenFileDialog { Multiselect = true, Filter = "Logs (*.log;*.txt;*.jsonl)|*.log;*.txt;*.jsonl" };
             if (selected.ShowDialog(this) == true) logs = selected.FileNames;
         }
-        var input = _generatedSettingsSnapshot;
-        var request = new DiagnosticBundleRequest { Template = _generatedTemplate, Settings = input is null ? GatherSettings() : Services.SettingsSnapshotMapper.FromGeneratorSettings(input), Installation = catalog.Source,
-            TemplateSeed = input?.Seed ?? _profileOptions.TemplateSeed, AlgorithmVersion = input?.ProfileOptions.AlgorithmVersion ?? _profileOptions.AlgorithmVersion,
-            GameSeed = input is null ? _profileOptions.GameSeed : input.ProfileOptions.GameSeed,
+        var template = CurrentGeneratedTemplate;
+        var input = template is null ? null : _generatedSettingsSnapshot;
+        var request = new DiagnosticBundleRequest { Template = template, Settings = input is null ? GatherSettings() : Services.SettingsSnapshotMapper.FromGeneratorSettings(input), Installation = catalog.Source,
+            TemplateSeed = input?.Seed ?? ActiveProfileOptions.TemplateSeed, AlgorithmVersion = input?.ProfileOptions.AlgorithmVersion ?? ActiveProfileOptions.AlgorithmVersion,
+            GameSeed = input is null ? ActiveProfileOptions.GameSeed : input.ProfileOptions.GameSeed,
             SelectedLogPaths = logs,
-            ValidationIssues = _generatedTemplate is null ? [] : TemplateCompatibilityValidator.Validate(_generatedTemplate, catalog: catalog.GetReferenceCatalog()) };
+            ValidationIssues = template is null ? [] : TemplateCompatibilityValidator.Validate(template, catalog: catalog.GetReferenceCatalog()) };
         var receipt = await DiagnosticBundleService.CreateAsync(dialog.FileName, request);
         MessageBox.Show(L.Get("S.Patch.Saved", receipt.Path) + "\n" + L.Get("S.Patch.DiagnosticReceipt", receipt.Redactions,
             receipt.Logs.Count(l => l.Truncated), receipt.Logs.Count(l => l.Error is not null))
@@ -297,10 +305,13 @@ public partial class MainWindow
         if (new FileInfo(dialog.FileName).Length > 1024 * 1024) throw new InvalidDataException("The configuration exceeds 1 MiB.");
         var text = File.ReadAllText(dialog.FileName).Trim();
         var configuration = text.StartsWith('{') ? Services.NativeSchema.NativeConfigurationCodec.ParseJson(text) : Services.NativeSchema.NativeConfigurationCodec.Decode(text);
-        var imported = Services.NativeSchema.NativeConfigurationImporter.Import(configuration, BuildSettings());
+        if (IsSimpleMode && !ValidateSimpleSelections()) return Task.CompletedTask;
+        var quick = IsSimpleMode ? BuildQuickOptions() : null;
+        var input = quick is null ? BuildSettings() : Services.Generation.RandomTemplateBuilder.Build(quick);
+        var imported = Services.NativeSchema.NativeConfigurationImporter.Import(configuration, input, quick);
         imported.Settings.ProfileOptions.ImportedNativeConfiguration = imported.RawConfiguration;
         imported.Settings.ProfileOptions.ImportedNativeSchema = imported.RawSchema;
-        if (!ResolveUnsavedSettings()) return Task.CompletedTask;
+        if (!ResolveUnsavedSettings(simple: false)) return Task.CompletedTask;
         ReplaceSettings(Services.SettingsSnapshotMapper.FromGeneratorSettings(imported.Settings), path: null, dirty: true);
         MessageBox.Show(this, L.Get("S.Patch.ImportWarning", string.Join("\n", imported.Warnings.Select(x => x.Message))), Title, MessageBoxButton.OK, MessageBoxImage.Information);
         return Task.CompletedTask;

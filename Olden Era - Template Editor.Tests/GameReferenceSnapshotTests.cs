@@ -15,6 +15,7 @@ public class GameReferenceSnapshotTests
             SyntheticInstalledGame.Add(zip, "generator/content_lists/l.json", "[{\"name\":\"list\",\"content\":[{\"sid\":\"dangling_reference\"}]}]");
             SyntheticInstalledGame.Add(zip, "generator/zone_layouts/z.json", "[{\"name\":\"layout\"}]");
             SyntheticInstalledGame.Add(zip, "DB/map/objects/objects.json", "{\"array\":[{\"id\":\"real_object\"}]}");
+            SyntheticInstalledGame.Add(zip, "DB/objects_logic/test/object.json", """{"array":[{"id":"logic_object"}]}""");
             SyntheticInstalledGame.Add(zip, "generator/generator_config.json", "{\"metaObjects\":[{\"sid\":\"random_hire_1\",\"type\":\"RandomHire\",\"args\":[\"1\"]}]}");
         }
         stream.Position = 0; using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
@@ -25,6 +26,38 @@ public class GameReferenceSnapshotTests
         Assert.Contains("random_hire_1", snapshot.Objects);
         Assert.DoesNotContain("dangling_reference", snapshot.Objects);
         Assert.True(snapshot.CoreReadComplete);
+    }
+
+    [Theory]
+    [InlineData("generator/content_pools/")]
+    [InlineData("generator/content_lists/")]
+    [InlineData("generator/zone_layouts/")]
+    [InlineData("DB/map/objects/")]
+    [InlineData("DB/objects_logic/")]
+    [InlineData("generator/generator_config.json")]
+    public void MissingOrEmptyRequiredDomainsDoNotClaimCompleteReferenceData(string missingDomain)
+    {
+        using var game = new SyntheticInstalledGame();
+        using (var zip = ZipFile.Open(game.CorePath, ZipArchiveMode.Update))
+            foreach (var entry in zip.Entries.Where(entry => entry.FullName.StartsWith(missingDomain, StringComparison.Ordinal)).ToArray())
+                entry.Delete();
+
+        var warnings = new List<string>();
+        using (var archive = ZipFile.OpenRead(game.CorePath))
+        {
+            var missing = GameReferenceSnapshotBuilder.Build(archive, warnings: warnings);
+            Assert.False(missing.CoreReadComplete);
+            Assert.False(missing.ToReferenceCatalog(new GameInstallation()).IsComplete);
+        }
+        Assert.Contains(warnings, message => message.Contains("missing or empty", StringComparison.Ordinal) &&
+            message.Contains(missingDomain, StringComparison.Ordinal));
+
+        using (var zip = ZipFile.Open(game.CorePath, ZipArchiveMode.Update))
+            SyntheticInstalledGame.Add(zip, missingDomain.EndsWith('/') ? missingDomain + "empty.json" : missingDomain,
+                missingDomain.EndsWith('/') ? "[]" : """{"metaObjects":[]}""");
+        using var emptyArchive = ZipFile.OpenRead(game.CorePath);
+        var empty = GameReferenceSnapshotBuilder.Build(emptyArchive);
+        Assert.False(empty.CoreReadComplete);
     }
 
     [Fact]

@@ -848,8 +848,18 @@ namespace Olden_Era___Template_Editor
                 {
                     if (string.IsNullOrWhiteSpace(v) || Connections.Any(other => !ReferenceEquals(other, c) && other.Name == v))
                     { UpdateStatus(L("S.CM.InvalidName")); BuildInspector(); return; }
-                    if (!string.IsNullOrEmpty(c.Name))
-                        TemplateRefactor.RenameConnectionReferences(Variant, new Dictionary<string, string> { [c.Name] = v });
+                    if (c.Name == v) return;
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(c.Name))
+                            TemplateRefactor.RenameConnectionReferences(Variant, new Dictionary<string, string> { [c.Name] = v }, _template);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        ShowReferenceEditError(ex);
+                        BuildInspector();
+                        return;
+                    }
                     c.Name = v;
                     MarkDirty();
                 }, mainPanel);
@@ -2674,18 +2684,14 @@ namespace Olden_Era___Template_Editor
             RememberCurrentLayout();
             if (_selected is Zone z)
             {
-                // Also prunes the roads, biome selectors and orientation anchor that pointed at it —
-                // leaving those behind produces a template the engine cannot generate.
-                int removedConns = TemplateRefactor.RemoveZoneReferences(Variant, z.Name);
-                Zones.Remove(z);
-                _positions.Remove(z.Name);
-
-                // Mirror mode: the twin goes with it, otherwise the map stops being symmetric.
-                if (MirrorTwinToDelete(z) is { } twin)
+                Zone[] removed = _mirrorMode && TwinOf(z) is { } twin ? [z, twin] : [z];
+                int removedConns;
+                try { removedConns = TemplateRefactor.RemoveZones(Variant, removed, _template); }
+                catch (InvalidOperationException ex) { ShowReferenceEditError(ex); return; }
+                foreach (var zone in removed)
                 {
-                    removedConns += TemplateRefactor.RemoveZoneReferences(Variant, twin.Name);
-                    Zones.Remove(twin);
-                    _positions.Remove(twin.Name);
+                    _positions.Remove(zone.Name);
+                    _mirrorMap.Remove(zone.Name);
                 }
 
                 MarkDirty();
@@ -2695,8 +2701,8 @@ namespace Olden_Era___Template_Editor
             }
             else if (_selected is Connection c)
             {
-                Connections.Remove(c);
-                if (!string.IsNullOrEmpty(c.Name)) TemplateRefactor.RemoveRoadsFor(Variant, c.Name!);
+                try { TemplateRefactor.RemoveConnection(Variant, c, _template); }
+                catch (InvalidOperationException ex) { ShowReferenceEditError(ex); return; }
                 MarkDirty();
                 RebuildGraph();
                 Select(null);
@@ -2704,6 +2710,9 @@ namespace Olden_Era___Template_Editor
             }
             else UpdateStatus(L("S.EC.NothingToDelete"));
         }
+
+        private void ShowReferenceEditError(InvalidOperationException error) =>
+            MessageBox.Show(this, error.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
 
         private void BtnValidate_Click(object sender, RoutedEventArgs e)
         {
@@ -2781,10 +2790,10 @@ namespace Olden_Era___Template_Editor
             var dlg = new ConnectionManagerWindow(Connections) { Owner = this };
             if (dlg.ShowDialog() == true)
             {
-                try { TemplateRefactor.ApplyConnectionEdits(Variant, dlg.EditedConnections); }
+                try { TemplateRefactor.ApplyConnectionEdits(Variant, dlg.EditedConnections, _template); }
                 catch (InvalidOperationException ex)
                 {
-                    MessageBox.Show(this, ex.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ShowReferenceEditError(ex);
                     return;
                 }
                 _selected = null;
@@ -2916,9 +2925,18 @@ namespace Olden_Era___Template_Editor
         {
             Keyboard.ClearFocus();
             if (_invalidWeightEditors.Count > 0) { MessageBox.Show(L("S.Patch.InvalidEditor"), Title); return; }
-            var dialog = new TemplateBulkEditWindow(_template) { Owner = this };
+            var dialog = new TemplateBulkEditWindow(_template, _variantIndex) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.ResultTemplate is not { } result) return;
-            _selected = null; _template = result; MarkDirty(); RebuildGraph(); BuildInspector();
+            bool changedVariant = _variantIndex != dialog.SelectedVariantIndex;
+            if (changedVariant) RememberVariantLayout();
+            _template = result;
+            RefreshVariantChoices(dialog.SelectedVariantIndex);
+            ResetVariantInteraction(disableMirror: changedVariant);
+            if (changedVariant) RestoreVariantLayout();
+            MarkDirty();
+            RebuildGraph();
+            if (changedVariant) FitToView();
+            BuildInspector();
         }
 
         private async void BtnProperties_Click(object sender, RoutedEventArgs e)
@@ -2936,14 +2954,16 @@ namespace Olden_Era___Template_Editor
             if (dialog.ValidationIssues.Count > 0) UpdateStatus(string.Join("; ", dialog.ValidationIssues.Take(5).Select(i => i.Message)));
         }
 
-        private async void BtnSave_Click(object sender, RoutedEventArgs e)
+        private async void BtnSave_Click(object sender, RoutedEventArgs e) => await SaveTemplateAsync();
+
+        private async Task<bool> SaveTemplateAsync()
         {
-            if (_saveCheckingReferences) return;
+            if (_saveCheckingReferences) return false;
             Keyboard.ClearFocus();
             if (_invalidWeightEditors.Count > 0)
             {
                 MessageBox.Show(L("S.Patch.InvalidEditor"), Title, MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                return false;
             }
 
             // Hard-blocking validation: empty connection names
@@ -2954,12 +2974,13 @@ namespace Olden_Era___Template_Editor
                 MessageBox.Show(this,
                     L("S.EC.SaveEmptyNames", emptyNameConns.Count, connList),
                     L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                return false;
             }
 
             RmgTemplate savable;
             IReadOnlyList<string> addedLayouts;
             IReadOnlyList<Services.Analysis.TemplateValidationIssue> catalogFindings;
+            bool wasEnabled = IsEnabled;
             try
             {
                 _saveCheckingReferences = true; IsEnabled = false;
@@ -2973,9 +2994,9 @@ namespace Olden_Era___Template_Editor
             catch (Exception ex) when (ex is InvalidOperationException or JsonException or IOException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception)
             {
                 MessageBox.Show(this, ex.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                return false;
             }
-            finally { IsEnabled = true; _saveCheckingReferences = false; }
+            finally { IsEnabled = wasEnabled; _saveCheckingReferences = false; }
             var issues = Validate().Concat(catalogFindings
                 .Where(finding => finding.Severity != Services.Analysis.TemplateIssueSeverity.Information)
                 .Select(finding => finding.Path + ": " + finding.Message)).Distinct(StringComparer.Ordinal).ToList();
@@ -2984,7 +3005,7 @@ namespace Olden_Era___Template_Editor
                 var go = MessageBox.Show(this,
                     L("S.EC.SaveValidate", issues.Count, string.Join("\n", issues.Take(10))),
                     L("S.EC.SaveValidateTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (go != MessageBoxResult.Yes) return;
+                if (go != MessageBoxResult.Yes) return false;
             }
 
             var dlg = new SaveFileDialog
@@ -2996,7 +3017,7 @@ namespace Olden_Era___Template_Editor
                                                     : $"{_template.Name}.rmg.json",
             };
             if (_currentPath is not null) dlg.InitialDirectory = IOPath.GetDirectoryName(_currentPath);
-            if (dlg.ShowDialog(this) != true) return;
+            if (dlg.ShowDialog(this) != true) return false;
 
             try
             {
@@ -3013,10 +3034,12 @@ namespace Olden_Era___Template_Editor
                 UpdateStatus(addedLayouts.Count > 0
                     ? L("S.EC.SavedFixedLayouts", IOPath.GetFileName(dlg.FileName), string.Join(", ", addedLayouts))
                     : L("S.EC.Saved", IOPath.GetFileName(dlg.FileName)));
+                return true;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this, L("S.EC.SaveErr", ex.Message), L("S.EC.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
             }
         }
 
@@ -3254,14 +3277,53 @@ namespace Olden_Era___Template_Editor
         /// <summary>Localization shortcut.</summary>
         private static string L(string key, params object[] args) => Services.Localization.LocalizationManager.T(key, args);
 
+        private bool _templateCloseApproved;
+        private bool _templateClosePending;
+
+        internal void ApproveClose() => _templateCloseApproved = true;
+
+        internal void DebugMarkDirtyForClose() => MarkDirty();
+
+        private void CommitFocusedInspectorInput()
+        {
+            if (Keyboard.FocusedElement is DependencyObject focused && GetWindow(focused) == this)
+                Keyboard.ClearFocus();
+        }
+
+        internal async Task<bool> RequestCloseApprovalAsync(Func<MessageBoxResult>? choose = null, Func<Task<bool>>? save = null)
+        {
+            CommitFocusedInspectorInput();
+            if (_saveCheckingReferences) return false;
+            if (!_dirty && _invalidWeightEditors.Count == 0) return true;
+            var choice = choose?.Invoke() ?? MessageBox.Show(this, L("S.Settings.SaveTemplateBeforeClosing", _template.Name),
+                L("S.EC.UnsavedTitle"), MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel);
+            return choice == MessageBoxResult.No ||
+                (choice == MessageBoxResult.Yes && await (save?.Invoke() ?? SaveTemplateAsync()));
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            if (_dirty)
+            if (!_templateCloseApproved)
             {
-                var r = MessageBox.Show(this,
-                    L("S.EC.UnsavedMsg"),
-                    L("S.EC.UnsavedTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (r != MessageBoxResult.Yes) { e.Cancel = true; return; }
+                CommitFocusedInspectorInput();
+                if (_dirty || _invalidWeightEditors.Count > 0 || _saveCheckingReferences)
+                {
+                    e.Cancel = true;
+                    if (!_templateClosePending && !_saveCheckingReferences)
+                    {
+                        _templateClosePending = true;
+                        Dispatcher.BeginInvoke(new Action(async () =>
+                        {
+                            try
+                            {
+                                if (!await RequestCloseApprovalAsync()) return;
+                                ApproveClose();
+                                Close();
+                            }
+                            finally { _templateClosePending = false; }
+                        }));
+                    }
+                }
             }
             base.OnClosing(e);
         }

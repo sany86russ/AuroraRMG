@@ -1,8 +1,10 @@
 using OldenEraTemplateEditor.Models;
 using Olden_Era___Template_Editor.Models;
 using Olden_Era___Template_Editor.Services;
+using Olden_Era___Template_Editor.Services.GameData;
 using Olden_Era___Template_Editor.Services.Localization;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,20 +16,56 @@ public partial class ValueOverridePickerWindow : Window
 {
     public List<string> ResultLines { get; private set; } = [];
     private readonly List<SelectableSid> _choices = [];
+    private readonly HashSet<string> _existing;
 
     public ValueOverridePickerWindow(IEnumerable<string> alreadyOverridden)
     {
         InitializeComponent();
-        var existing = new HashSet<string>(alreadyOverridden, System.StringComparer.Ordinal);
-        foreach (string sid in KnownValues.ObjectSids.Distinct().Where(s => !existing.Contains(s)).OrderBy(s => s))
-        {
-            var choice = new SelectableSid(sid);
-            choice.PropertyChanged += (_, _) => UpdateAddButton();
-            _choices.Add(choice);
-        }
+        _existing = alreadyOverridden.Select(target => ValueOverrideText.TryParseTarget(target, out string sid, out int variant)
+            ? ValueOverrideText.FormatTarget(sid, variant) : target).ToHashSet(StringComparer.Ordinal);
+        foreach (string sid in KnownValues.ObjectSids.Distinct().Where(s => !_existing.Contains(s)).OrderBy(s => s))
+            AddChoice(new SelectableSid(sid));
         TxtSearch.SetResourceReference(ToolTipProperty, "S.P.SearchKeepsSelection");
         LocalizationManager.Observe(this, () => { foreach (var choice in _choices) choice.RefreshLanguage(); RefreshList(); });
         RefreshList();
+    }
+
+    private void AddChoice(SelectableSid choice)
+    {
+        choice.PropertyChanged += (_, _) => UpdateAddButton();
+        _choices.Add(choice);
+    }
+
+    private void BtnCatalog_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new GameContentCatalogWindow(chooseVariant: SelectCatalogTarget, allowedKind: GameContentKind.Object)
+        { Owner = this };
+        picker.ShowDialog();
+    }
+
+    private void SelectCatalogTarget(GameContentEntry entry, GameRewardVariant? reward)
+    {
+        string target = ValueOverrideText.FormatTarget(entry.Sid, reward?.Index ?? -1);
+        if (_existing.Contains(target))
+        {
+            MessageBox.Show(this, LocalizationManager.T("S.Vov.ExistingTarget", target), Title,
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var choice = _choices.FirstOrDefault(c => c.Id == target);
+        if (choice is null)
+        {
+            choice = new SelectableSid(target, () =>
+            {
+                string language = LocalizationManager.Instance.CurrentLanguage == AppLanguage.En ? "english" : "russian";
+                return ValueOverrideText.FormatTarget(entry.DisplayName(language), reward?.Index ?? -1);
+            });
+            AddChoice(choice);
+        }
+        choice.IsSelected = true;
+        if (TxtSearch.Text == target) RefreshList();
+        else TxtSearch.Text = target;
     }
 
     private void UpdateAddButton()
@@ -54,7 +92,7 @@ public partial class ValueOverridePickerWindow : Window
             TxtGuardValue.Focus(); TxtGuardValue.SelectAll();
             return;
         }
-        ResultLines = _choices.Where(c => c.IsSelected).Select(c => $"{c.Id}={guard.Value}").ToList();
+        ResultLines = _choices.Where(c => c.IsSelected).Select(c => $"{c.Id}={guard.Value.ToString(CultureInfo.InvariantCulture)}").ToList();
         if (ResultLines.Count > 0) DialogResult = true;
     }
 

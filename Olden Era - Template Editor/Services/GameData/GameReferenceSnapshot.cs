@@ -48,25 +48,34 @@ public static class GameReferenceSnapshotBuilder
         var pools = new HashSet<string>(StringComparer.Ordinal);
         var lists = new HashSet<string>(StringComparer.Ordinal);
         var layouts = new HashSet<string>(StringComparer.Ordinal);
-        var objects = new HashSet<string>(StringComparer.Ordinal);
+        var mapObjects = new HashSet<string>(StringComparer.Ordinal);
+        var objectLogic = new HashSet<string>(StringComparer.Ordinal);
+        var aliases = new HashSet<string>(StringComparer.Ordinal);
+        const string poolsPrefix = "generator/content_pools/";
+        const string listsPrefix = "generator/content_lists/";
+        const string layoutsPrefix = "generator/zone_layouts/";
+        const string mapObjectsPrefix = "DB/map/objects/";
+        const string objectLogicPrefix = "DB/objects_logic/";
+        const string generatorConfig = "generator/generator_config.json";
         if (core.GetEntry(SkillsPath) is { } skillsEntry) ReadSkills(skillsEntry, snapshot, warnings);
         foreach (var entry in core.Entries)
         {
             string path = entry.FullName.Replace('\\', '/');
             if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
             HashSet<string>? target = null; string property = "name";
-            if (path.StartsWith("generator/content_pools/", StringComparison.Ordinal)) target = pools;
-            else if (path.StartsWith("generator/content_lists/", StringComparison.Ordinal)) target = lists;
-            else if (path.StartsWith("generator/zone_layouts/", StringComparison.Ordinal)) target = layouts;
-            else if (path.StartsWith("DB/map/objects/", StringComparison.Ordinal) || path.StartsWith("DB/objects_logic/", StringComparison.Ordinal)) { target = objects; property = "id"; }
-            else if (path == "generator/generator_config.json") target = objects;
+            if (path.StartsWith(poolsPrefix, StringComparison.Ordinal)) target = pools;
+            else if (path.StartsWith(listsPrefix, StringComparison.Ordinal)) target = lists;
+            else if (path.StartsWith(layoutsPrefix, StringComparison.Ordinal)) target = layouts;
+            else if (path.StartsWith(mapObjectsPrefix, StringComparison.Ordinal)) { target = mapObjects; property = "id"; }
+            else if (path.StartsWith(objectLogicPrefix, StringComparison.Ordinal)) { target = objectLogic; property = "id"; }
+            else if (path == generatorConfig) target = aliases;
             if (target is null) continue;
             try
             {
                 using var stream = entry.Open(); using var doc = JsonDocument.Parse(stream, Options);
-                if (path == "generator/generator_config.json")
+                if (path == generatorConfig)
                 {
-                    if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("metaObjects", out var meta) && meta.ValueKind == JsonValueKind.Array) AddRows(meta, "sid", objects);
+                    if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("metaObjects", out var meta) && meta.ValueKind == JsonValueKind.Array) AddRows(meta, "sid", aliases);
                     else { snapshot.CoreReadComplete = false; warnings?.Add("Unrecognized generator meta-object reference shape: " + path); }
                 }
                 else if (doc.RootElement.ValueKind == JsonValueKind.Array) AddRows(doc.RootElement, property, target);
@@ -76,8 +85,20 @@ public static class GameReferenceSnapshotBuilder
             catch (Exception ex) when (ex is JsonException or IOException or InvalidDataException)
             { snapshot.CoreReadComplete = false; warnings?.Add($"Reference data could not be read from {path}: {ex.Message}"); }
         }
+        (string Path, HashSet<string> Ids)[] required =
+        [
+            (poolsPrefix, pools), (listsPrefix, lists), (layoutsPrefix, layouts), (mapObjectsPrefix, mapObjects),
+            (objectLogicPrefix, objectLogic), (generatorConfig, aliases)
+        ];
+        foreach (var domain in required)
+        {
+            if (domain.Ids.Count > 0) continue;
+            snapshot.CoreReadComplete = false;
+            warnings?.Add("The reference domain is missing or empty: " + domain.Path);
+        }
         snapshot.Pools = pools.Order(StringComparer.Ordinal).ToList(); snapshot.Lists = lists.Order(StringComparer.Ordinal).ToList();
-        snapshot.Layouts = layouts.Order(StringComparer.Ordinal).ToList(); snapshot.Objects = objects.Order(StringComparer.Ordinal).ToList();
+        snapshot.Layouts = layouts.Order(StringComparer.Ordinal).ToList();
+        snapshot.Objects = mapObjects.Union(objectLogic).Union(aliases).Order(StringComparer.Ordinal).ToList();
         try
         {
             bool hasAiDomain = core.Entries.Any(entry =>

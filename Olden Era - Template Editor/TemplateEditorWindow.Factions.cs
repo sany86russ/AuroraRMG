@@ -20,9 +20,12 @@ public partial class TemplateEditorWindow
 
     private void RemoveEditorMainObject(Zone zone, int index)
     {
-        int reset = TemplateRefactor.RemoveMainObject(Variant, zone, index);
+        var removals = new List<(Zone Zone, int Index)> { (zone, index) };
         if (_mirrorMode && _mirrorProperties && TwinOf(zone) is { } twin && index < (twin.MainObjects?.Count ?? 0))
-            reset += TemplateRefactor.RemoveMainObject(Variant, twin, index);
+            removals.Add((twin, index));
+        int reset;
+        try { reset = TemplateRefactor.RemoveMainObjects(Variant, removals, _template); }
+        catch (InvalidOperationException ex) { ShowReferenceEditError(ex); return; }
         MarkDirty();
         RefreshNode(zone);
         BuildInspector();

@@ -74,6 +74,8 @@ public class GameCatalogRefreshTests
     [InlineData("heroes", "null-row")]
     [InlineData("Content", "null-row")]
     [InlineData("Content.0.PlacementVerified", "true")]
+    [InlineData("Content.0.HasMapPickup", "true")]
+    [InlineData("Content.0.HasMapPickup", "remove")]
     [InlineData("Content.0.RewardVariants.0.RollChance", "infinite")]
     [InlineData("Content.0.RewardVariants", "null")]
     [InlineData("Content.0.RewardVariants", "null-row")]
@@ -299,6 +301,39 @@ public class GameCatalogRefreshTests
         var changed = await new GameCatalogService(locator, cache).GetCatalogAsync("english");
         Assert.Equal(added.Source.SourceFingerprint, changed.Source!.SourceFingerprint);
         Assert.Empty(changed.Search("stock_reward", rmgReferenced: true));
+    }
+
+    [Fact]
+    public async Task CatalogSelectsArtifactsOnlyWhenAnExactMapPickupIsDefined()
+    {
+        using var fixture = new SyntheticInstalledGame();
+        using (var archive = ZipFile.Open(fixture.CorePath, ZipArchiveMode.Update))
+        {
+            SyntheticInstalledGame.Add(archive, "DB/items/items/item_slot.json", """
+                {"array":[
+                    {"id":"orb_of_poisons_artifact","name":"orb_name","rarity":"legendary"},
+                    {"id":"service_item","rarity":"rare"},{"id":"Case_mismatch","rarity":"epic"}
+                ]}
+                """);
+            SyntheticInstalledGame.Add(archive, "DB/map/objects/6_artifacts.json", """
+                {"array":[
+                    {"id":"orb_of_poisons_artifact","tag":"Artifact"},
+                    {"id":"case_mismatch","tag":"Artifact"},{"id":"only_map_object","tag":"Artifact"},
+                    {"id":"service_item","tag":"Other"}
+                ]}
+                """);
+            SyntheticInstalledGame.Add(archive, "Lang/english/texts/artifacts.json",
+                """{"tokens":[{"sid":"orb_name","text":"Orb of Poison"}]}""");
+        }
+        string cache = Path.Combine(fixture.Root, "cache");
+        await new GameCatalogService(fixture.Service(), cache).GetCatalogAsync("english");
+        var catalog = await new GameCatalogService(fixture.Service(), cache).GetCatalogAsync("english");
+        var artifact = Assert.Single(catalog.GetMapArtifacts());
+        Assert.Equal("orb_of_poisons_artifact", artifact.Sid);
+        Assert.Equal("Orb of Poison", artifact.NameEn);
+        Assert.Equal("legendary", artifact.Category);
+        Assert.False(artifact.PlacementVerified);
+        Assert.Contains(catalog.Search(kind: GameContentKind.Artifact), entry => entry.Sid == "service_item");
     }
 
     [Fact]

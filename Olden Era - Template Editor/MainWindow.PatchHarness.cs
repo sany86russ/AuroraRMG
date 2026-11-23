@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using Olden_Era___Template_Editor.Models;
 using Olden_Era___Template_Editor.Services;
 using Olden_Era___Template_Editor.Services.Analysis;
+using Olden_Era___Template_Editor.Services.Export;
 using Olden_Era___Template_Editor.Services.GameData;
 
 namespace Olden_Era___Template_Editor;
@@ -16,11 +17,11 @@ public partial class MainWindow
 {
     private void InitializePatchHarness(string[] arguments)
     {
-        int index = Array.FindIndex(arguments, a => a is "--shoot-patch" or "--shoot-docs" or "--make-patch-kit");
+        int index = Array.FindIndex(arguments, App.IsPatchVerificationCommand);
         if (index < 0) return;
         if (index + 1 >= arguments.Length) throw new ArgumentException("The verification command requires an output directory.");
         ShowActivated = false; WindowStartupLocation = WindowStartupLocation.Manual; Left = -6000; Top = 100;
-        string command = arguments[index], directory = Path.GetFullPath(arguments[index + 1]);
+        string command = arguments[index].ToLowerInvariant(), directory = Path.GetFullPath(arguments[index + 1]);
         ContentRendered += async (_, _) =>
         {
             try
@@ -29,6 +30,11 @@ public partial class MainWindow
                 {
                     var receipt = await PatchAcceptanceSuite.RunAsync(directory, await CurrentPatchCatalog(true));
                     if (!receipt.OfflinePassed) throw new InvalidOperationException("Offline acceptance did not pass.");
+                }
+                else if (command == "--gen-readymaps")
+                {
+                    var references = (await CurrentPatchCatalog(true)).GetReferenceCatalog();
+                    await Task.Run(() => ReadyMapExporter.Generate(directory, references));
                 }
                 else
                 {
@@ -57,7 +63,7 @@ public partial class MainWindow
         CmbSimpleType.SelectedIndex = 5; ApplySimplePlayerSelection(2, false);
         Require(CmbSimpleType.SelectedIndex == 1 && SldSimplePlayers.Value == 2, "Solo options silently clamped the new player count.");
         checks.Add("Simple: options can change Duel to five players and Solo to two without clamping.");
-        _profileOptions = GenerationProfileOptions.CurrentDefaults();
+        _simpleProfileOptions = GenerationProfileOptions.CurrentDefaults();
         CmbSimpleType.SelectedIndex = 4; SldSimplePlayers.Value = 4; TxtSimpleSeed.Text = "000006C1";
         BtnSimpleGenerate_Click(this, new());
         Require(_lastQuickSettings?.Topology == MapTopology.Lanes && _generatedSettingsSnapshot?.Topology == MapTopology.Lanes
@@ -96,14 +102,13 @@ public partial class MainWindow
         Require(JsonSerializer.Serialize(bonusTemplate, JsonExport.Options) == JsonSerializer.Serialize(TemplateGenerator.Generate(Presets.ToGeneratorSettings(bonusSnapshot)), JsonExport.Options),
             "Real WPF bonuses cannot be generated or reproduced in Balanced tempo.");
         checks.Add("WPF bonus: Balanced tempo and restored settings produce identical JSON.");
-        _profileOptions = GenerationProfileOptions.CurrentDefaults();
+        _simpleProfileOptions = GenerationProfileOptions.CurrentDefaults();
         CmbSimpleType.SelectedIndex = 3; SldSimplePlayers.Value = 5; TxtSimpleSeed.Text = "00ABC123";
-        _profileOptions.Alliances = new() { Enabled = true, Preset = "2v2v1", Layout = AllianceLayout.TeamRegions };
+        _simpleProfileOptions.Alliances = new() { Enabled = true, Preset = "2v2v1", Layout = AllianceLayout.TeamRegions };
         SetMode(false); BtnSimpleGenerate_Click(this, new());
         Require(_generatedTemplate is not null && !_templateOutdated && _generatedSettingsSnapshot is not null, "Simple generation did not finish.");
         Require(_generatedTemplate!.SpawnInfos?.Count == 5, "Odd team assignment was lost in Simple.");
-        BtnSimpleOpenAdvanced_Click(this, new());
-        TxtTemplateName.Text = "Patch UI verification";
+        RenameGeneratedTemplate("Patch UI verification");
         Require(!_templateOutdated && _generatedSettingsSnapshot!.TemplateName == _generatedTemplate.Name && _lastQuickSettings?.TemplateName == _generatedTemplate.Name,
             "Renaming a generated template did not update its reproducible input.");
         var generated = _generatedSettingsSnapshot!;
@@ -111,7 +116,7 @@ public partial class MainWindow
         var regenerated = TemplateGenerator.Generate(Presets.ToGeneratorSettings(file));
         Require(JsonSerializer.Serialize(regenerated, JsonExport.Options) == JsonSerializer.Serialize(_generatedTemplate, JsonExport.Options), "Captured Simple settings do not reproduce the template.");
         checks.Add("Simple: 5 players, 2v2v1 teams, full settings snapshot reproduces JSON.");
-        checks.Add("Name: cosmetic renaming updates the template, snapshot and Advanced input.");
+        checks.Add("Name: renaming a Simple template updates its reproducible snapshot.");
         SetMode(advanced: false, persist: false);
         if (SimplePreviewBox.Visibility != Visibility.Visible) BtnSimpleTogglePreview_Click(this, new());
         Require(ImgSimplePreview.Source is not null, "Showing the Simple preview did not render the generated graph.");
@@ -119,11 +124,11 @@ public partial class MainWindow
         ChkSimplePortals.IsChecked = !ChkSimplePortals.IsChecked;
         Require(_templateOutdated && !BtnSimpleSave.IsEnabled && !BtnSimpleSaveToGame.IsEnabled && !await CanExportGeneratedTemplate(), "Simple stale export was not blocked.");
         checks.Add("Simple: changing portals marks output stale and blocks both export paths.");
-        ApplySettings(file); SetMode(true);
+        ReplaceSettings(file, path: null, dirty: false);
         var restored = BuildSettings();
         Require(JsonSerializer.Serialize(TemplateGenerator.Generate(restored), JsonExport.Options) == JsonSerializer.Serialize(regenerated, JsonExport.Options), "Opening the captured settings changed generation.");
         checks.Add("Advanced: opening captured settings retains the complete generator input.");
-        _profileOptions.TemplateSeed = 424242;
+        _advancedProfileOptions.TemplateSeed = 424242;
         var changedSeedFile = GatherSettings();
         Require(changedSeedFile.Seed == 424242 && SettingsSnapshotMapper.RestoreSnapshot(changedSeedFile)?.Seed == 424242,
             "Advanced saved a different seed in its legacy fields and canonical snapshot.");
@@ -159,28 +164,81 @@ public partial class MainWindow
         checks.Add("Mode switching: both previews use the latest result, and only matching settings allow export or editing.");
 
         string settingsPath = Path.Combine(directory, "settings-workflow.oetgs");
-        WriteSettingsDocument(settingsPath);
+        WriteSettingsDocument(settingsPath, simple: false);
         string savedSettings = File.ReadAllText(settingsPath);
         TxtTemplateName.Text = "Unsaved settings test";
-        Require(_isDirty && !AcceptSettingsTransition(MessageBoxResult.Cancel, () => throw new InvalidOperationException("Cancel tried to save."))
+        Require(_advancedDocument.IsDirty && !AcceptSettingsTransition(MessageBoxResult.Cancel, () => throw new InvalidOperationException("Cancel tried to save."))
             && AcceptSettingsTransition(MessageBoxResult.No, () => throw new InvalidOperationException("Discard tried to save.")),
             "Cancel or discard did not preserve the save/discard choice.");
         bool saveFailed = false;
-        try { WriteSettingsDocument(directory); }
+        try { WriteSettingsDocument(directory, simple: false); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { saveFailed = true; }
-        Require(saveFailed && _isDirty && _currentSettingsPath == settingsPath && File.ReadAllText(settingsPath) == savedSettings
+        Require(saveFailed && _advancedDocument.IsDirty && _advancedDocument.Path == settingsPath && File.ReadAllText(settingsPath) == savedSettings
             && !AcceptSettingsTransition(MessageBoxResult.Yes, () => false),
             "A failed save replaced the active settings path, touched the saved document or allowed the transition.");
-        Require(AcceptSettingsTransition(MessageBoxResult.Yes, () => SaveToPath(settingsPath)) && !_isDirty,
+        Require(AcceptSettingsTransition(MessageBoxResult.Yes, () => SaveToPath(settingsPath, simple: false)) && !_advancedDocument.IsDirty,
             "Saving before transition did not commit the selected settings.");
         savedSettings = File.ReadAllText(settingsPath);
+        var advanced = GatherSettings(simple: false);
+        advanced.Extra = new() { ["privateAdvancedMetadata"] = JsonSerializer.SerializeToElement("advanced-only test value") };
+        ReplaceSettings(advanced, settingsPath, dirty: false);
+        var advancedSeed = BuildSettings().Seed;
         SetMode(advanced: false, persist: false);
-        Require(ReusableSettingsPath is null, "Simple settings could overwrite an Advanced document after changing modes.");
+        Require(_simpleDocument.Path is null, "Simple settings reused the Advanced document path.");
+        string quickPath = Path.Combine(directory, "settings-quick.oetgs");
+        WriteSettingsDocument(quickPath, simple: true);
+        string savedQuickSeed = TxtSimpleSeed.Text;
+        Require(!File.ReadAllText(quickPath).Contains("privateAdvancedMetadata", StringComparison.Ordinal),
+            "A new Simple file copied unrelated Advanced metadata.");
+        _simpleProfileOptions.TemplateSeed = 34;
+        TxtSimpleSeed.Text = "00000022";
+        Require(ApplySettingsDecision(simple: true, MessageBoxResult.No, restoreOnDiscard: true)
+            && TxtSimpleSeed.Text == savedQuickSeed && _simpleDocument.Path == quickPath && !_simpleDocument.IsDirty
+            && BuildSettings().Seed == advancedSeed && _advancedDocument.Path == settingsPath,
+            "Discard failed to restore the Simple seed or changed the Advanced document.");
+
+        string invalidPath = Path.Combine(directory, "settings-invalid.oetgs");
+        File.WriteAllText(invalidPath, "{\"templateName\":\"Rejected settings\",\"seed\":777,\"playerZoneContentRows\":[null]}");
+        bool rejected = false;
+        try { ReplaceAdvancedSettings(ReadAdvancedSettings(invalidPath), invalidPath, dirty: false); }
+        catch (JsonException) { rejected = true; }
+        Require(rejected && BuildSettings().Seed == advancedSeed && _advancedDocument.Path == settingsPath &&
+            !_advancedDocument.IsDirty && File.ReadAllText(settingsPath) == savedSettings,
+            "A failed settings import mutated Advanced controls or its previous file.");
         ResetSimpleToDefaults();
-        Require(_currentSettingsPath is null && !_isDirty && _generatedSettingsSnapshot is null && CurrentGeneratedTemplate is null
-            && ImgPreview.Source is null && ImgSimplePreview.Source is null && File.ReadAllText(settingsPath) == savedSettings,
-            "Simple reset did not detach from the previous settings document and clear both previews.");
-        checks.Add("Settings: save/discard/cancel, a failed atomic save and Simple reset protect the previous .oetgs.");
+        Require(_simpleDocument.Path is null && !_simpleDocument.IsDirty && CurrentGeneratedTemplate is null
+            && ImgSimplePreview.Source is null && File.ReadAllText(settingsPath) == savedSettings
+            && _simpleProfileOptions.ProfileId == GenerationProfileOptions.CurrentProfile
+            && BuildSettings().Seed == advancedSeed && _loadedSettingsMetadata?.ContainsKey("privateAdvancedMetadata") == true,
+            "Simple reset lost the Advanced document or did not use the current default profile.");
+        WriteSettingsDocument(quickPath, simple: true);
+        ReplaceAdvancedSettings(ReadAdvancedSettings(quickPath), quickPath, dirty: false);
+        Require(_advancedDocument.Path == quickPath && _simpleDocument.Path is null,
+            "Opening one file in Advanced allowed both modes to overwrite it via ordinary Save.");
+        checks.Add("Settings: save/discard/cancel and Simple reset isolate document paths, seeds and metadata, including a rejected import.");
+
+        var ownedEditor = new TemplateEditorWindow(regenerated)
+        {
+            Owner = this, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -6000, Top = 100
+        };
+        try
+        {
+            ownedEditor.Show();
+            ownedEditor.DebugMarkDirtyForClose();
+            var cancelled = await RequestShutdownApprovalAsync(
+                editor => editor.RequestCloseApprovalAsync(() => MessageBoxResult.Cancel),
+                _ => throw new InvalidOperationException("Settings would be prompted after an owned editor cancelled."));
+            var failed = await RequestShutdownApprovalAsync(
+                editor => editor.RequestCloseApprovalAsync(() => MessageBoxResult.Yes, () => Task.FromResult(false)),
+                _ => throw new InvalidOperationException("Shutdown proceeded after an owned editor failed to save."));
+            var accepted = await RequestShutdownApprovalAsync(
+                editor => editor.RequestCloseApprovalAsync(() => MessageBoxResult.No),
+                _ => MessageBoxResult.OK);
+            Require(cancelled is null && failed is null && ownedEditor.IsLoaded && accepted?.Editors.Contains(ownedEditor) == true,
+                "Owner shutdown ignored Cancel or a failed save, or failed to recognize explicit discard.");
+        }
+        finally { ownedEditor.DebugDiscardAndClose(); }
+        checks.Add("Shutdown: a modeless dirty editor can cancel Close/Update; save failure vetoes shutdown and explicit discard authorizes it.");
 
         var availableSkills = catalog.Search(kind: GameContentKind.Skill).ToArray();
         Require(availableSkills.Length > 0, "The installed game catalog did not expose any skills.");
@@ -228,6 +286,14 @@ public partial class MainWindow
                 window => ((GameContentCatalogWindow)window).DebugSelectRewardObject(pandora.Sid, variantIndex: 55));
             checks.Add("Catalog: Pandora shows the configured choice mode and weight, and the RMG filter includes the mandatory Hell Light Spire.");
 
+            var artifacts = BuildArtifactBanEntries(catalog);
+            const string newArtifact = "orb_of_poisons_artifact";
+            Require(artifacts.ContainsKey(newArtifact) && artifacts["ambassadors_word_ambassadors_robe_artifact"].AvailabilityResource is not null,
+                "The artifact picker is missing a new artifact or the random-map availability status.");
+            await CapturePatchWindowAsync(new ItemPickerWindow(artifacts.Values, [], "S.CB.BanItems"), directory, "artifact-picker",
+                window => ((ItemPickerWindow)window).DebugToggleEntry(newArtifact));
+            checks.Add("Artifact picker: a new installed-game artifact is selectable and excluded random-map content is labeled.");
+
             string stockPath = Path.Combine(source.TemplatesPath, "Jebus Cross.rmg.json");
             if (File.Exists(stockPath))
             {
@@ -236,6 +302,18 @@ public partial class MainWindow
                 await CapturePatchWindowAsync(new TemplateEditorWindow(stock), directory, "editor-stock-variant",
                     window => ((TemplateEditorWindow)window).DebugSelectVariant(1));
                 checks.Add("Editor: Jebus Cross's second stock variant renders in the active graph.");
+                await CapturePatchWindowAsync(new TemplateBulkEditWindow(stock, 1), directory, "bulk-stock-variant",
+                    window =>
+                    {
+                        var bulk = (TemplateBulkEditWindow)window;
+                        Require(bulk.SelectedVariantIndex == 1, "Mass editing did not start on the graph's active variant.");
+                        bulk.DebugSelectFirstZone();
+                    });
+                stock.Variants![0] = null!;
+                var gapped = new TemplateBulkEditWindow(stock);
+                Require(gapped.SelectedVariantIndex == 1, "A missing first variant blocked bulk editing of valid variants.");
+                gapped.Close();
+                checks.Add("Bulk editor: the active stock variant is selected and missing variants are skipped.");
             }
         }
         using (var stream = File.Create(Path.Combine(directory, "teams-preview.png")))
@@ -249,9 +327,9 @@ public partial class MainWindow
     private async Task CaptureDocumentationAsync(string directory)
     {
         File.Copy(Path.Combine(directory, "main-simple.png"), Path.Combine(directory, "ui-simple.png"));
-        _profileOptions = GenerationProfileOptions.CurrentDefaults();
-        _profileOptions.Tempo = MapTempo.Legacy;
-        _profileOptions.TemplateSeed = 1234;
+        _simpleProfileOptions = GenerationProfileOptions.CurrentDefaults();
+        _simpleProfileOptions.Tempo = MapTempo.Legacy;
+        _simpleProfileOptions.TemplateSeed = 1234;
         SetMode(advanced: false, persist: false);
         CmbSimpleType.SelectedIndex = Array.IndexOf(SimpleTypeKeys, "S.Simple.Type.Lanes");
         ApplySimplePlayerSelection(4, false);
@@ -290,24 +368,13 @@ public partial class MainWindow
         await CapturePatchWindowAsync(new MirrorSettingsWindow(true, true), directory, "ui-tool-mirror-settings");
         await CapturePatchWindowAsync(new HotkeySettingsWindow(), directory, "ui-tool-hotkeys");
         await CapturePatchWindowAsync(new ImageImportWindow(), directory, "ui-tool-sketch");
-        var references = (await CurrentPatchCatalog(true)).GetReferenceCatalog();
-        string readyDirectory = Path.Combine(directory, "ReadyMaps");
-        Directory.CreateDirectory(readyDirectory);
-        foreach (var preset in PatchPresets.Current.Concat(PatchPresets.Cooperative))
-        {
-            var settings = Presets.ToGeneratorSettings(PatchPresets.Clone(preset.Settings));
-            settings.Seed = 1729; settings.ProfileOptions.TemplateSeed = 1729;
-            var readyTemplate = TemplateGenerator.Generate(settings);
-            var errors = TemplateCompatibilityValidator.Validate(readyTemplate, TemplateValidationMode.StrictExport, references)
-                .Where(issue => issue.Severity == TemplateIssueSeverity.Error).ToArray();
-            Require(errors.Length == 0, "ReadyMaps validation failed: " + preset.Id + ": " + string.Join("; ", errors.Select(error => error.Message)));
-            File.WriteAllText(Path.Combine(readyDirectory, "[Gen] " + settings.TemplateName + ".rmg.json"), JsonSerializer.Serialize(readyTemplate, JsonExport.Options));
-        }
-        Require(Directory.GetFiles(readyDirectory, "*.rmg.json").Length == 53, "The current ReadyMaps collection is incomplete.");
-        foreach (string name in ShootTabs.Select(tab => tab.File).Concat(new[] { "ui-simple", "ui-simple-lanes", "ui-editor",
-                     "ui-tool-json", "ui-tool-connections", "ui-tool-orientation", "ui-tool-help", "ui-tool-mirror-settings", "ui-tool-hotkeys", "ui-tool-sketch" }))
+        var documentationCaptures = ShootTabs.Select(tab => tab.File).Concat(new[] { "ui-simple", "ui-simple-lanes", "ui-editor",
+            "ui-tool-json", "ui-tool-connections", "ui-tool-orientation", "ui-tool-help", "ui-tool-mirror-settings", "ui-tool-hotkeys", "ui-tool-sketch" }).ToArray();
+        foreach (string name in documentationCaptures)
             Require(new FileInfo(Path.Combine(directory, name + ".png")).Length > 100, "A documentation capture is empty: " + name);
-        File.WriteAllText(Path.Combine(directory, "documentation-verification.txt"), "All 14 documentation screenshots captured after the 16 UI checks passed; all 53 current ReadyMaps passed strict validation.");
+        int uiChecks = File.ReadLines(Path.Combine(directory, "ui-verification.txt")).Count();
+        File.WriteAllText(Path.Combine(directory, "documentation-verification.txt"),
+            $"Captured {documentationCaptures.Length} documentation screenshots after {uiChecks} UI checks passed.");
     }
 
     private async Task CaptureMainPatchAsync(string directory, string name)

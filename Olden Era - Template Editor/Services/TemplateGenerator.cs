@@ -95,7 +95,7 @@ namespace Olden_Era___Template_Editor.Services
                 SizeX = settings.MapSize,
                 SizeZ = settings.MapSize,
                 GameRules = BuildGameRules(settings, effectiveVictoryCondition),
-                ValueOverrides = BuildValueOverrides(settings.ValueOverridesText),
+                ValueOverrides = ValueOverrideText.Parse(settings.ValueOverridesText),
                 GlobalBans = BuildGlobalBans(settings),
                 Variants = [BuildVariant(settings, playerLetters, neutralZones, tuning, holdCityNeutralLetter, useCityHold && settings.Topology == MapTopology.HubAndSpoke)],
                 ZoneLayouts = BuildZoneLayouts(settings),
@@ -443,28 +443,6 @@ namespace Olden_Era___Template_Editor.Services
             foreach (var entry in entries)
                 result.AddRange(entry.ToBonuses());
             return result.Count > 0 ? result : null;
-        }
-
-        /// <summary>
-        /// Parses newline-separated "sid=guardValue" lines into a ValueOverride list.
-        /// Lines that are blank or unparseable are silently skipped.
-        /// </summary>
-        private static List<ValueOverride>? BuildValueOverrides(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) return null;
-            var list = new List<ValueOverride>();
-            foreach (var line in raw.Split('\n'))
-            {
-                var trimmed = line.Trim();
-                if (string.IsNullOrEmpty(trimmed)) continue;
-                var eq = trimmed.IndexOf('=');
-                if (eq <= 0) continue;
-                var sid = trimmed[..eq].Trim();
-                if (string.IsNullOrEmpty(sid)) continue;
-                if (!int.TryParse(trimmed[(eq + 1)..].Trim(), out int gv)) continue;
-                list.Add(new ValueOverride { Sid = sid, Variant = -1, GuardValue = gv });
-            }
-            return list.Count > 0 ? list : null;
         }
 
         /// <summary>
@@ -3709,9 +3687,9 @@ namespace Olden_Era___Template_Editor.Services
         {
             var content = quality switch
             {
-                NeutralZoneQuality.Low    => ZoneContentManager.BuildLowNeutralMandatoryContent(settings),
-                NeutralZoneQuality.High   => ZoneContentManager.BuildHighNeutralMandatoryContent(settings),
-                _                         => ZoneContentManager.BuildMediumNeutralMandatoryContent(settings),
+                NeutralZoneQuality.Low    => ZoneContentManager.BuildLowNeutralMandatoryContent(settings, castleCount),
+                NeutralZoneQuality.High   => ZoneContentManager.BuildHighNeutralMandatoryContent(settings, castleCount),
+                _                         => ZoneContentManager.BuildMediumNeutralMandatoryContent(settings, castleCount),
             };
 
             if (castleCount == 0)

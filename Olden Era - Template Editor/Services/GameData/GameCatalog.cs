@@ -35,7 +35,7 @@ namespace Olden_Era___Template_Editor.Services.GameData
         [JsonPropertyName("language")]   public string Language { get; set; } = "russian";
         [JsonPropertyName("sourceStamp")] public long  SourceStamp { get; set; }
         [JsonPropertyName("heroes")]     public List<HeroCatalogEntry> Heroes { get; set; } = [];
-        public const int CurrentSnapshotFormatVersion = 6;
+        public const int CurrentSnapshotFormatVersion = 7;
         public int SnapshotFormatVersion { get; set; } = CurrentSnapshotFormatVersion;
         public GameInstallation? Source { get; set; }
         public List<GameContentEntry> Content { get; set; } = [];
@@ -55,6 +55,10 @@ namespace Olden_Era___Template_Editor.Services.GameData
                 .ToDictionary(group => group.Sid, group => (IReadOnlySet<int>)group.Indices, StringComparer.Ordinal);
             return References.ToReferenceCatalog(Source, includeNativeSchemaDefinitions, rewardIndices);
         }
+
+        /// <summary>Catalog items with an exact Artifact pickup definition in the installed map database.</summary>
+        public IEnumerable<GameContentEntry> GetMapArtifacts() =>
+            Content.Where(entry => entry.Kind == GameContentKind.Artifact && entry.HasMapPickup);
 
         [JsonIgnore] public bool IsEmpty => Heroes.Count == 0 && Content.Count == 0;
         [JsonIgnore] public bool IsLiveSource => Source is not null;

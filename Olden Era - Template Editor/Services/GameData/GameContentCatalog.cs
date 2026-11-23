@@ -33,6 +33,7 @@ public sealed class GameContentEntry
     public int? Level { get; set; }
     public string SourceEntry { get; set; } = "";
     public bool HasGeneratorConfig { get; set; }
+    public bool HasMapPickup { get; set; }
     public bool ReferencedByRmgContent { get; set; }
     // No parser-only observation can set this to true. It needs a separate game-validation receipt.
     public bool PlacementVerified { get; set; }
@@ -61,6 +62,7 @@ public static class GameContentCatalogBuilder
         var rmgSids = ReadRmgSids(core, warnings);
         if (templatesDirectory is not null) ReadInstalledTemplateSids(templatesDirectory, templates, rmgSids, warnings);
         var entries = new Dictionary<(GameContentKind Kind, string Sid), GameContentEntry>();
+        var artifactPickups = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in core.Entries.OrderBy(e => e.FullName, StringComparer.Ordinal))
         {
             string path = entry.FullName.Replace('\\', '/');
@@ -80,6 +82,8 @@ public static class GameContentCatalogBuilder
                 if (row.ValueKind != JsonValueKind.Object) continue;
                 string sid = Text(row, "id");
                 if (sid.Length == 0) continue;
+                if (path.StartsWith("DB/map/objects/", StringComparison.Ordinal) && Text(row, "tag") == "Artifact")
+                    artifactPickups.Add(sid);
                 var key = (kind, sid);
                 bool existed = entries.TryGetValue(key, out var item);
                 item ??= new() { Sid = sid, Kind = kind, ReferencedByRmgContent = rmgSids.Contains(sid) };
@@ -155,6 +159,9 @@ public static class GameContentCatalogBuilder
                     });
                 }
         }
+        foreach (var artifact in entries.Values.Where(entry => entry.Kind == GameContentKind.Artifact))
+            artifact.HasMapPickup = artifactPickups.Contains(artifact.Sid);
+
         foreach (var variant in entries.Values.SelectMany(e => e.RewardVariants))
         {
             var spellIds = new HashSet<string>(StringComparer.Ordinal);

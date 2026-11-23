@@ -15,5 +15,9 @@ public static partial class Strings
         ("S.Patch08210.Variant", "Вариант карты", "Map variant"),
         ("S.Patch08210.VariantSwitch", "Выбран вариант {0} из {1}", "Selected variant {0} of {1}"),
         ("S.Patch08210.VariantEntry", "{0} из {1}", "{0} of {1}"),
+        ("S.Category.installedartifacts", "Артефакты из игры", "Installed game artifacts"),
+        ("S.Patch08210.ArtifactExcludedFromRandomMaps", "Отключён в случайной генерации 0.82.10", "Excluded from random generation in 0.82.10"),
+        ("S.EC.AmbiguousMandatoryPlacement", "Для зоны «{1}» найдено несколько определений обязательного содержимого «{0}». Разрешите дубликат в JSON и повторите действие.", "Zone '{1}' has several definitions for mandatory content '{0}'. Resolve the duplicate in JSON and retry."),
+        ("S.EC.AmbiguousConnectionPlacement", "Имя связи «{0}» повторяется. Разрешите дубликат в JSON, чтобы однозначно обновить ссылки.", "Connection name '{0}' is repeated. Resolve the duplicate in JSON so its references can be updated unambiguously."),
     ];
 }
