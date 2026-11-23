@@ -17,15 +17,16 @@
 
 </div>
 
-## New in v1.13.0 · Olden Era 0.82.10
+## New in v1.12.1 · Olden Era 0.82.10
 
 - **Map and tools → Teams and map options** offers the **Olden Era 0.82.10** profile. **0.81.04** and **Aurora 1.11** are available for previously saved settings. Aurora checks installed game data by version, Steam build, and checksums.
-- In **Rules and calendar**, you can ban skills from the installed catalog and enable champion selection at the Hell Light Spire for tournaments and final battles. Template properties can add spires near player starts in variants that do not have them.
+- In **Rules and calendar**, you can ban skills from the installed catalog and enable champion selection at the Hell Light Spire for tournaments and final battles. The generator checks that each tournament start can reach a spire when this option is enabled.
 - The Pandora catalog identifies rewards that let the player choose one option and marks entries with zero roll weight. The RMG filter includes mandatory objects from stock templates. The graph editor can switch among map variants, edit them, and save their layouts separately.
 - Aurora applies the extra portal limit to the entire template. Each seed in a Simple batch follows the same path as a single generation. The main window offers to save changed settings before replacing them or closing.
 - Simple and Advanced keep separate settings. Bulk editing starts on the active variant. The editor validates connection and object references before saving. The artifact picker includes entries from the installed game.
+- Switching languages and updating custom pools are faster. The schema editor keeps the selected node after applying a change. Turning off PNG output keeps the current template ready to export.
 
-[v1.13.0 RU/EN changelog](docs/release-notes-v1.13.0.md) · [Report a generator or in-game issue](https://github.com/sany86russ/AuroraRMG/issues/new?template=aurorarmg-bug.yml)
+[v1.12.1 RU/EN changelog](docs/release-notes-v1.12.1.md) · [Download v1.12.1](https://github.com/sany86russ/AuroraRMG/releases/tag/v1.12.1) · [Report a generator or in-game issue](https://github.com/sany86russ/AuroraRMG/issues/new?template=aurorarmg-bug.yml)
 
 Run the built EXE with `--make-patch-kit <new-folder>` outside the game directory to prepare in-game scenarios. Use `--gen-readymaps <folder> --lang ru` to reproduce the 53 checked-in ReadyMaps, including team presets.
 
@@ -247,7 +248,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.12]  —  file_name    🔄 📂 💾 💾… RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG [v1.12.1] —  file_name    🔄 📂 💾 💾… RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │

@@ -6,7 +6,7 @@ body:
     id: aurora-version
     attributes:
       label: Версия AuroraRMG / AuroraRMG version
-      placeholder: v1.13.0
+      placeholder: v1.12.1
     validations:
       required: true
   - type: input

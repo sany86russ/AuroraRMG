@@ -1,6 +1,6 @@
-# AuroraRMG v1.13.0
+# AuroraRMG v1.12.1
 
-[Скачать / Download](https://github.com/sany86russ/AuroraRMG/releases/tag/v1.13.0) · [Full changelog](https://github.com/sany86russ/AuroraRMG/compare/v1.12.0...v1.13.0)
+[Скачать / Download](https://github.com/sany86russ/AuroraRMG/releases/download/v1.12.1/AuroraRMG.exe) · [Full changelog](https://github.com/sany86russ/AuroraRMG/compare/v1.12.0...v1.12.1)
 
 ## Обновление под Olden Era 0.82.10
 
@@ -15,7 +15,8 @@
 - Переименование прохода, вставка зоны и изменение числа городов обновляют ссылки в правилах размещения. Проверка учитывает установленный каталог игры и отдельные стороны турнира. У штатных шаблонов сохраняются исходные поля, включая лимиты по группам без SID.
 - Простой и расширенный режимы сохраняют свои настройки отдельно. «Не сохранять» отбрасывает изменения текущего режима. Если файл `.oetgs` ошибочен, открытый документ остаётся доступен со своим именем и данными. Перед закрытием или автообновлением можно сохранить изменения открытых окон либо отменить действие.
 - Для одинаковых настроек и seed одиночная и пакетная генерация Simple дают один результат. Лимит дополнительных порталов действует на весь турнирный шаблон.
-- Готовый шаблон остаётся доступен при выключении PNG и при откате настроек к параметрам этого шаблона. Автообновление возвращает предыдущую версию при аварийном завершении сразу после запуска.
+- Готовый шаблон остаётся доступен при выключении PNG и при возврате к его настройкам. При экспорте используется уже отрисованное превью.
+- Переключение языка и обновление пользовательских пулов быстрее. При последующих обновлениях из v1.12.1 приложение восстанавливает предыдущий EXE, если новая версия аварийно завершается при запуске.
 
 ## Проверка игры и обратная связь
 
@@ -36,7 +37,8 @@
 - Renaming connections, pasting zones and changing the town count update placement references. Validation uses the installed game catalog and accounts for isolated tournament sides. Imported stock fields are preserved, including list-based limits without an SID.
 - Simple and Advanced keep their own settings. Discard drops the changes in the current mode. A damaged `.oetgs` leaves the open document and its path intact. You can save open work or cancel before closing the app or applying an update.
 - With the same Simple settings and seed, single and batch generation produce the same template. The extra portal cap applies to the entire tournament template.
-- Turning off PNG output or reverting to the settings that produced the current template keeps it ready for export. The updater restores the previous version if the new version crashes on startup.
+- Turning off PNG output or reverting to the settings that produced the current template keeps it ready for export. Export reuses the rendered preview.
+- Switching languages and updating custom pools are faster. When updating from v1.12.1, the updater restores the previous executable if the new version crashes on startup.
 
 ## In-game feedback
 
