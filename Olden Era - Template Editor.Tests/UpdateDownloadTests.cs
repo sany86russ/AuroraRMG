@@ -114,21 +114,60 @@ public sealed class UpdateDownloadTests : IDisposable
     {
         string source = Path.Combine(_dir, "new.update");
         string target = Path.Combine(_dir, "app.exe");
-        string helper = Path.Combine(_dir, "apply.ps1");
         File.WriteAllText(source, "new");
         File.WriteAllText(target, "original");
-        File.WriteAllText(helper, UpdateService.HelperScript);
         using var held = locked ? new FileStream(target, FileMode.Open, FileAccess.Read, FileShare.Read) : null;
+        int exitCode = await RunInstallerAsync(source, target, noRestart: true);
+        Assert.Equal(locked ? 1 : 0, exitCode);
+        Assert.Equal(locked ? "original" : "new", File.ReadAllText(target));
+        if (!locked) Assert.Equal("original", File.ReadAllText(target + ".previous"));
+    }
+
+    [Fact]
+    public async Task Installer_RestoresOriginalWhenNewProcessExitsWithAnError()
+    {
+        string source = Path.Combine(_dir, "new.update");
+        string target = Path.Combine(_dir, "app.exe");
+        byte[] original = File.ReadAllBytes(Path.Combine(Environment.SystemDirectory, "whoami.exe"));
+        File.WriteAllBytes(target, original);
+        File.Copy(Path.Combine(Environment.SystemDirectory, "where.exe"), source);
+
+        Assert.Equal(1, await RunInstallerAsync(source, target, noRestart: false));
+        Assert.Equal(original, File.ReadAllBytes(target));
+        Assert.Contains("exited during startup", File.ReadAllText(target + ".update-error.log"));
+    }
+
+    [Fact]
+    public async Task Installer_KeepsUpdateWhenNewProcessExitsNormally()
+    {
+        string source = Path.Combine(_dir, "new.update");
+        string target = Path.Combine(_dir, "app.exe");
+        byte[] update = File.ReadAllBytes(Path.Combine(Environment.SystemDirectory, "whoami.exe"));
+        File.WriteAllText(target, "original");
+        File.WriteAllBytes(source, update);
+
+        Assert.Equal(0, await RunInstallerAsync(source, target, noRestart: false));
+        Assert.Equal(update, File.ReadAllBytes(target));
+        Assert.Equal("original", File.ReadAllText(target + ".previous"));
+        Assert.False(File.Exists(target + ".update-error.log"));
+    }
+
+    private async Task<int> RunInstallerAsync(string source, string target, bool noRestart)
+    {
+        string helper = Path.Combine(_dir, "apply.ps1");
+        File.WriteAllText(helper, UpdateService.HelperScript);
         var start = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardError = true, RedirectStandardOutput = true };
         foreach (var arg in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", helper,
-            "-ProcessId", int.MaxValue.ToString(), "-Source", source, "-Target", target, "-NoRestart", "-Attempts", "1" })
+            "-ProcessId", int.MaxValue.ToString(), "-Source", source, "-Target", target, "-Attempts", "1" })
             start.ArgumentList.Add(arg);
+        if (noRestart) start.ArgumentList.Add("-NoRestart");
         using var process = Process.Start(start)!;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var output = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        var errors = process.StandardError.ReadToEndAsync(timeout.Token);
         await process.WaitForExitAsync(timeout.Token);
-        Assert.Equal(locked ? 1 : 0, process.ExitCode);
-        Assert.Equal(locked ? "original" : "new", File.ReadAllText(target));
-        if (!locked) Assert.Equal("original", File.ReadAllText(target + ".previous"));
+        await Task.WhenAll(output, errors);
+        return process.ExitCode;
     }
 }
