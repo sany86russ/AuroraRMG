@@ -17,8 +17,17 @@ namespace Olden_Era___Template_Editor.Services.GameData
         [JsonPropertyName("icon")]    public string IconSid { get; set; } = "";
     }
 
+    public sealed record RmgTemplateStamp(string FileName, long LastWriteUtcTicks, long Length)
+    {
+        internal static RmgTemplateStamp Read(string directory, string fileName)
+        {
+            var info = new FileInfo(Path.Combine(directory, fileName));
+            return info.Exists ? new(fileName, info.LastWriteTimeUtc.Ticks, info.Length) : new(fileName, 0, -1);
+        }
+    }
+
     /// <summary>
-    /// A snapshot of game data extracted from the installed game's <c>Core.zip</c>.
+    /// A snapshot of game data extracted from the installed game's <c>Core.zip</c> and its standard templates.
     /// Persisted to disk so it is built once and loaded instantly afterwards.
     /// </summary>
     public sealed class GameCatalog
@@ -26,9 +35,11 @@ namespace Olden_Era___Template_Editor.Services.GameData
         [JsonPropertyName("language")]   public string Language { get; set; } = "russian";
         [JsonPropertyName("sourceStamp")] public long  SourceStamp { get; set; }
         [JsonPropertyName("heroes")]     public List<HeroCatalogEntry> Heroes { get; set; } = [];
-        public int SnapshotFormatVersion { get; set; } = 4;
+        public const int CurrentSnapshotFormatVersion = 6;
+        public int SnapshotFormatVersion { get; set; } = CurrentSnapshotFormatVersion;
         public GameInstallation? Source { get; set; }
         public List<GameContentEntry> Content { get; set; } = [];
+        public List<RmgTemplateStamp> RmgTemplateStamps { get; set; } = [];
         public List<string> Warnings { get; set; } = [];
         public GameReferenceSnapshot References { get; set; } = new();
 

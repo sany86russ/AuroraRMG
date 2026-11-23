@@ -1,5 +1,8 @@
+using System.Text.Json;
 using Olden_Era___Template_Editor.Models;
+using Olden_Era___Template_Editor.Services;
 using Olden_Era___Template_Editor.Services.Export;
+using Olden_Era___Template_Editor.Services.Generation;
 using OldenEraTemplateEditor.Models;
 
 namespace Olden_Era___Template_Editor.Tests;
@@ -20,6 +23,34 @@ public class TemplateBatchTests
         Assert.Equal(999, settings.Seed); Assert.Single(settings.PlayerZoneMandatoryContent);
         Assert.False(a.Cancelled);
     }
+
+    [Fact]
+    public async Task SimpleBatchMatchesDirectSimpleGenerationForEverySeed()
+    {
+        using var fixture = new SyntheticInstalledGame();
+        var options = new QuickGenerateOptions
+        {
+            PlayerCount = 4,
+            Seed = 1729,
+            ProfileOptions = GenerationProfileOptions.CurrentDefaults()
+        };
+        var receipt = await TemplateBatchService.GenerateQuickAsync(new(options, [424242, -1], fixture.Root));
+        Assert.Equal(2, receipt.SuccessfulCount);
+        Assert.Equal(1729, options.Seed);
+        foreach (var result in receipt.Cases)
+        {
+            var directOptions = new QuickGenerateOptions
+            {
+                PlayerCount = options.PlayerCount,
+                Seed = result.Seed,
+                ProfileOptions = options.ProfileOptions.Clone()
+            };
+            var direct = TemplateGenerator.Generate(RandomTemplateBuilder.Build(directOptions));
+            Assert.Contains(unchecked((uint)result.Seed).ToString("X8"), Path.GetFileName(result.TemplatePath!));
+            Assert.Equal(JsonSerializer.Serialize(direct, JsonExport.Options), File.ReadAllText(result.TemplatePath!));
+        }
+    }
+
     [Fact]
     public async Task BatchRejectsEmptyDuplicateAndOversizedSeedLists()
     {

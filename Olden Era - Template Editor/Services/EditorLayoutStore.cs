@@ -30,7 +30,7 @@ namespace Olden_Era___Template_Editor.Services
         /// Sidecar path for a template file: a readable prefix (so the folder can be browsed by hand)
         /// plus a hash of the full path, which keeps two same-named templates in different folders apart.
         /// </summary>
-        private static string SidecarFor(string templatePath)
+        private static string SidecarFor(string templatePath, int variantIndex)
         {
             string full = Path.GetFullPath(templatePath);
             byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(full.ToLowerInvariant()));
@@ -40,18 +40,22 @@ namespace Olden_Era___Template_Editor.Services
             foreach (char bad in Path.GetInvalidFileNameChars()) stem = stem.Replace(bad, '_');
             if (stem.Length > 60) stem = stem[..60];
 
-            return Path.Combine(Dir, $"{stem}-{shortHash}.json");
+            string variantSuffix = variantIndex == 0 ? "" : $"-variant-{variantIndex + 1}";
+            return Path.Combine(Dir, $"{stem}-{shortHash}{variantSuffix}.json");
         }
 
         /// <summary>Stores the canvas position of every zone for the given template file.</summary>
         public static void Save(string templatePath, IReadOnlyDictionary<string, Point> positions)
+            => SaveVariant(templatePath, 0, positions);
+
+        internal static void SaveVariant(string templatePath, int variantIndex, IReadOnlyDictionary<string, Point> positions)
         {
             try
             {
                 Directory.CreateDirectory(Dir);
                 var payload = new Dictionary<string, double[]>(StringComparer.Ordinal);
                 foreach (var kv in positions) payload[kv.Key] = [kv.Value.X, kv.Value.Y];
-                AtomicFile.WriteAllText(SidecarFor(templatePath), JsonSerializer.Serialize(payload));
+                AtomicFile.WriteAllText(SidecarFor(templatePath, variantIndex), JsonSerializer.Serialize(payload));
             }
             catch
             {
@@ -65,10 +69,13 @@ namespace Olden_Era___Template_Editor.Services
         /// never looked up.
         /// </summary>
         public static Dictionary<string, Point>? Load(string templatePath)
+            => LoadVariant(templatePath, 0);
+
+        internal static Dictionary<string, Point>? LoadVariant(string templatePath, int variantIndex)
         {
             try
             {
-                string file = SidecarFor(templatePath);
+                string file = SidecarFor(templatePath, variantIndex);
                 if (!File.Exists(file)) return null;
 
                 var payload = JsonSerializer.Deserialize<Dictionary<string, double[]>>(File.ReadAllText(file));

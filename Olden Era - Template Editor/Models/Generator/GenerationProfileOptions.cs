@@ -30,13 +30,15 @@ public sealed class AllianceSettings
 }
 
 /// <summary>Versioned additions. The legacy default preserves historical generator seeds and presets.</summary>
-public sealed class GenerationProfileOptions
+public sealed partial class GenerationProfileOptions
 {
     [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
     public System.Text.Json.Nodes.JsonObject? ImportedNativeConfiguration { get; set; }
     public System.Text.Json.Nodes.JsonObject? ImportedNativeSchema { get; set; }
     public const string LegacyProfile = "aurora-1.11";
-    public const string CurrentProfile = "olden-era-0.81.04";
+    public const string PreviousProfile = "olden-era-0.81.04";
+    public const string CurrentGameVersion = "0.82.10";
+    public const string CurrentProfile = "olden-era-" + CurrentGameVersion;
     public int SchemaVersion { get; set; } = 1;
     public string ProfileId { get; set; } = LegacyProfile;
     public string AlgorithmVersion { get; set; } = "aurora-generator-2";
@@ -72,7 +74,8 @@ public sealed class GenerationProfileOptions
     public string? CustomAI { get; set; }
     public string AuthorDescription { get; set; } = "";
 
-    [JsonIgnore] public bool IsCurrentProfile => ProfileId == CurrentProfile;
+    [JsonIgnore] public bool UsesVersionedRules => UsesVersionedRulesFor(ProfileId);
+    public static bool UsesVersionedRulesFor(string? profileId) => profileId is PreviousProfile or CurrentProfile;
     public static GenerationProfileOptions CurrentDefaults() => new()
     {
         ProfileId = CurrentProfile,

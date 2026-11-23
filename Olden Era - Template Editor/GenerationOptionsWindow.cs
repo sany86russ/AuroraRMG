@@ -17,6 +17,8 @@ public sealed class GenerationOptionsWindow : Window
     private bool _settingPresetSlots;
     private readonly ComboBox _players = new();
     private readonly ComboBox _preset = new();
+    private readonly ComboBox _champion = new();
+    private readonly SkillBanEditor _skillBans;
     private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBox _gamePath = new();
     private readonly List<UIElement> _currentOnlyControls = [];
@@ -26,7 +28,8 @@ public sealed class GenerationOptionsWindow : Window
     public string ResultGameInstallPath => _gamePath.Text.Trim();
     private static LocalizationManager L => LocalizationManager.Instance;
 
-    public GenerationOptionsWindow(GenerationProfileOptions options, int players, string gamePath = "", GameInstallation? source = null, IReadOnlySet<string>? customAiIds = null)
+    public GenerationOptionsWindow(GenerationProfileOptions options, int players, string gamePath = "", GameInstallation? source = null,
+        IReadOnlySet<string>? customAiIds = null, IEnumerable<GameContentEntry>? availableSkills = null)
     {
         _customAiIds = customAiIds;
         ResultOptions = options.Clone();
@@ -51,6 +54,7 @@ public sealed class GenerationOptionsWindow : Window
         Help(map, "S.Patch.ProfileHelp");
         var profile = new ComboBox();
         profile.Items.Add(Item("S.Patch.Legacy", GenerationProfileOptions.LegacyProfile));
+        profile.Items.Add(Item("S.Patch.Previous", GenerationProfileOptions.PreviousProfile));
         profile.Items.Add(Item("S.Patch.Current", GenerationProfileOptions.CurrentProfile));
         profile.SelectedItem = profile.Items.Cast<ComboBoxItem>().FirstOrDefault(x => Equals(x.Tag, options.ProfileId));
         Row(map, "S.Patch.Field.ProfileId", profile);
@@ -66,8 +70,8 @@ public sealed class GenerationOptionsWindow : Window
         Help(map, "S.Patch.AreaHelp"); AddField(map, ResultOptions, nameof(options.UseAreaBudgets)); _currentOnlyControls.Add(map.Children[^1]);
         void RefreshProfileControls()
         {
-            bool current = (profile.SelectedItem as ComboBoxItem)?.Tag as string == GenerationProfileOptions.CurrentProfile;
-            foreach (var control in _currentOnlyControls) control.IsEnabled = current;
+            bool usesVersionedRules = GenerationProfileOptions.UsesVersionedRulesFor((profile.SelectedItem as ComboBoxItem)?.Tag as string);
+            foreach (var control in _currentOnlyControls) control.IsEnabled = usesVersionedRules;
         }
         profile.SelectionChanged += (_, _) => RefreshProfileControls(); RefreshProfileControls();
 
@@ -124,6 +128,22 @@ public sealed class GenerationOptionsWindow : Window
         var rules = Tab(tabs, "S.Patch.Rules"); Help(rules, "S.Patch.CalendarHelp");
         foreach (var name in new[] { "ClassicVictoryEnabled", "ResetCityHoldTimer", "TournamentAnnouncementLeadDays", "UseNativeFinalBattleSchedule", "FinalBattleDay" })
             AddField(rules, ResultOptions, name);
+        _champion.Items.Add(Item("S.Patch08210.StartingHero", ChampionSelection.StartingHero));
+        _champion.Items.Add(Item("S.Patch08210.Spire", ChampionSelection.HellLightSpire));
+        _champion.SelectedItem = _champion.Items.Cast<ComboBoxItem>().FirstOrDefault(item => Equals(item.Tag, options.ChampionSelection));
+        Row(rules, "S.TemplateProperties.Field.championSelectRule", _champion);
+        Help(rules, "S.Patch08210.ChampionHelp");
+        _skillBans = new SkillBanEditor(options.BannedSkills, availableSkills);
+        Row(rules, "S.Patch08210.SkillBans", _skillBans);
+        void RefreshPatchRuleControls() => _champion.IsEnabled = _skillBans.IsEnabled =
+            (profile.SelectedItem as ComboBoxItem)?.Tag as string == GenerationProfileOptions.CurrentProfile;
+        profile.SelectionChanged += (_, _) => RefreshPatchRuleControls();
+        RefreshPatchRuleControls();
+        _commit.Add(() =>
+        {
+            if (_champion.SelectedItem is ComboBoxItem { Tag: ChampionSelection selected }) ResultOptions.ChampionSelection = selected;
+            if (_skillBans.WasEdited) ResultOptions.BannedSkills = _skillBans.ReadIds() is { Count: > 0 } ids ? ids : null;
+        });
         var dates = new TextBox { Text = string.Join(", ", options.TournamentBattleDays) };
         Row(rules, "S.Patch.BattleDays", dates);
         _commit.Add(() =>
@@ -141,7 +161,7 @@ public sealed class GenerationOptionsWindow : Window
         var environment = Tab(tabs, "S.Patch.Environment");
         foreach (var name in new[] { "EnableRivers", "RiverTributarySpacing", "EnableWeeklyUnitIncrement", "WeekOneOnlyModificatorGrowth", "InitialUnitIncrement", "DisableFactionLaws", "DisableMagicGuild", "DisableMagicCustomLearning", "PortalFromEnabled", "PortalToEnabled", "BorderGuardReaction", "CustomAI" })
             AddField(environment, ResultOptions, name);
-        Help(environment, "S.Patch.PortalsHelp");
+        Help(environment, "S.Patch08210.PortalEnds");
         Help(environment, "S.Patch.AiHelp");
         var install = Tab(tabs, "S.Patch.Source");
         _gamePath.Text = gamePath; Row(install, "S.Patch.GamePath", _gamePath);
@@ -180,6 +200,14 @@ public sealed class GenerationOptionsWindow : Window
 
     internal void DebugSetAllianceSlot(int player, int alliance)
         => _teamSlots[player - 1].Text = alliance.ToString(CultureInfo.InvariantCulture);
+
+    internal void DebugSelectPatchRules(ChampionSelection champion, string skillId)
+    {
+        if (!_champion.IsEnabled || !_skillBans.IsEnabled)
+            throw new InvalidOperationException("The current profile does not enable the patch rule editors.");
+        _champion.SelectedItem = _champion.Items.OfType<ComboBoxItem>().Single(item => Equals(item.Tag, champion));
+        _skillBans.DebugAddCatalogSkill(skillId);
+    }
 
     private void Apply()
     {

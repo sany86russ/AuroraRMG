@@ -45,12 +45,13 @@ public static class TemplateCardBuilder
             blocks.Add(new() { Type = "text", Parameters = [LocalizationManager.T("S.Patch.Card.Tournament", string.Join(", ", calendar.BattleDays), string.Join(", ", announcements),
                 LocalizationManager.T(template.GameRules.WinConditions.TournamentSaveArmy == true ? "S.Patch.Yes" : "S.Patch.No"))] });
         }
+        string nativeScheduleProfile = profile.UsesVersionedRules ? profile.ProfileId : GenerationProfileOptions.PreviousProfile;
         if (template.GameRules?.WinConditions?.GladiatorArena == true)
         {
             if (profile.UseNativeFinalBattleSchedule)
                 blocks.Add(new() { Type = "text", Parameters = [LocalizationManager.T("S.Patch.Card.FinalDay", profile.FinalBattleDay ?? settings.GladiatorArenaRules.DaysDelayStart)] });
             blocks.Add(new() { Type = "text", Parameters = [LocalizationManager.T("S.Patch.Card.Final", template.GameRules.WinConditions.GladiatorArenaDaysDelayStart ?? 0,
-                template.GameRules.WinConditions.GladiatorArenaCountDay ?? 0, profile.UseNativeFinalBattleSchedule ? GenerationProfileOptions.CurrentProfile : GenerationProfileOptions.LegacyProfile)] });
+                template.GameRules.WinConditions.GladiatorArenaCountDay ?? 0, profile.UseNativeFinalBattleSchedule ? nativeScheduleProfile : GenerationProfileOptions.LegacyProfile)] });
         }
         if (!string.IsNullOrWhiteSpace(profile.AuthorDescription))
         { blocks.Add(new() { Type = "spacer" }); blocks.Add(new() { Type = "text", Parameters = [profile.AuthorDescription] }); }

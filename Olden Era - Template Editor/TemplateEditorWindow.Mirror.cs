@@ -310,7 +310,7 @@ namespace Olden_Era___Template_Editor
                     GuardValue = 20000,
                     GuardWeeklyIncrement = 0.15,
                 };
-                Connections.Add(link);
+                (Variant.Connections ??= []).Add(link);
                 MirrorConnection(link);
             }
         }
@@ -338,7 +338,7 @@ namespace Olden_Era___Template_Editor
             // Roads anchor on this zone's own connections, which the twin does not have yet.
             twin.Roads = twin.Roads is { Count: > 0 } ? [] : twin.Roads;
 
-            Zones.Add(twin);
+            (Variant.Zones ??= []).Add(twin);
             _positions[twin.Name] = MirrorPoint(sourcePos);
             _mirrorMap[source.Name] = twin.Name;
             _mirrorMap[twin.Name] = source.Name;
@@ -448,7 +448,7 @@ namespace Olden_Era___Template_Editor
             twin.From = from;
             twin.To = to;
             twin.Name = MakeUniqueConnectionName($"{StripMirrorSuffix(source.Name ?? "Direct")}-M");
-            Connections.Add(twin);
+            (Variant.Connections ??= []).Add(twin);
             if (!deferReferences)
             {
                 var warnings = ApplyMirrorConnectionReferences([(source, twin)]);

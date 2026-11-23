@@ -8,6 +8,8 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Olden_Era___Template_Editor.Services;
 using Olden_Era___Template_Editor.Services.Analysis;
+using Olden_Era___Template_Editor.Services.GameData;
+using Olden_Era___Template_Editor.Services.Generation;
 using Olden_Era___Template_Editor.Services.Localization;
 using OldenEraTemplateEditor.Models;
 using Orientation = System.Windows.Controls.Orientation;
@@ -23,13 +25,14 @@ public sealed class TemplatePropertiesWindow : Window
     private readonly List<AllianceRow> _allianceRows = [];
     private readonly StackPanel _alliancePanel = new();
     private readonly CheckBox _useAlliances = new();
+    private readonly CheckBox _addChampionSpires = new() { Margin = new Thickness(0, 6, 0, 10) };
     private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.OrangeRed };
     public RmgTemplate? ResultTemplate { get; private set; }
     public IReadOnlyList<TemplateValidationIssue> ValidationIssues { get; private set; } = [];
 
-    public TemplatePropertiesWindow(RmgTemplate source)
+    public TemplatePropertiesWindow(RmgTemplate source, GameCatalog? catalog = null)
     {
-        _draft = new(source); _initial = _draft.Snapshot();
+        _draft = new(source, catalog?.GetReferenceCatalog()); _initial = _draft.Snapshot();
         Width = 820; Height = 750; MinWidth = 600; MinHeight = 420; ShowInTaskbar = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         SetResourceReference(TitleProperty, "S.TemplateProperties.Title");
@@ -87,6 +90,15 @@ public sealed class TemplatePropertiesWindow : Window
         }
         var rules = Tab(tabs, "S.TemplateProperties.Rules"); Help(rules, "S.TemplateProperties.NullHelp");
         AddFields<GameRules>(rules, ["gameRules"]); AddRaw(rules, ["gameRules"], "bonuses", "S.TemplateProperties.Bonuses");
+        var skills = new SkillBanEditor(source.GlobalBans?.Skills, catalog?.Search(kind: GameContentKind.Skill));
+        Row(rules, "S.Patch08210.SkillBans", skills);
+        _commit.Add(candidate =>
+        {
+            if (!skills.WasEdited) return;
+            List<string> ids = skills.ReadIds();
+            Set(candidate, ["globalBans"], "skills", ids.Count == 0 ? null : JsonSerializer.SerializeToNode(ids));
+            if (candidate["globalBans"] is JsonObject { Count: 0 }) candidate.Remove("globalBans");
+        });
         var victory = Tab(tabs, "S.TemplateProperties.Victory"); Help(victory, "S.TemplateProperties.CalendarHelp");
         AddFields<WinConditions>(victory, ["gameRules", "winConditions"]);
         AddRaw(victory, ["gameRules", "winConditions"], "tournamentAnnounceDays", "S.TemplateProperties.Announcements");
@@ -114,6 +126,27 @@ public sealed class TemplatePropertiesWindow : Window
             if (type != typeof(string) && type != typeof(bool) && type != typeof(int) && type != typeof(double)) continue;
             var original = Resolve(_initial, path)?[name];
             FrameworkElement editor;
+            if (name == "championSelectRule")
+            {
+                const string defaultRule = "StartHero";
+                string? currentRule = original?.GetValue<string>();
+                var choice = new ComboBox { SelectedValuePath = nameof(FrameworkElement.Tag) };
+                choice.Items.Add(ChampionChoice("S.Patch.Default", null));
+                choice.Items.Add(ChampionChoice("S.Patch08210.StartingHero", defaultRule));
+                choice.Items.Add(ChampionChoice("S.Patch08210.Spire", ChampionSpirePlacement.SelectedRule));
+                if (currentRule is not null && !KnownValues.ChampionSelectRules.Contains(currentRule, StringComparer.Ordinal))
+                    choice.Items.Add(new ComboBoxItem { Content = currentRule, Tag = currentRule });
+                choice.SelectedItem = choice.Items.Cast<ComboBoxItem>().First(item => Equals(item.Tag, currentRule));
+                choice.SelectionChanged += (_, _) => RefreshSpireOption();
+                _addChampionSpires.SetResourceReference(ContentControl.ContentProperty, "S.Patch08210.AddSpires");
+                RefreshSpireOption();
+                Row(panel, "S.TemplateProperties.Field.championSelectRule", choice);
+                panel.Children.Add(_addChampionSpires);
+                _commit.Add(candidate => Set(candidate, path, name, JsonValue.Create(choice.SelectedValue as string)));
+                continue;
+
+                void RefreshSpireOption() => _addChampionSpires.IsEnabled = Equals(choice.SelectedValue, ChampionSpirePlacement.SelectedRule);
+            }
             if (type == typeof(bool))
             {
                 var box = new CheckBox { IsThreeState = true, IsChecked = original?.GetValue<bool>(), VerticalAlignment = VerticalAlignment.Center };
@@ -185,11 +218,25 @@ public sealed class TemplatePropertiesWindow : Window
         try
         {
             var candidate = _draft.Snapshot(); foreach (var commit in _commit) commit(candidate);
+            if (_addChampionSpires.IsEnabled && _addChampionSpires.IsChecked == true)
+            {
+                var withSpires = candidate.Deserialize<RmgTemplate>(JsonExport.Options)
+                    ?? throw new JsonException("Template must be an object.");
+                ChampionSpirePlacement.AddToStarts(withSpires);
+                candidate = JsonSerializer.SerializeToNode(withSpires, JsonExport.Options)!.AsObject();
+            }
             ResultTemplate = _draft.Commit(candidate, out var findings); ValidationIssues = findings;
             DialogResult = true;
         }
         catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException or ArgumentException or OverflowException)
         { _error.Text = LocalizationManager.T("S.TemplateProperties.Error", ex.Message); }
+    }
+
+    private static ComboBoxItem ChampionChoice(string key, string? value)
+    {
+        var choice = new ComboBoxItem { Tag = value };
+        choice.SetResourceReference(ContentControl.ContentProperty, key);
+        return choice;
     }
 
     private void Set(JsonObject candidate, string[] path, string property, JsonNode? value)

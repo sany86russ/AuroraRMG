@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using Olden_Era___Template_Editor.Services.Generation;
 using OldenEraTemplateEditor.Models;
 
 namespace Olden_Era___Template_Editor.Services.Analysis;
@@ -22,6 +23,8 @@ public sealed class TemplateReferenceCatalog
     public IReadOnlySet<string>? CountLimits { get; init; }
     public IReadOnlySet<string>? Objects { get; init; }
     public IReadOnlySet<string>? CustomAI { get; init; }
+    public IReadOnlySet<string>? Skills { get; init; }
+    public bool SkillCompleteness { get; init; }
     /// <summary>Exact configured reward indices for known objects with variant metadata; absent or empty entries impose no additional restriction.</summary>
     public IReadOnlyDictionary<string, IReadOnlySet<int>>? ObjectRewardVariantIndices { get; init; }
     public bool IsComplete { get; init; }
@@ -73,6 +76,7 @@ public static class TemplateCompatibilityValidator
             Known(template.GameMode, KnownValues.GameModes, "gameMode", verified: true);
             ReadDefinitions();
             ValidateRules();
+            ValidateSkillBans();
             if (template.Variants is not { Count: > 0 })
                 Error("variants.empty", "variants", "At least one map variant is required.");
             else
@@ -82,6 +86,21 @@ public static class TemplateCompatibilityValidator
             ValidateTeams();
             ValidateDescriptions();
             return issues;
+        }
+
+        private void ValidateSkillBans()
+        {
+            if (template.GlobalBans?.Skills is not { Count: > 0 } skills) return;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < skills.Count; i++)
+            {
+                string path = $"globalBans.skills[{i}]";
+                var skill = skills[i];
+                if (string.IsNullOrWhiteSpace(skill)) Error("reference.empty", path, "A skill SID cannot be empty.");
+                else if (!seen.Add(skill)) Error("reference.duplicate", path, $"Repeated skill SID '{skill}'.");
+                else if (catalog.SkillCompleteness && catalog.Skills?.Contains(skill) != true)
+                    Error("skill.unknown", path, $"Unknown skill SID '{skill}' in {catalog.Source ?? "the installed catalog"}.");
+            }
         }
 
         private void ReadDefinitions()
@@ -133,12 +152,24 @@ public static class TemplateCompatibilityValidator
                 Nonnegative(limit.PlayerMin, path + ".playerMin");
                 Nonnegative(limit.PlayerMax, path + ".playerMax");
                 Ordered(limit.PlayerMin, limit.PlayerMax, path);
-                foreach (var entry in limit.Limits ?? [])
-                    if (entry is not null)
+                for (int j = 0; j < (limit.Limits?.Count ?? 0); j++)
+                {
+                    string entryPath = $"{path}.limits[{j}]";
+                    if (limit.Limits![j] is not { } entry)
                     {
-                        ObjectSid(entry.Sid, path + ".limits.sid");
-                        Nonnegative(entry.MaxCount, path + ".limits.maxCount");
+                        Error("node.null", entryPath, "A count limit cannot be null.");
+                        continue;
                     }
+                    ValidateCountLimitTarget(entry.Sid, entry.Variant, entry.IncludeLists, entryPath, entry.Content is { Count: > 0 });
+                    Nonnegative(entry.MaxCount, entryPath + ".maxCount");
+                    for (int k = 0; k < (entry.Content?.Count ?? 0); k++)
+                    {
+                        string targetPath = $"{entryPath}.content[{k}]";
+                        if (entry.Content![k] is { } target)
+                            ValidateCountLimitTarget(target.Sid, target.Variant, target.IncludeLists, targetPath);
+                        else Error("node.null", targetPath, "An inline count-limit target cannot be null.");
+                    }
+                }
             }
             foreach (var value in template.ValueOverrides ?? [])
                 if (value is not null)
@@ -147,6 +178,16 @@ public static class TemplateCompatibilityValidator
                     Nonnegative(value.GuardValue, "valueOverrides.guardValue");
                     if (value.Variant is < -1) Error("number.variant", "valueOverrides.variant", "An override variant must be -1 (all variants) or nonnegative.");
                 }
+        }
+
+        private void ValidateCountLimitTarget(string? sid, int? variant, List<string>? includeLists, string path, bool hasInlineContent = false)
+        {
+            if (sid is { Length: > 0 }) ObjectSid(sid, path + ".sid");
+            else if (includeLists is not { Count: > 0 } && !hasInlineContent)
+                Error("countLimit.target", path, "A count limit needs an object SID, an included list or inline content.");
+            ReferenceList(includeLists, localLists, catalog.Lists, path + ".includeLists");
+            if (variant is < -1) Error("number.variant", path + ".variant", "A content variant must be -1 (all variants) or nonnegative.");
+            ConfiguredRewardVariant(sid, variant, path + ".variant");
         }
 
         private void AddNames<T>(List<T>? entries, Func<T, string> name, HashSet<string> target, string path) where T : class
@@ -344,6 +385,9 @@ public static class TemplateCompatibilityValidator
                 Error("win.cityHoldTarget", path, "City hold needs a City or Spawn marked holdCityWinCon in every variant.");
             if (win?.GladiatorArena == true && !objects.Any(o => o.Type == "GladiatorArena") && !connections.Any(c => c.ConnectionType == "GladiatorArena"))
                 Error("win.arenaTarget", path, "Final battle needs a GladiatorArena object or connection in every variant.");
+            if ((win?.GladiatorArena == true || win?.Tournament == true)
+                && win.ChampionSelectRule == ChampionSpirePlacement.SelectedRule && !ChampionSpirePlacement.HasLinkedSpire(template, variant))
+                Error("win.championSpire", path + ".zones", "Champion selection needs a linked Hell Light Spire in every variant.");
             if (win?.LostStartCity == true && !objects.Any(o => o.IsKeyObject == true && IsCity(o)))
                 Warn("win.capitalUnverified", path, "Capital defeat is enabled without a key city; legacy start-city semantics need game verification.");
         }
@@ -401,7 +445,9 @@ public static class TemplateCompatibilityValidator
                 if (zone.MainObjects![i] is { } obj)
                 {
                     string child = $"{path}.mainObjects[{i}]";
-                    Known(obj.Type, KnownValues.MainObjectTypes, child + ".type", required: true, verified: true);
+                    if (obj.Type is null)
+                        Warn("mainObject.defaultType", child + ".type", "The template leaves the main object type unspecified. Verify the game's default in a test match.");
+                    else Known(obj.Type, KnownValues.MainObjectTypes, child + ".type", required: true, verified: true);
                     Known(obj.Placement, KnownValues.MainObjectPlacements, child + ".placement", verified: true);
                     Fraction(obj.GuardChance, child + ".guardChance");
                     Fraction(obj.GuardRandomization, child + ".guardRandomization");
@@ -414,8 +460,31 @@ public static class TemplateCompatibilityValidator
                         Error("win.holdNonCity", child + ".holdCityWinCon", "A City or Spawn is required for a city-hold objective.");
                     if (obj.Placement == "NearZone") RequiredTarget(obj.PlacementArgs, names, child + ".placementArgs", "zone");
                     if (obj.Placement == "Connection") RequiredTarget(obj.PlacementArgs, connectionNames, child + ".placementArgs", "connection");
+                    ValidateUniformPlacementAnchors(obj.UniformPlacementAnchors, names, child + ".uniformPlacementAnchors");
                 }
                 else Error("node.null", $"{path}.mainObjects[{i}]", "A main object cannot be null.");
+        }
+
+        private void ValidateUniformPlacementAnchors(List<UniformPlacementAnchor>? anchors, HashSet<string> zones, string path)
+        {
+            if (anchors is null) return;
+            for (int i = 0; i < anchors.Count; i++)
+            {
+                string anchorPath = $"{path}[{i}]";
+                if (anchors[i] is not { } anchor)
+                {
+                    Error("node.null", anchorPath, "A uniform placement anchor cannot be null.");
+                    continue;
+                }
+                if (anchor.Type != "Zone")
+                {
+                    Warn("anchor.typeUnverified", anchorPath + ".type", $"Anchor type '{anchor.Type}' is preserved and needs game verification.");
+                    continue;
+                }
+                if (string.IsNullOrEmpty(anchor.ZoneName) || !zones.Contains(anchor.ZoneName))
+                    Error("reference.zone", anchorPath + ".zoneName", $"Missing or unknown anchor zone '{anchor.ZoneName}'.");
+                Nonnegative(anchor.Weight, anchorPath + ".weight");
+            }
         }
 
         private void ValidateConnection(Connection connection, string path, HashSet<string> names)
@@ -515,8 +584,9 @@ public static class TemplateCompatibilityValidator
             {
                 Nonnegative(win.GladiatorArenaDaysDelayStart, "gameRules.winConditions.gladiatorArenaDaysDelayStart");
                 Positive(win.GladiatorArenaCountDay, "gameRules.winConditions.gladiatorArenaCountDay", required: true);
-                Known(win.ChampionSelectRule, KnownValues.ChampionSelectRules, "gameRules.winConditions.championSelectRule");
             }
+            if (win.GladiatorArena == true || win.Tournament == true)
+                Known(win.ChampionSelectRule, KnownValues.ChampionSelectRules, "gameRules.winConditions.championSelectRule");
             if (win.Tournament == true) ValidateTournament(win);
             if (win.Tournament == true && win.GladiatorArena == true)
                 Warn("win.multipleBattleRules", "gameRules.winConditions", "Tournament and final battle are both enabled; combined scheduling requires game validation.");

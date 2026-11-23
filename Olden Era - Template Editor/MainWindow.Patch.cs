@@ -81,12 +81,12 @@ public partial class MainWindow
         MarkDirty();
     }
 
-    private bool ValidateSimpleSelections()
+    private bool ValidateSimpleSelections(bool validateSeed = true)
     {
         if (new[] { CmbSimpleType, CmbSimpleScale, CmbSimpleLength, CmbSimpleChaos, CmbSimpleGuards, CmbSimpleCastleFaction, CmbSimpleVictory }.Any(x => x.SelectedIndex < 0))
         { MessageBox.Show(L.Get("S.Patch.SelectOptions"), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return false; }
         var text = TxtSimpleSeed.Text.Trim();
-        if (!uint.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _) && !int.TryParse(text, out _))
+        if (validateSeed && !uint.TryParse(text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _) && !int.TryParse(text, out _))
         { MessageBox.Show(L.Get("S.Patch.InvalidSeed"), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return false; }
         string victory = KnownValues.VictoryConditionIds[CmbSimpleVictory.SelectedIndex];
         if (victory is "win_condition_4" or "win_condition_6" && (int)SldSimplePlayers.Value != 2)
@@ -99,10 +99,10 @@ public partial class MainWindow
 
     private async Task<bool> CanExportGeneratedTemplate()
     {
-        if (_generatedTemplate is null || _templateOutdated) return false;
+        if (CurrentGeneratedTemplate is null) return false;
         _patchCatalog = await CurrentPatchCatalog();
-        if (_generatedTemplate is null || _templateOutdated) return false;
-        var issues = TemplateCompatibilityValidator.Validate(_generatedTemplate, TemplateValidationMode.StrictExport, _patchCatalog.GetReferenceCatalog());
+        if (CurrentGeneratedTemplate is not { } template) return false;
+        var issues = TemplateCompatibilityValidator.Validate(template, TemplateValidationMode.StrictExport, _patchCatalog.GetReferenceCatalog());
         var errors = issues.Where(x => x.Severity == TemplateIssueSeverity.Error).ToArray();
         if (errors.Length == 0) return true;
         MessageBox.Show(L.Get("S.Patch.ValidationFailed", string.Join("\n", errors.Select(x => $"{x.Path}: {x.Message}"))),
@@ -132,7 +132,8 @@ public partial class MainWindow
         }
         if (SimpleView.Visibility == Visibility.Visible && CmbSimpleType.SelectedIndex == 3) projected.Alliances.Enabled = true;
         var window = new GenerationOptionsWindow(projected, SimpleView.Visibility == Visibility.Visible ? (int)SldSimplePlayers.Value : (int)SldPlayers.Value,
-            AppSettings.Current.GameInstallPath, source, catalog.GetReferenceCatalog().CustomAI) { Owner = this };
+            AppSettings.Current.GameInstallPath, source, catalog.GetReferenceCatalog().CustomAI,
+            availableSkills: catalog.Search(kind: GameContentKind.Skill).ToArray()) { Owner = this };
         if (window.ShowDialog() != true) return;
         _profileOptions = window.ResultOptions.Clone();
         AppSettings.Current.GameInstallPath = window.ResultGameInstallPath;
@@ -172,19 +173,20 @@ public partial class MainWindow
 
     private async Task ExportTemplatePackage()
     {
+        if (CurrentGeneratedTemplate is null) { MessageBox.Show(this, L.Get("S.Patch.NeedsGenerated"), Title); return; }
         if (!await CanExportGeneratedTemplate()) return;
-        var dialog = new SaveFileDialog { Filter = "ZIP (*.zip)|*.zip", FileName = _generatedTemplate!.Name + ".zip" };
+        var dialog = new SaveFileDialog { Filter = "ZIP (*.zip)|*.zip", FileName = CurrentGeneratedTemplate!.Name + ".zip" };
         if (dialog.ShowDialog(this) != true) return;
         var catalog = await CurrentPatchCatalog();
-        if (_generatedTemplate is null || _templateOutdated || _generatedSettingsSnapshot is null) { MessageBox.Show(L.Get("S.Patch.NeedsGenerated"), Title); return; }
-        var templateSnapshot = Services.TemplateRefactor.CreateEditingCopy(_generatedTemplate);
+        if (CurrentGeneratedTemplate is not { } template || _generatedSettingsSnapshot is null) { MessageBox.Show(L.Get("S.Patch.NeedsGenerated"), Title); return; }
+        var templateSnapshot = Services.TemplateRefactor.CreateEditingCopy(template);
         var inputSnapshot = Services.SettingsSnapshotMapper.Clone(_generatedSettingsSnapshot);
         byte[]? preview = null;
         bool includeSettings = MessageBox.Show(this, L.Get("S.Patch.OptionalSettings"), Title, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
         if (MessageBox.Show(this, L.Get("S.Patch.OptionalPreview"), Title, MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
         {
             var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
-            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(Services.TemplatePreviewPngWriter.Render(_generatedTemplate!, _generatedTopology)));
+            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(Services.TemplatePreviewPngWriter.Render(templateSnapshot, _generatedTopology)));
             using var stream = new MemoryStream(); encoder.Save(stream); preview = stream.ToArray();
         }
         var request = new TemplatePackageRequest(templateSnapshot, Services.SettingsSnapshotMapper.FromGeneratorSettings(inputSnapshot))
@@ -228,15 +230,21 @@ public partial class MainWindow
             .Select(s => int.Parse(s, CultureInfo.InvariantCulture)).ToArray();
         var folder = new OpenFolderDialog { Title = L.Get("S.Patch.Batch") };
         if (folder.ShowDialog(this) != true) return;
-        var configurations = source switch
+        QuickGenerateOptions? quickOptions = null;
+        if (source == "current" && SimpleView.Visibility == Visibility.Visible)
+        {
+            if (!ValidateSimpleSelections(validateSeed: false)) return;
+            quickOptions = BuildQuickOptions(seeds.FirstOrDefault());
+        }
+        GeneratorSettings[] configurations = source switch
         {
             "presets" => PatchPresets.Current.Select(p => Presets.ToGeneratorSettings(p.Settings)).ToArray(),
             "teams" => PatchPresets.Cooperative.Select(p => Presets.ToGeneratorSettings(p.Settings)).ToArray(),
-            _ => [SimpleView.Visibility == Visibility.Visible ? Services.Generation.RandomTemplateBuilder.Build(BuildQuickOptions()) : BuildSettings()]
+            _ => quickOptions is null ? [BuildSettings()] : []
         };
-        int total = checked(seeds.Length * configurations.Length);
+        int total = checked(seeds.Length * (quickOptions is null ? configurations.Length : 1));
         if (total > TemplateBatchService.MaximumCases) throw new ArgumentException(L.Get("S.Patch.BatchLimit", TemplateBatchService.MaximumCases));
-        var catalog = await CurrentPatchCatalog();
+        var catalog = (await CurrentPatchCatalog()).GetReferenceCatalog();
         using var cancellation = new CancellationTokenSource();
         var progressWindow = new Window { Owner = this, Title = L.Get("S.Patch.Batch"), Width = 520, Height = 200,
             WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
@@ -253,12 +261,26 @@ public partial class MainWindow
         bool cancelled = false;
         try
         {
+            if (quickOptions is not null)
+            {
+                var progress = new Progress<TemplateBatchProgress>(p =>
+                {
+                    bar.Value = p.Completed;
+                    caption.Text = L.Get("S.Patch.BatchProgress", p.Completed, total, p.Case.Seed);
+                });
+                var part = await TemplateBatchService.GenerateQuickAsync(new(quickOptions, seeds, folder.FolderName)
+                {
+                    ValidationCatalog = catalog
+                }, cancellation.Token, progress);
+                cases.AddRange(part.Cases);
+                cancelled = part.Cancelled;
+            }
             foreach (var settings in configurations)
             {
                 if (cancellation.IsCancellationRequested) { cancelled = true; break; }
                 int completedBefore = cases.Count;
                 var progress = new Progress<TemplateBatchProgress>(p => { bar.Value = completedBefore + p.Completed; caption.Text = L.Get("S.Patch.BatchProgress", completedBefore + p.Completed, total, p.Case.Seed); });
-                var part = await TemplateBatchService.GenerateAsync(new(settings, seeds, folder.FolderName) { ValidationCatalog = catalog.GetReferenceCatalog() }, cancellation.Token, progress);
+                var part = await TemplateBatchService.GenerateAsync(new(settings, seeds, folder.FolderName) { ValidationCatalog = catalog }, cancellation.Token, progress);
                 cases.AddRange(part.Cases); if (part.Cancelled) { cancelled = true; break; }
             }
         }
@@ -278,16 +300,17 @@ public partial class MainWindow
         var imported = Services.NativeSchema.NativeConfigurationImporter.Import(configuration, BuildSettings());
         imported.Settings.ProfileOptions.ImportedNativeConfiguration = imported.RawConfiguration;
         imported.Settings.ProfileOptions.ImportedNativeSchema = imported.RawSchema;
-        ApplySettings(Services.SettingsSnapshotMapper.FromGeneratorSettings(imported.Settings)); SetMode(advanced: true); MarkDirty();
+        if (!ResolveUnsavedSettings()) return Task.CompletedTask;
+        ReplaceSettings(Services.SettingsSnapshotMapper.FromGeneratorSettings(imported.Settings), path: null, dirty: true);
         MessageBox.Show(this, L.Get("S.Patch.ImportWarning", string.Join("\n", imported.Warnings.Select(x => x.Message))), Title, MessageBoxButton.OK, MessageBoxImage.Information);
         return Task.CompletedTask;
     }
 
     private Task ShowDetailedBalance()
     {
-        if (_generatedTemplate is null || _templateOutdated) { MessageBox.Show(L.Get("S.Patch.NeedsGenerated"), Title); return Task.CompletedTask; }
-        var report = TemplateBalanceReport.Analyze(_generatedTemplate);
-        var text = FormatAnalysis(_generatedTemplate) + "\n\n" + string.Join("\n", report.Players.Select(p =>
+        if (CurrentGeneratedTemplate is not { } template) { MessageBox.Show(L.Get("S.Patch.NeedsGenerated"), Title); return Task.CompletedTask; }
+        var report = TemplateBalanceReport.Analyze(template);
+        var text = FormatAnalysis(template) + "\n\n" + string.Join("\n", report.Players.Select(p =>
             L.Get("S.Patch.BalancePlayer", p.SpawnId, p.AllianceKey, p.StartingCities, p.StartingResourceValue, p.StartingAreaCoefficient, p.NearestOpponentHops, p.ClosestCastleGuardBudget?.ToString() ?? "—")
             + "\n" + L.Get("S.Patch.BalanceTreasure", p.TreasureHops?.ToString() ?? "—", p.ClosestTreasureGuardBudget?.ToString() ?? "—")))
             + "\n\n" + string.Join("\n", report.Teams.Select(t => L.Get("S.Patch.BalanceTeam", t.AllianceKey, string.Join(", ", t.Players), t.StartingCities, t.StartingResources, t.StartingAreaCoefficient, t.NearestOpponentHops)))

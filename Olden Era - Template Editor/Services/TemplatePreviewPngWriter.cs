@@ -97,8 +97,10 @@ namespace Olden_Era___Template_Editor.Services
         /// <paramref name="template"/>, keyed by zone name.
         /// </summary>
         public static Dictionary<string, Point> ComputeLayout(RmgTemplate template, MapTopology topology = MapTopology.Default)
+            => ComputeVariantLayout(template.Variants?.FirstOrDefault(), topology);
+
+        internal static Dictionary<string, Point> ComputeVariantLayout(Variant? variant, MapTopology topology)
         {
-            Variant? variant = template.Variants?.FirstOrDefault();
             List<Zone> zones = variant?.Zones ?? [];
             if (zones.Count == 0) return [];
             var orderedZones = OrderZones(zones, variant?.Orientation?.ZeroAngleZone);

@@ -27,7 +27,10 @@ namespace Olden_Era___Template_Editor
 
         // Currently open settings file path (null = unsaved / untitled)
         private string? _currentSettingsPath = null;
+        private bool _savedSettingsFromSimple;
         private bool _isDirty = false;
+        private bool _applyingSettings;
+        private bool _settingsCloseApproved;
 
         // Ban lists
         private readonly ObservableCollection<BanEntry>   _bannedItems  = [];
@@ -97,6 +100,7 @@ namespace Olden_Era___Template_Editor
             // Launch quietly when started with --minimized (e.g. from a shortcut while gaming):
             // start in the taskbar without grabbing focus, so it never pops over a fullscreen game.
             var cmdLine = Environment.GetCommandLineArgs();
+            _settingsCloseApproved = cmdLine.Any(arg => arg.StartsWith("--shoot", StringComparison.OrdinalIgnoreCase) || arg == "--make-patch-kit");
             bool startMinimized = cmdLine.Any(a =>
                 a.Equals("--minimized", StringComparison.OrdinalIgnoreCase) ||
                 a.Equals("-m", StringComparison.OrdinalIgnoreCase) ||
@@ -258,6 +262,7 @@ namespace Olden_Era___Template_Editor
             };
 
             TxtTemplateName.TextChanged += (_, _) => { MarkDirtyNameOnly(); Validate(); };
+            _isDirty = false;
             UpdateTitle();
             TxtWindowTitle.Text = Title;
 
@@ -518,7 +523,7 @@ namespace Olden_Era___Template_Editor
 
         private void MarkDirty()
         {
-            if (!IsInitialized || _refreshingLists) return;
+            if (!IsInitialized || _refreshingLists || _applyingSettings) return;
             _isDirty = true;
             if (_generatedTemplate is not null)
                 _templateOutdated = true;
@@ -528,13 +533,10 @@ namespace Olden_Era___Template_Editor
 
         private void MarkDirtyNameOnly()
         {
-            if (!IsInitialized) return;
+            if (!IsInitialized || _applyingSettings) return;
             _isDirty = true;
-            if (_generatedTemplate is not null)
-                _generatedTemplate.Name = TxtTemplateName.Text.Trim();
             string name = TxtTemplateName.Text.Trim();
-            if (_generatedSettingsSnapshot is not null) _generatedSettingsSnapshot.TemplateName = name;
-            if (_lastQuickSettings is not null) _lastQuickSettings.TemplateName = name;
+            if (_generatedForAdvancedSettings && !_templateOutdated) RenameGeneratedTemplate(name);
             if (_loadedGeneratorSnapshot is not null) _loadedGeneratorSnapshot.TemplateName = name;
             if (_loadedSnapshotUiBaseline is not null) _loadedSnapshotUiBaseline.TemplateName = name;
             UpdateTitle();
@@ -543,19 +545,24 @@ namespace Olden_Era___Template_Editor
         private void UpdateOutdatedWarning()
         {
             if (TxtOutdatedWarning == null) return;
-            bool outdated = _templateOutdated && _generatedTemplate is not null;
-            TxtOutdatedWarning.Visibility = outdated ? Visibility.Visible : Visibility.Hidden;
+            bool hasAdvancedResult = _generatedForAdvancedSettings && !_templateOutdated;
+            bool hasSimpleResult = _lastQuickSettings is not null && !_templateOutdated;
+            TxtOutdatedWarning.Visibility = _generatedTemplate is not null && !hasAdvancedResult ? Visibility.Visible : Visibility.Hidden;
+            TxtOutdatedWarning.SetResourceReference(TextBlock.TextProperty,
+                _templateOutdated ? "S.M.113" : "S.Settings.PreviewFromSimple");
             if (BtnSaveGenerated != null)
-                BtnSaveGenerated.IsEnabled = _generatedTemplate is not null && !outdated;
-            if (BtnSimpleSave != null) BtnSimpleSave.IsEnabled = _generatedTemplate is not null && !outdated;
-            if (BtnSimpleSaveToGame != null) BtnSimpleSaveToGame.IsEnabled = _generatedTemplate is not null && !outdated;
-            if (BtnSimpleOpenAdvanced != null) BtnSimpleOpenAdvanced.IsEnabled = _lastQuickSettings is not null && !outdated;
+                BtnSaveGenerated.IsEnabled = hasAdvancedResult;
+            if (BtnSimpleSave != null) BtnSimpleSave.IsEnabled = hasSimpleResult;
+            if (BtnSimpleSaveToGame != null) BtnSimpleSaveToGame.IsEnabled = hasSimpleResult;
+            if (BtnSimpleOpenAdvanced != null) BtnSimpleOpenAdvanced.IsEnabled = hasSimpleResult;
+            if (_templateOutdated && _lastQuickSettings is not null && TxtSimpleSummary != null)
+                TxtSimpleSummary.Text = L.Get("S.M.113");
         }
 
         private void UpdateTitle()
         {
-            string file = _currentSettingsPath is not null
-                ? System.IO.Path.GetFileName(_currentSettingsPath)
+            string file = ReusableSettingsPath is { } path
+                ? System.IO.Path.GetFileName(path)
                 : L.Get("S.CB.Untitled");
             string fileLabel = _isDirty ? $"{file}*" : file;
             // Taskbar / OS window title keeps the full brand + version + file.
@@ -602,6 +609,12 @@ namespace Olden_Era___Template_Editor
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) =>
             Close();
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            if (!_settingsCloseApproved && !ResolveUnsavedSettings()) e.Cancel = true;
+            base.OnClosing(e);
+        }
 
         // Keep value labels in sync with slider positions.
         private void Slider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1282,7 +1295,7 @@ namespace Olden_Era___Template_Editor
                 foreach (var preset in presets)
                 {
                     var entry = new MenuItem { Header = en ? preset.NameEn : preset.NameRu, ToolTip = en ? preset.DescriptionEn : preset.DescriptionRu };
-                    entry.Click += (_, _) => { ApplySettings(PatchPresets.Clone(preset.Settings)); _currentSettingsPath = null; _isDirty = true; UpdateTitle(); Validate(); };
+                    entry.Click += (_, _) => ApplyPresetSettings(PatchPresets.Clone(preset.Settings));
                     section.Items.Add(entry);
                 }
                 menu.Items.Add(section);
@@ -1316,17 +1329,14 @@ namespace Olden_Era___Template_Editor
         private void PresetMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (sender is MenuItem { Tag: Presets.Preset preset })
-                ApplyPreset(preset);
+                ApplyPresetSettings(preset.Settings);
         }
 
         /// <summary>Loads a built-in quick-start preset into the whole UI.</summary>
-        private void ApplyPreset(Presets.Preset preset)
+        private void ApplyPresetSettings(SettingsFile settings)
         {
-            if (!IsInitialized) return;
-            ApplySettings(preset.Settings);
-            _currentSettingsPath = null;
-            _isDirty = true;
-            UpdateTitle();
+            if (!IsInitialized || !ResolveUnsavedSettings()) return;
+            ReplaceSettings(settings, path: null, dirty: true);
             Validate();
         }
 
@@ -1351,7 +1361,7 @@ namespace Olden_Era___Template_Editor
             if (pool.Count == 0) pool = matches;
             var pick = pool[_presetRng.Next(pool.Count)];
             _lastRandomPreset = pick.Name;
-            ApplyPreset(pick);
+            ApplyPresetSettings(pick.Settings);
         }
 
         private void SldMaxPortals_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1910,7 +1920,7 @@ namespace Olden_Era___Template_Editor
             if (SimpleView.Visibility == Visibility.Visible)
             {
                 if (!ValidateSimpleSelections()) throw new ArgumentException(L.Get("S.Patch.SelectOptions"));
-                var input = !_templateOutdated && _generatedSettingsSnapshot is not null ? _generatedSettingsSnapshot
+                var input = CurrentGeneratedTemplate is not null && _generatedSettingsSnapshot is not null ? _generatedSettingsSnapshot
                     : Services.Generation.RandomTemplateBuilder.Build(BuildQuickOptions());
                 return RetainSettingsMetadata(SettingsSnapshotMapper.FromGeneratorSettings(input));
             }
@@ -2130,26 +2140,72 @@ namespace Olden_Era___Template_Editor
         {
             try
             {
-                var json = JsonSerializer.Serialize(GatherSettings(), JsonOptions);
-                AtomicFile.WriteAllText(path, json);
-                _currentSettingsPath = path;
-                _isDirty = false;
-                UpdateTitle();
+                WriteSettingsDocument(path);
                 return true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show(L.Get("S.D.SaveSettingsErr", ex.Message), L.Get("S.D.SaveErrTitle"),
+                MessageBox.Show(this, L.Get("S.D.SaveSettingsErr", ex.Message), L.Get("S.D.SaveErrTitle"),
                                 MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
         }
 
+        private void WriteSettingsDocument(string path)
+        {
+            var json = JsonSerializer.Serialize(GatherSettings(), JsonOptions);
+            AtomicFile.WriteAllText(path, json);
+            _currentSettingsPath = path;
+            _savedSettingsFromSimple = SimpleView.Visibility == Visibility.Visible;
+            _isDirty = false;
+            UpdateTitle();
+        }
+
+        private bool ResolveUnsavedSettings()
+        {
+            if (!_isDirty) return true;
+            var choice = MessageBox.Show(this, L.Get("S.Settings.SaveBeforeReplacing"),
+                L.Get("S.Settings.UnsavedTitle"), MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel);
+            return AcceptSettingsTransition(choice, SaveCurrentSettings);
+        }
+
+        private static bool AcceptSettingsTransition(MessageBoxResult choice, Func<bool> save) =>
+            choice == MessageBoxResult.No || (choice == MessageBoxResult.Yes && save());
+
+        private void ApplySettingsWithoutTracking(SettingsFile settings)
+        {
+            _applyingSettings = true;
+            try { ApplySettings(settings); }
+            finally { _applyingSettings = false; }
+        }
+
+        private void ReplaceSettings(SettingsFile settings, string? path, bool dirty)
+        {
+            ApplySettingsWithoutTracking(settings);
+            SetSettingsDocument(path, dirty);
+            SetMode(advanced: true);
+        }
+
+        private void SetSettingsDocument(string? path, bool dirty)
+        {
+            _currentSettingsPath = path;
+            _savedSettingsFromSimple = false;
+            _isDirty = dirty;
+            ClearGeneratedResult();
+            UpdateTitle();
+        }
+
         private void BtnNew_Click(object sender, RoutedEventArgs e)
         {
-            var result = MessageBox.Show(L.Get("S.D.ResetConfirm"), L.Get("S.D.ResetTitle"),
-                                         MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (result != MessageBoxResult.Yes) return;
+            if (_isDirty)
+            {
+                if (!ResolveUnsavedSettings()) return;
+            }
+            else if (MessageBox.Show(this, L.Get("S.D.ResetConfirm"), L.Get("S.D.ResetTitle"),
+                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes)
+            {
+                return;
+            }
 
             // Simple Mode has its own controls (the Advanced ApplySettings does not touch them),
             // so the reset must be routed to whichever view is currently shown.
@@ -2159,34 +2215,25 @@ namespace Olden_Era___Template_Editor
                 return;
             }
 
-            ApplySettings(new SettingsFile());
-            _currentSettingsPath = null;
-            _isDirty = false;
-            UpdateTitle();
+            ReplaceSettings(new SettingsFile(), path: null, dirty: false);
         }
 
         /// <summary>Resets the Simple-mode options to defaults (+ a fresh seed) and clears the last result,
         /// mirroring what BtnNew does for the Advanced view. Used by the header "Reset settings" in Simple mode.</summary>
         private void ResetSimpleToDefaults()
         {
-            ApplySimpleState(new Services.GameData.SimpleModeState()); // default selections
-            TxtSimpleSeed.Text = ((uint)NewSeed()).ToString("X8");      // a fresh seed too
-            SaveSimpleState();                                          // persist the reset
-
-            // Clear the result panel + collapse the optional preview.
-            _generatedTemplate = null;
-            _lastQuickSettings = null;
-            _lastQuickOptions = null;
-            if (ImgSimplePreview   != null) ImgSimplePreview.Source = null;
-            if (TxtSimpleNoPreview != null) TxtSimpleNoPreview.Visibility = Visibility.Visible;
-            if (SimplePreviewBox   != null) SimplePreviewBox.Visibility   = Visibility.Collapsed;
-            if (TxtSimpleSummary   != null) TxtSimpleSummary.Text = string.Empty;
-            BtnSimpleSaveToGame.IsEnabled   = false;
-            BtnSimpleSave.IsEnabled         = false;
-            BtnSimpleOpenAdvanced.IsEnabled = false;
-            if (BtnSimpleTogglePreview != null) BtnSimpleTogglePreview.IsEnabled = false;
-            BtnSaveGenerated.Visibility = Visibility.Collapsed;
-            UpdateSimplePreviewToggle();
+            _applyingSettings = true;
+            try
+            {
+                ApplySimpleState(new Services.GameData.SimpleModeState());
+                TxtSimpleSeed.Text = unchecked((uint)NewSeed()).ToString("X8");
+            }
+            finally { _applyingSettings = false; }
+            _loadedGeneratorSnapshot = null;
+            _loadedSnapshotUiBaseline = null;
+            _loadedSettingsMetadata = null;
+            SaveSimpleState();
+            SetSettingsDocument(path: null, dirty: false);
         }
 
         private void BtnOpen_Click(object sender, RoutedEventArgs e)
@@ -2196,17 +2243,14 @@ namespace Olden_Era___Template_Editor
                 Title  = L.Get("S.D.OpenTitle"),
                 Filter = L.Get("S.D.SettingsFilter"),
             };
-            if (dlg.ShowDialog() != true) return;
+            if (dlg.ShowDialog(this) != true) return;
+            if (!ResolveUnsavedSettings()) return;
             try
             {
                 var json = File.ReadAllText(dlg.FileName);
                 var s = JsonSerializer.Deserialize<SettingsFile>(json, JsonOptions);
                 if (s is null) throw new InvalidDataException(L.Get("S.D.FileEmpty"));
-                ApplySettings(s);
-                SetMode(true); // .oetgs contains Advanced settings; show the controls that were loaded
-                _currentSettingsPath = dlg.FileName;
-                _isDirty = false;
-                UpdateTitle();
+                ReplaceSettings(s, dlg.FileName, dirty: false);
             }
             catch (Exception ex)
             {
@@ -2215,70 +2259,143 @@ namespace Olden_Era___Template_Editor
             }
         }
 
-        private void BtnSave_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentSettingsPath is not null)
-                SaveToPath(_currentSettingsPath);
-            else
-                BtnSaveAs_Click(sender, e);
-        }
+        private void BtnSave_Click(object sender, RoutedEventArgs e) => SaveCurrentSettings();
 
-        private void BtnSaveAs_Click(object sender, RoutedEventArgs e)
+        private bool SaveCurrentSettings() =>
+            ReusableSettingsPath is { } path ? SaveToPath(path) : SaveSettingsAs();
+
+        private string? ReusableSettingsPath =>
+            _savedSettingsFromSimple == (SimpleView?.Visibility == Visibility.Visible) ? _currentSettingsPath : null;
+
+        private void BtnSaveAs_Click(object sender, RoutedEventArgs e) => SaveSettingsAs();
+
+        private bool SaveSettingsAs()
         {
+            string name = CurrentGeneratedTemplate?.Name ?? TxtTemplateName.Text.Trim();
             var dlg = new SaveFileDialog
             {
                 Title      = L.Get("S.D.SaveAsTitle"),
                 Filter     = L.Get("S.D.SettingsFilter"),
-                FileName   = TxtTemplateName.Text.Trim().Length > 0 ? TxtTemplateName.Text.Trim() : L.Get("S.D.MySettings"),
+                FileName   = name.Length > 0 ? name : L.Get("S.D.MySettings"),
                 DefaultExt = ".oetgs",
             };
-            if (dlg.ShowDialog() == true)
-                SaveToPath(dlg.FileName);
+            return dlg.ShowDialog(this) == true && SaveToPath(dlg.FileName);
         }
 
         // -- Generate ----------------------------------------------------------
 
         // The most recently generated template — used by BtnSaveGenerated_Click
         private RmgTemplate? _generatedTemplate;
+        private bool _generatedForAdvancedSettings;
+        private System.Windows.Media.ImageSource? _generatedPreview;
         private MapTopology  _generatedTopology;
         private bool _templateOutdated = false;
+
+        private RmgTemplate? CurrentGeneratedTemplate => !_templateOutdated &&
+            (SimpleView.Visibility == Visibility.Visible ? _lastQuickSettings is not null : _generatedForAdvancedSettings)
+                ? _generatedTemplate : null;
+
+        private void SetGeneratedResult(RmgTemplate template, GeneratorSettings settings, MapTopology topology, QuickGenerateOptions? quickOptions = null)
+        {
+            _generatedTemplate = template;
+            _generatedSettingsSnapshot = SettingsSnapshotMapper.Clone(settings);
+            _generatedTopology = topology;
+            _generatedForAdvancedSettings = quickOptions is null;
+            _templateOutdated = false;
+            _lastQuickSettings = quickOptions is null ? null : settings;
+            _lastQuickOptions = quickOptions;
+            RefreshGeneratedResult();
+        }
+
+        private void ClearGeneratedResult()
+        {
+            _generatedTemplate = null;
+            _generatedSettingsSnapshot = null;
+            _generatedForAdvancedSettings = false;
+            _templateOutdated = false;
+            _lastQuickSettings = null;
+            _lastQuickOptions = null;
+            RefreshGeneratedResult();
+        }
+
+        private void RefreshGeneratedResult()
+        {
+            _generatedPreview = null;
+            ImgPreview.Source = ImgSimplePreview.Source = null;
+            if (_lastQuickSettings is null) SimplePreviewBox.Visibility = Visibility.Collapsed;
+            UpdateGeneratedPreview();
+            UpdateSimpleSummary();
+            UpdateBalanceReport();
+            UpdateOutdatedWarning();
+            BtnSaveGenerated.Visibility = _generatedTemplate is null ? Visibility.Collapsed : Visibility.Visible;
+            BtnSimpleTogglePreview.IsEnabled = _lastQuickSettings is not null;
+            UpdateSimplePreviewToggle();
+        }
+
+        private void UpdateGeneratedPreview()
+        {
+            if (_generatedTemplate is not { } template) return;
+            if (AdvancedView.Visibility == Visibility.Visible)
+                ImgPreview.Source = _generatedPreview ??= TemplatePreviewPngWriter.Render(template, _generatedTopology);
+            else if (_lastQuickSettings is not null && SimplePreviewBox.Visibility == Visibility.Visible)
+                ImgSimplePreview.Source = _generatedPreview ??= TemplatePreviewPngWriter.Render(template, _generatedTopology);
+            TxtSimpleNoPreview.Visibility = _lastQuickSettings is null ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void UpdateSimpleSummary()
+        {
+            TxtSimpleSummary.Text = _lastQuickSettings is { } settings && _lastQuickOptions is { } options
+                ? (_templateOutdated ? L.Get("S.M.113") : BuildSimpleSummary(settings, options))
+                : L.Get("S.Simple.NoPreview");
+        }
+
+        private void RenameGeneratedTemplate(string name)
+        {
+            if (_generatedTemplate is not { } template || template.Name == name) return;
+            template.Name = name;
+            if (_generatedSettingsSnapshot is not null) _generatedSettingsSnapshot.TemplateName = name;
+            if (_lastQuickSettings is not null) _lastQuickSettings.TemplateName = name;
+            _generatedPreview = null;
+            ImgPreview.Source = ImgSimplePreview.Source = null;
+            UpdateGeneratedPreview();
+        }
 
         private void BtnPreview_Click(object sender, RoutedEventArgs e)
         {
             if (CmbGameMode.SelectedIndex < 0 || CmbVictory.SelectedIndex < 0)
             { MessageBox.Show(L.Get("S.Patch.SelectOptions"), Title); return; }
             if (!Validate()) return;
-            _profileOptions.TemplateSeed ??= Random.Shared.Next(int.MinValue, int.MaxValue);
             var settings = BuildSettings();
+            bool choseSeed = settings.ProfileOptions.TemplateSeed is null && settings.Seed is null;
+            if (choseSeed)
+                settings.ProfileOptions.TemplateSeed = settings.Seed = Random.Shared.Next(int.MinValue, int.MaxValue);
             MapTopology effectiveTopology;
+            RmgTemplate template;
             try
             {
                 effectiveTopology = Services.Generation.GenerationProfileApplier.Prepare(settings).Topology;
-                _generatedTemplate = TemplateGenerator.Generate(settings);
+                template = TemplateGenerator.Generate(settings);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException or FormatException or OverflowException or JsonException)
             { MessageBox.Show(L.Get("S.Patch.OperationFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return; }
-            _generatedSettingsSnapshot = SettingsSnapshotMapper.Clone(settings);
-            _generatedTopology = effectiveTopology;
-            _templateOutdated = false;
-            _lastQuickSettings = null;
-            _lastQuickOptions = null;
-            ImgSimplePreview.Source = null;
-            TxtSimpleSummary.Text = L.Get("S.Simple.NoPreview");
-            BtnSimpleSaveToGame.IsEnabled = BtnSimpleSave.IsEnabled = BtnSimpleOpenAdvanced.IsEnabled = BtnSimpleTogglePreview.IsEnabled = false;
-            ImgPreview.Source = TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology);
-            lblNoPreview.Content = "?";
-            BtnSaveGenerated.Visibility = Visibility.Visible;
-            UpdateBalanceReport();
-            UpdateOutdatedWarning();
+            SetGeneratedResult(template, settings, effectiveTopology);
+            if (choseSeed)
+            {
+                _profileOptions.TemplateSeed = settings.Seed;
+                _isDirty = true;
+                UpdateTitle();
+            }
             Validate(); // refresh warnings now that template is up to date
         }
 
         private void BtnOpenEditor_Click(object sender, RoutedEventArgs e)
         {
-            // Open the just-generated template if there is one; otherwise an empty editor
-            // where the user can load a .rmg.json directly.
-            var editor = new TemplateEditorWindow(_generatedTemplate, _generatedTopology) { Owner = this };
+            var template = CurrentGeneratedTemplate;
+            if (template is null && _generatedTemplate is not null &&
+                MessageBox.Show(this, L.Get("S.Settings.OpenEmptyEditor"), Title,
+                    MessageBoxButton.OKCancel, MessageBoxImage.Information, MessageBoxResult.Cancel) != MessageBoxResult.OK)
+                return;
+            var editor = new TemplateEditorWindow(template, template is null ? MapTopology.Default : _generatedTopology) { Owner = this };
             editor.Show();
         }
 
@@ -2310,8 +2427,7 @@ namespace Olden_Era___Template_Editor
             foreach (var entry in _bannedItems.Concat(_bannedMagics)) entry.RefreshLanguage();
             UpdateLanguageButtons();
             UpdateSimplePreviewToggle();   // Simple-mode preview toggle caption (code-set, re-localize here)
-            if (_lastQuickSettings is not null && _lastQuickOptions is not null)
-                TxtSimpleSummary.Text = BuildSimpleSummary(_lastQuickSettings, _lastQuickOptions);
+            UpdateSimpleSummary();
             UpdateBalanceReport();
             if (TxtWipWarning != null) TxtWipWarning.Text = L.Get("S.CB.Wip");
             if (_pendingUpdate is not null) ShowUpdateBanner(_pendingUpdate);
@@ -2454,6 +2570,8 @@ namespace Olden_Era___Template_Editor
             AdvancedView.Visibility = advanced ? Visibility.Visible : Visibility.Collapsed;
             SimpleView.Visibility   = advanced ? Visibility.Collapsed : Visibility.Visible;
             UpdateModeButtons(advanced);
+            UpdateGeneratedPreview();
+            UpdateTitle();
             if (persist)
             {
                 Services.GameData.AppSettings.Current.Mode = advanced ? "advanced" : "simple";
@@ -2472,8 +2590,11 @@ namespace Olden_Era___Template_Editor
 
         private void BtnMode_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button { Tag: string tag })
-                SetMode(tag == "advanced");
+            if (sender is not Button { Tag: string tag }) return;
+            bool advanced = tag == "advanced";
+            if (advanced == (AdvancedView.Visibility == Visibility.Visible) || !ResolveUnsavedSettings()) return;
+            _isDirty = false;
+            SetMode(advanced);
         }
 
         private static int NewSeed() => new Random().Next(int.MinValue, int.MaxValue);
@@ -2490,7 +2611,7 @@ namespace Olden_Era___Template_Editor
         private void BtnSimpleRoll_Click(object sender, RoutedEventArgs e)
             => TxtSimpleSeed.Text = ((uint)NewSeed()).ToString("X8");
 
-        private QuickGenerateOptions BuildQuickOptions() => new()
+        private QuickGenerateOptions BuildQuickOptions(int? seed = null) => new()
         {
             ProfileOptions = _profileOptions.Clone(),
             PlayerCount    = (int)SldSimplePlayers.Value,
@@ -2506,7 +2627,7 @@ namespace Olden_Era___Template_Editor
             VictoryCondition = CmbSimpleVictory.SelectedIndex >= 0 && CmbSimpleVictory.SelectedIndex < KnownValues.VictoryConditionIds.Length
                 ? KnownValues.VictoryConditionIds[CmbSimpleVictory.SelectedIndex]
                 : "win_condition_1",
-            Seed           = ParseSeed(TxtSimpleSeed.Text),
+            Seed           = seed ?? ParseSeed(TxtSimpleSeed.Text),
         };
 
         private void BtnSimpleGenerate_Click(object sender, RoutedEventArgs e)
@@ -2516,33 +2637,19 @@ namespace Olden_Era___Template_Editor
             TxtSimpleSeed.Text = ((uint)opts.Seed).ToString("X8"); // normalise display
             GeneratorSettings settings;
             MapTopology effectiveTopology;
+            RmgTemplate template;
             try
             {
                 settings = Olden_Era___Template_Editor.Services.Generation.RandomTemplateBuilder.Build(opts);
                 effectiveTopology = Services.Generation.GenerationProfileApplier.Prepare(settings).Topology;
-                _generatedTemplate = TemplateGenerator.Generate(settings);
+                template = TemplateGenerator.Generate(settings);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NotSupportedException or FormatException or OverflowException or JsonException)
             { MessageBox.Show(L.Get("S.Patch.OperationFailed", ex.Message), Title, MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+            bool changedSeed = _profileOptions.TemplateSeed != settings.Seed;
             _profileOptions.TemplateSeed = settings.Seed;
-            _generatedSettingsSnapshot = SettingsSnapshotMapper.Clone(settings);
-            _generatedTopology = effectiveTopology;
-            _templateOutdated  = false;
-            _lastQuickSettings = settings;
-            _lastQuickOptions = opts;
-            TxtTemplateName.Text = settings.TemplateName; // so the Save dialog uses the generated name
-
-            // The layout is intentionally hidden until requested; defer its bitmap allocation too.
-            ImgSimplePreview.Source = SimplePreviewBox.Visibility == Visibility.Visible
-                ? TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology) : null;
-            TxtSimpleNoPreview.Visibility = Visibility.Collapsed;
-            TxtSimpleSummary.Text = BuildSimpleSummary(settings, opts);
-            BtnSimpleSaveToGame.IsEnabled = true;
-            BtnSimpleSave.IsEnabled = true;
-            BtnSimpleOpenAdvanced.IsEnabled = true;
-            BtnSimpleTogglePreview.IsEnabled = true;          // preview is now available on demand
-            UpdateSimplePreviewToggle();                       // (re)sync the toggle caption; preview stays hidden by default
-            BtnSaveGenerated.Visibility = Visibility.Visible; // keep the advanced save path in sync too
+            SetGeneratedResult(template, settings, effectiveTopology, opts);
+            if (changedSeed) { _isDirty = true; UpdateTitle(); }
             SaveSimpleState();                                 // remember these selections for next launch
         }
 
@@ -2552,9 +2659,8 @@ namespace Olden_Era___Template_Editor
         {
             if (SimplePreviewBox == null) return;
             bool show = SimplePreviewBox.Visibility != Visibility.Visible;
-            if (show && ImgSimplePreview.Source is null && _generatedTemplate is not null)
-                ImgSimplePreview.Source = TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology);
             SimplePreviewBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            UpdateGeneratedPreview();
             UpdateSimplePreviewToggle();
         }
 
@@ -2689,8 +2795,16 @@ namespace Olden_Era___Template_Editor
 
         private void BtnSimpleOpenAdvanced_Click(object sender, RoutedEventArgs e)
         {
-            if (_lastQuickSettings != null) ApplySettings(SettingsSnapshotMapper.FromGeneratorSettings(_lastQuickSettings));
+            if (CurrentGeneratedTemplate is null || _lastQuickSettings is null) return;
+            var settings = RetainSettingsMetadata(SettingsSnapshotMapper.FromGeneratorSettings(_lastQuickSettings));
+            ApplySettingsWithoutTracking(settings);
+            if (!_savedSettingsFromSimple) _currentSettingsPath = null;
+            _savedSettingsFromSimple = false;
+            _generatedForAdvancedSettings = true;
+            _isDirty = true;
             SetMode(advanced: true);
+            UpdateOutdatedWarning();
+            UpdateTitle();
         }
 
         /// <summary>Pushes the principal fields of a quick-generated settings object into the advanced
@@ -2769,13 +2883,6 @@ namespace Olden_Era___Template_Editor
             }
             finally { _suppressTopologySync = false; }
 
-            if (_generatedTemplate != null)
-            {
-                ImgPreview.Source = TemplatePreviewPngWriter.Render(_generatedTemplate, _generatedTopology);
-                lblNoPreview.Content = "?";
-                BtnSaveGenerated.Visibility = Visibility.Visible;
-                BtnSaveGenerated.IsEnabled = true;
-            }
         }
 
         private async void BtnSimpleCopySeed_Click(object sender, RoutedEventArgs e)
@@ -2794,7 +2901,7 @@ namespace Olden_Era___Template_Editor
         /// <summary>One-click save straight into the game's map_templates folder (no dialog).</summary>
         private async void BtnSimpleSaveToGame_Click(object sender, RoutedEventArgs e)
         {
-            if (_generatedTemplate is null || _templateOutdated || !await CanExportGeneratedTemplate()) return;
+            if (!await CanExportGeneratedTemplate() || CurrentGeneratedTemplate is not { } template) return;
 
             string? gameDir = FindOldenEraTemplatesPath();
             if (string.IsNullOrEmpty(gameDir) || !Directory.Exists(gameDir))
@@ -2806,7 +2913,7 @@ namespace Olden_Era___Template_Editor
             }
 
             // Ask the player what to call the map (this is the name the game shows in its picker).
-            string suggested = TxtTemplateName.Text.Trim();
+            string suggested = template.Name.Trim();
             if (suggested.Length == 0) suggested = "AuroraQuick";
             var prompt = new NamePromptWindow(suggested) { Owner = this };
             if (prompt.ShowDialog() != true) return;
@@ -2820,13 +2927,16 @@ namespace Olden_Era___Template_Editor
                 L.Get("S.D.SaveTplTitle"), MessageBoxButton.YesNo, MessageBoxImage.Question,
                 MessageBoxResult.No) != MessageBoxResult.Yes) return;
 
-            _generatedTemplate.Name = chosen;
-            TxtTemplateName.Text = chosen;
-
             try
             {
-                AtomicFile.WriteAllText(path, JsonSerializer.Serialize(_generatedTemplate, JsonOptions));
-                try { TemplatePreviewPngWriter.Save(_generatedTemplate, TemplatePreviewPngWriter.GetSidecarPath(path), _generatedTopology); }
+                var namedTemplate = TemplateRefactor.CreateEditingCopy(template);
+                namedTemplate.Name = chosen;
+                AtomicFile.WriteAllText(path, JsonSerializer.Serialize(namedTemplate, JsonOptions));
+                RenameGeneratedTemplate(chosen);
+                if (_generatedForAdvancedSettings) TxtTemplateName.Text = chosen;
+                _isDirty = true;
+                UpdateTitle();
+                try { TemplatePreviewPngWriter.Save(namedTemplate, TemplatePreviewPngWriter.GetSidecarPath(path), _generatedTopology); }
                 catch { /* preview sidecar is best-effort */ }
                 MessageBox.Show(L.Get("S.Simple.SavedToGame", path), L.Get("S.D.SavedTitle"),
                     MessageBoxButton.OK, MessageBoxImage.Information);
@@ -2839,11 +2949,11 @@ namespace Olden_Era___Template_Editor
 
         private async void BtnSaveGenerated_Click(object sender, RoutedEventArgs e)
         {
-            if (_generatedTemplate is null || _templateOutdated || !await CanExportGeneratedTemplate()) return;
+            if (!await CanExportGeneratedTemplate() || CurrentGeneratedTemplate is not { } template) return;
 
             string? gameTemplatesPath = FindOldenEraTemplatesPath();
 
-            string currentTemplateName = TxtTemplateName.Text.Trim();
+            string currentTemplateName = template.Name.Trim();
 
             var dlg = new SaveFileDialog
             {
@@ -2884,7 +2994,7 @@ namespace Olden_Era___Template_Editor
 
             try
             {
-                string json = JsonSerializer.Serialize(_generatedTemplate, JsonOptions);
+                string json = JsonSerializer.Serialize(template, JsonOptions);
                 AtomicFile.WriteAllText(dlg.FileName, json);
             }
             catch (Exception ex)
@@ -2899,7 +3009,7 @@ namespace Olden_Era___Template_Editor
             {
                 try
                 {
-                    TemplatePreviewPngWriter.Save(_generatedTemplate, previewPath, _generatedTopology);
+                    TemplatePreviewPngWriter.Save(template, previewPath, _generatedTopology);
                 }
                 catch (Exception ex)
                 {

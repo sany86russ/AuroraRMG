@@ -51,13 +51,14 @@ namespace Olden_Era___Template_Editor
 
         private void BtnUpdateNow_Click(object sender, RoutedEventArgs e)
         {
-            if (_pendingUpdate is null) return;
+            if (_pendingUpdate is null || !ResolveUnsavedSettings()) return;
 
             var dlg = new UpdateProgressWindow(_pendingUpdate) { Owner = this };
             bool launched = dlg.ShowDialog() == true;
             if (launched)
             {
                 // The helper is waiting for us to exit before swapping the exe.
+                _settingsCloseApproved = true;
                 Application.Current.Shutdown();
             }
         }

@@ -239,7 +239,7 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.Simple.Help.Victory"]    = "Условие победы — как выигрывается партия: классика, удержание города или столицы, решающая битва, турнир.",
             ["S.Simple.Help.Guards"]     = "Охрана границ — сила монстров-стражей на проходах между зонами и у порталов. «Неприступная» сохраняет прежний диапазон около 300–500%. «800%» задаёт ровно 800% при любом уровне хаоса. Усиливает охрану, но не гарантирует защиту от ИИ: результат зависит от игры и сложности.",
             ["S.Simple.Help.CastleFaction"] = "Фракция нейтр. замков — какой фракции будут замки, стоящие в нейтральных зонах. «Случайная» — как раньше. Выбор конкретной фракции делает все нейтральные замки этой фракции: они ничьи, пока их не захватишь. Идеально для «дорожек» с друзьями, где по пути надо взять город нужной фракции.",
-            ["S.Simple.Help.Extras"]     = "Дополнительно — вода между зонами, телепорты-порталы и усиленные нейтралы.",
+            ["S.Simple.Help.Extras"]     = "Здесь можно добавить воду между зонами, дополнительные порталы генератора и усиленных нейтралов.",
             ["S.Simple.Help.Seed"]       = "Одинаковые сид, настройки и версия генератора дают одинаковый шаблон. Передавайте их вместе или делитесь готовым .rmg.json. Расстановку объектов и игровой мир строит сама игра. Кнопка 🎲 — новый случайный сид.",
 
             // ── UI chrome (curated) ──
@@ -355,7 +355,7 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.M.069"] = "Генерировать дороги",
             ["S.M.070"] = "Создавать удалённые плацдармы",
             ["S.M.071"] = "Создавать доп. порталы",
-            ["S.M.072"] = "Макс. число порталов",
+            ["S.M.072"] = "Макс. число доп. порталов",
             ["S.M.073"] = "Тонкая настройка зон [ЭКСПЕРИМЕНТ]",
             ["S.M.074"] = "Относительные веса регионов и разброс охраны для раскладки игры.",
             ["S.M.075"] = "Размер зоны игрока",
@@ -1186,7 +1186,7 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.Simple.Help.Victory"]    = "Victory condition — how the game is won: classic, city or capital hold, final battle, tournament.",
             ["S.Simple.Help.Guards"]     = "Border guards — the strength of guardian stacks on zone passages and at portals. Impassable keeps its existing band of roughly 300–500%. The 800% option sets exactly 800% at any chaos level. Stronger guards do not guarantee protection from AI: the outcome depends on the game and difficulty.",
             ["S.Simple.Help.CastleFaction"] = "Neutral castle faction — which faction the castles standing in neutral zones belong to. \"Random\" is the old behaviour. Picking a specific faction makes every neutral castle that faction: they're unowned until you capture them. Perfect for co-op \"lanes\" maps where you take a town of a chosen faction along the way.",
-            ["S.Simple.Help.Extras"]     = "Extras — water between zones, teleport portals and stronger neutrals.",
+            ["S.Simple.Help.Extras"]     = "Add water between zones, extra generator portals, and stronger neutrals.",
             ["S.Simple.Help.Seed"]       = "The same seed, settings and generator version produce the same template. Share them together or send the .rmg.json file. The game builds the actual world and object placement. The 🎲 button rolls a new random seed.",
 
             // ── UI chrome (curated) ──
@@ -1302,7 +1302,7 @@ namespace Olden_Era___Template_Editor.Localization
             ["S.M.069"] = "Generate roads",
             ["S.M.070"] = "Create remote footholds",
             ["S.M.071"] = "Create extra portals",
-            ["S.M.072"] = "Max portal count",
+            ["S.M.072"] = "Max additional portals",
             ["S.M.073"] = "Zone fine-tuning [EXPERIMENTAL]",
             ["S.M.074"] = "Relative region weights and guard spread for the game's layout.",
             ["S.M.075"] = "Player zone size",

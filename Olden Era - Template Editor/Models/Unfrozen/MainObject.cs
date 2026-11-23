@@ -6,7 +6,7 @@ namespace OldenEraTemplateEditor.Models
     public class MainObject : RmgNode
     {
         [JsonPropertyName("type")]
-        public string Type { get; set; } = string.Empty;
+        public string? Type { get; set; }
 
         [JsonPropertyName("spawn")]
         public string? Spawn { get; set; }
@@ -38,6 +38,9 @@ namespace OldenEraTemplateEditor.Models
         [JsonPropertyName("placementArgs")]
         public List<string>? PlacementArgs { get; set; }
 
+        [JsonPropertyName("uniformPlacementAnchors")]
+        public List<UniformPlacementAnchor>? UniformPlacementAnchors { get; set; }
+
         /// <summary>Per-object guard-strength jitter (engine <c>guardRandomization</c>).</summary>
         [JsonPropertyName("guardRandomization")]
         public double? GuardRandomization { get; set; }
@@ -65,6 +68,18 @@ namespace OldenEraTemplateEditor.Models
 
         [JsonPropertyName("initialUnitIncrement")]
         public int? InitialUnitIncrement { get; set; }
+    }
+
+    public class UniformPlacementAnchor : RmgNode
+    {
+        [JsonPropertyName("type")]
+        public string? Type { get; set; }
+
+        [JsonPropertyName("weight")]
+        public double? Weight { get; set; }
+
+        [JsonPropertyName("zoneName")]
+        public string? ZoneName { get; set; }
     }
 
     public class TypedSelector : RmgNode

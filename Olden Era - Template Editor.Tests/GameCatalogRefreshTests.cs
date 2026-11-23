@@ -78,8 +78,13 @@ public class GameCatalogRefreshTests
     [InlineData("Content.0.RewardVariants", "null")]
     [InlineData("Content.0.RewardVariants", "null-row")]
     [InlineData("Content.0.GrantedSpells", "null")]
-    [InlineData("Content.0.RewardVariants.0.RewardTypes", "null")]
-    [InlineData("Content.0.RewardVariants.0.RewardParameters", "null-row")]
+    [InlineData("References.Skills", "null-row")]
+    [InlineData("References.SkillCompleteness", "null")]
+    [InlineData("RmgTemplateStamps", "null")]
+    [InlineData("RmgTemplateStamps.0.FileName", "null")]
+    [InlineData("Content.0.RewardVariants.0.RewardApplyType", "null")]
+    [InlineData("Content.0.RewardVariants.0.Rewards", "null")]
+    [InlineData("Content.0.RewardVariants.0.Rewards.0.Parameters", "null-row")]
     [InlineData("Content.0.RewardVariants.0.Spells", "null")]
     [InlineData("Content.0.RewardVariants.0.Spells", "null-row")]
     [InlineData("Content", "remove")]
@@ -157,6 +162,146 @@ public class GameCatalogRefreshTests
     }
 
     [Fact]
+    public async Task CatalogPreservesRewardModeOptionsAndZeroWeightThroughCache()
+    {
+        using var fixture = new SyntheticInstalledGame();
+        using (var archive = ZipFile.Open(fixture.CorePath, ZipArchiveMode.Update))
+            SyntheticInstalledGame.Add(archive, "DB/objects_logic/chests/pandora_box.json", """
+                {"array":[{"id":"pandora_box","variants":[
+                   {"rollChance":0,"rewardSet":{"rewardSetApplyType":"ForAll","rewards":[
+                      {"rewardType":"SideResReward","parameters":["gold","5000"]}]}},
+                   null,
+                   {"rollChance":10,"rewardSet":{"rewardSetApplyType":"OnlySelected","rewards":[
+                      {"rewardType":"SideResReward","parameters":["gold","5000"]},
+                      {"rewardType":"SideResReward","parameters":["dust","40"]}]}}
+                ]}]}
+                """);
+        string cache = Path.Combine(fixture.Root, "cache");
+        await new GameCatalogService(fixture.Service(), cache).GetCatalogAsync("english");
+        var catalog = await new GameCatalogService(fixture.Service(), cache).GetCatalogAsync("english");
+        var pandora = Assert.Single(catalog.Search("pandora_box"));
+        Assert.Collection(pandora.RewardVariants,
+            legacy =>
+            {
+                Assert.Equal(0, legacy.Index);
+                Assert.Equal(0, legacy.RollChance);
+                Assert.Equal("ForAll", legacy.RewardApplyType);
+                Assert.Single(legacy.Rewards);
+            },
+            selectable =>
+            {
+                Assert.Equal(2, selectable.Index);
+                Assert.Equal(10, selectable.RollChance);
+                Assert.Equal("OnlySelected", selectable.RewardApplyType);
+                Assert.Equal(new[] { "gold", "5000" }, selectable.Rewards[0].Parameters);
+                Assert.Equal(new[] { "dust", "40" }, selectable.Rewards[1].Parameters);
+            });
+        Assert.Equal(new[] { 0, 2 }, catalog.GetReferenceCatalog().ObjectRewardVariantIndices!["pandora_box"].Order());
+    }
+
+    [Fact]
+    public async Task CatalogListsOnlyNormalGameSkillsAndUsesTheirLocalizations()
+    {
+        using var fixture = new SyntheticInstalledGame();
+        using (var archive = ZipFile.Open(fixture.CorePath, ZipArchiveMode.Update))
+        {
+            SyntheticInstalledGame.Add(archive, "DB/heroes_skills/skills/skills.json",
+                """{"array":[{"id":"skill_siege","name":"skill_siege_name"}]}""");
+            SyntheticInstalledGame.Add(archive, "DB/heroes_skills/skills/skills_arena.json",
+                """{"array":[{"id":"arena_skill_siege","name":"skill_siege_name"}]}""");
+            SyntheticInstalledGame.Add(archive, "Lang/english/texts/heroSkills.json",
+                """{"tokens":[{"sid":"skill_siege_name","text":"Siegecraft"}]}""");
+            SyntheticInstalledGame.Add(archive, "Lang/russian/texts/heroSkills.json",
+                """{"tokens":[{"sid":"skill_siege_name","text":"Осадное дело"}]}""");
+        }
+        string cache = Path.Combine(fixture.Root, "cache");
+        var catalog = await new GameCatalogService(fixture.Service(), cache).GetCatalogAsync("english");
+        var skill = Assert.Single(catalog.Search(kind: GameContentKind.Skill));
+        Assert.Equal("skill_siege", skill.Sid);
+        Assert.Equal("Siegecraft", skill.DisplayName("english"));
+        Assert.Equal("Осадное дело", skill.DisplayName("russian"));
+        var references = catalog.GetReferenceCatalog();
+        Assert.True(references.SkillCompleteness);
+        Assert.Equal("skill_siege", Assert.Single(references.Skills!));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("""{"array":[{}]}""")]
+    public async Task MissingSkillEvidenceDoesNotMakeTheCoreSnapshotIncomplete(string? skillData)
+    {
+        using var fixture = new SyntheticInstalledGame();
+        if (skillData is not null)
+        {
+            using var archive = ZipFile.Open(fixture.CorePath, ZipArchiveMode.Update);
+            SyntheticInstalledGame.Add(archive, "DB/heroes_skills/skills/skills.json", skillData);
+        }
+        var catalog = await new GameCatalogService(fixture.Service(), Path.Combine(fixture.Root, "cache")).GetCatalogAsync("english");
+        var references = catalog.GetReferenceCatalog();
+        Assert.True(references.IsComplete);
+        Assert.False(references.SkillCompleteness);
+        Assert.Null(references.Skills);
+    }
+
+    [Fact]
+    public async Task InstalledTemplateMandatoryContentMakesObjectsVisibleThroughTheRmgFilter()
+    {
+        using var fixture = new SyntheticInstalledGame();
+        using (var archive = ZipFile.Open(fixture.CorePath, ZipArchiveMode.Update))
+        {
+            SyntheticInstalledGame.Add(archive, "DB/quickStart.json", """{"classicMaps":["Stock"],"singleHeroMaps":[]}""");
+            SyntheticInstalledGame.Add(archive, "DB/objects_logic/gladiator_spire/gladiator_spire.json",
+                """{"array":[{"id":"gladiator_spire"},{"id":"stock_object"},{"id":"authored_object"}]}""");
+        }
+        string source = fixture.Service().Discover()!.TemplatesPath;
+        Directory.CreateDirectory(source);
+        File.WriteAllText(Path.Combine(source, "Jebus Arena.rmg.json"),
+            """{"mandatoryContent":[{"name":"registration","content":[{"sid":"gladiator_spire"}]}]}""");
+        File.WriteAllText(Path.Combine(source, "Stock.rmg.json"),
+            """{"mandatoryContent":[{"name":"object","content":[{"sid":"stock_object"}]}]}""");
+        File.WriteAllText(Path.Combine(source, "Custom.rmg.json"),
+            """{"mandatoryContent":[{"name":"object","content":[{"sid":"authored_object"}]}]}""");
+        var catalog = await new GameCatalogService(fixture.Service(), Path.Combine(fixture.Root, "cache")).GetCatalogAsync("english");
+        var objects = catalog.Search(kind: GameContentKind.Object, rmgReferenced: true).ToArray();
+        var spire = Assert.Single(objects, entry => entry.Sid == "gladiator_spire");
+        Assert.False(spire.PlacementVerified);
+        Assert.Single(objects, entry => entry.Sid == "stock_object");
+        Assert.DoesNotContain(objects, entry => entry.Sid == "authored_object");
+    }
+
+    [Fact]
+    public async Task CatalogTracksStandardTemplateChangesSeparatelyFromCoreAndOtherTemplates()
+    {
+        using var fixture = new SyntheticInstalledGame();
+        using (var archive = ZipFile.Open(fixture.CorePath, ZipArchiveMode.Update))
+        {
+            SyntheticInstalledGame.Add(archive, "DB/quickStart.json", """{"classicMaps":["Stock"]}""");
+            SyntheticInstalledGame.Add(archive, "DB/objects_logic/chests/standalone.json", """{"array":[{"id":"stock_reward"}]}""");
+        }
+        var locator = fixture.Service();
+        string templates = locator.Discover()!.TemplatesPath;
+        string cache = Path.Combine(fixture.Root, "cache");
+        var service = new GameCatalogService(locator, cache);
+        var before = await service.GetCatalogAsync("english");
+        Assert.Empty(before.Search("stock_reward", rmgReferenced: true));
+
+        Directory.CreateDirectory(templates);
+        string stock = Path.Combine(templates, "Stock.rmg.json");
+        File.WriteAllText(stock, """{"mandatoryContent":[{"name":"data","content":[{"sid":"stock_reward"}]}]}""");
+        var added = await service.GetCatalogAsync("english");
+        Assert.Equal(before.Source!.SourceFingerprint, added.Source!.SourceFingerprint);
+        Assert.Single(added.Search("stock_reward", rmgReferenced: true));
+
+        File.WriteAllText(Path.Combine(templates, "My template.rmg.json"), "{}");
+        Assert.Same(added, await service.GetCatalogAsync("english"));
+
+        File.WriteAllText(stock, """{"mandatoryContent":[]}""");
+        var changed = await new GameCatalogService(locator, cache).GetCatalogAsync("english");
+        Assert.Equal(added.Source.SourceFingerprint, changed.Source!.SourceFingerprint);
+        Assert.Empty(changed.Search("stock_reward", rmgReferenced: true));
+    }
+
+    [Fact]
     public void ContentCatalog_ParsesSpellRankSchoolAndLocalizesByConfiguredNameKey()
     {
         using var stream = new MemoryStream();
@@ -176,7 +321,7 @@ public class GameCatalogRefreshTests
     }
 
     [Fact]
-    public async Task ReferenceCatalogDerivesOnlyExactObservedObjectRewardIndicesWithoutChangingCacheFormat()
+    public async Task ReferenceCatalogDerivesOnlyExactObservedObjectRewardIndicesWithoutStoringTheComputedMap()
     {
         using var fixture = new SyntheticInstalledGame();
         using (var zip = ZipFile.Open(fixture.CorePath, ZipArchiveMode.Update))
@@ -195,7 +340,7 @@ public class GameCatalogRefreshTests
         catalog.Content.Single(entry => entry.Sid == "sparse_reward ").RewardVariants[0].Index = 7;
         Assert.Equal(new[] { 0, 2 }, map["sparse_reward "].Order()); // the injected validation snapshot is detached from mutable catalogue rows
         Assert.Equal(new[] { 2, 7 }, catalog.GetReferenceCatalog().ObjectRewardVariantIndices!["sparse_reward "].Order());
-        Assert.Equal(4, catalog.SnapshotFormatVersion);
+        Assert.Equal(GameCatalog.CurrentSnapshotFormatVersion, catalog.SnapshotFormatVersion);
         using var stored = JsonDocument.Parse(File.ReadAllText(Assert.Single(Directory.GetFiles(cache, "*.json"))));
         Assert.False(stored.RootElement.GetProperty("References").TryGetProperty("ObjectRewardVariantIndices", out _));
         Assert.Null(new GameCatalog().GetReferenceCatalog().ObjectRewardVariantIndices);

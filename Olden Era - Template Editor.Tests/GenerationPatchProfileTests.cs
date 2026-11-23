@@ -11,6 +11,52 @@ namespace Olden_Era___Template_Editor.Tests;
 public class GenerationPatchProfileTests
 {
     [Theory]
+    [InlineData("win_condition_4")]
+    [InlineData("win_condition_6")]
+    public void CurrentProfilePersistsSelectedChampionAndSpireAtEachStart(string condition)
+    {
+        var settings = Settings();
+        settings.GameEndConditions.VictoryCondition = condition;
+        settings.ProfileOptions.ChampionSelection = ChampionSelection.HellLightSpire;
+        settings.ProfileOptions.BannedSkills = ["skill_siege"];
+        if (condition == "win_condition_4") settings.ProfileOptions.UseNativeFinalBattleSchedule = true;
+
+        var reloaded = Presets.ToGeneratorSettings(SettingsSnapshotMapper.FromGeneratorSettings(settings));
+        var generated = TemplateGenerator.Generate(reloaded);
+        var win = generated.GameRules!.WinConditions!;
+        Assert.Equal(ChampionSpirePlacement.SelectedRule, win.ChampionSelectRule);
+        Assert.False(win.LostStartHero);
+        Assert.Equal(["skill_siege"], generated.GlobalBans!.Skills);
+
+        var spireGroups = generated.MandatoryContent!.Where(group => group.Content?.Any(item => item.Sid == ChampionSpirePlacement.SpireSid) == true)
+            .Select(group => group.Name).ToHashSet(StringComparer.Ordinal);
+        Assert.Equal(2, spireGroups.Count);
+        Assert.All(generated.Variants!.Single().Zones!.Where(zone => zone.MainObjects?.Any(obj => obj.Type == "Spawn") == true),
+            zone => Assert.Single(zone.MandatoryContent!, spireGroups.Contains));
+        AssertNoErrors(generated);
+
+        reloaded.ProfileOptions.ProfileId = GenerationProfileOptions.PreviousProfile;
+        var previous = TemplateGenerator.Generate(reloaded);
+        Assert.Equal("StartHero", previous.GameRules!.WinConditions!.ChampionSelectRule);
+        Assert.Null(previous.GlobalBans?.Skills);
+        Assert.DoesNotContain(previous.MandatoryContent!, group => spireGroups.Contains(group.Name));
+    }
+
+    [Fact]
+    public void SavedPreviousProfileRetainsTheVersionedGenerationRules()
+    {
+        var settings = Settings(4, 1729);
+        settings.ProfileOptions.IncludeTemplateCard = false;
+        var current = TemplateGenerator.Generate(settings);
+        settings.ProfileOptions.ProfileId = GenerationProfileOptions.PreviousProfile;
+        var restored = SettingsSnapshotMapper.Clone(settings);
+        Assert.Equal(GenerationProfileOptions.PreviousProfile, restored.ProfileOptions.ProfileId);
+        Assert.True(restored.ProfileOptions.UsesVersionedRules);
+        Assert.Equal(JsonSerializer.Serialize(current, JsonExport.Options),
+            JsonSerializer.Serialize(TemplateGenerator.Generate(restored), JsonExport.Options));
+    }
+
+    [Theory]
     [InlineData("1v7", 8, 2)]
     [InlineData("2v1", 3, 2)]
     [InlineData("3v3", 6, 2)]

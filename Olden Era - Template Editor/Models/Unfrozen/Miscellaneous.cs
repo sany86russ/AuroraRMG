@@ -25,5 +25,8 @@ namespace OldenEraTemplateEditor.Models
 
         [JsonPropertyName("heroes")]
         public List<string>? Heroes { get; set; }
+
+        [JsonPropertyName("skills")]
+        public List<string>? Skills { get; set; }
     }
 }

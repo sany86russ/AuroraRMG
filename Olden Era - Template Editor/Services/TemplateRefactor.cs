@@ -58,6 +58,7 @@ namespace Olden_Era___Template_Editor.Services
         public static bool PreparePastedZone(Zone clone, IReadOnlyList<Zone> existingZones, string? sourceName = null)
         {
             var taken = new HashSet<string>(StringComparer.Ordinal);
+            var availableAnchorTargets = existingZones.Select(zone => zone.Name).Append(clone.Name).ToHashSet(StringComparer.Ordinal);
             foreach (var zone in existingZones)
             foreach (var obj in zone.MainObjects ?? [])
             {
@@ -67,7 +68,12 @@ namespace Olden_Era___Template_Editor.Services
             bool cleared = false;
             foreach (var obj in clone.MainObjects ?? [])
             {
-                if (!string.IsNullOrEmpty(sourceName)) FactionSelectors.RenameZone(obj.Faction, sourceName, clone.Name);
+                if (!string.IsNullOrEmpty(sourceName))
+                {
+                    FactionSelectors.RenameZone(obj.Faction, sourceName, clone.Name);
+                    RenameUniformPlacementAnchors(obj, sourceName, clone.Name);
+                }
+                RemoveUniformPlacementAnchors(obj, target => !availableAnchorTargets.Contains(target));
                 if (!string.IsNullOrEmpty(obj.Owner) && taken.Contains(obj.Owner))
                 { obj.Owner = null; obj.IsStartCity = false; cleared = true; }
                 if (!string.IsNullOrEmpty(obj.Spawn) && taken.Contains(obj.Spawn))
@@ -164,6 +170,7 @@ namespace Olden_Era___Template_Editor.Services
             foreach (var obj in zone.MainObjects ?? [])
             {
                 FactionSelectors.RenameZone(obj.Faction, oldName, newName);
+                RenameUniformPlacementAnchors(obj, oldName, newName);
                 if (obj.Placement == "NearZone" && obj.PlacementArgs is { Count: > 0 } args && args[0] == oldName)
                     args[0] = newName;
             }
@@ -208,6 +215,7 @@ namespace Olden_Era___Template_Editor.Services
                 foreach (var obj in zone.MainObjects ?? [])
                 {
                     FactionSelectors.RemoveSource(obj.Faction, zone.Name, zoneName, null);
+                    RemoveUniformPlacementAnchors(obj, target => target == zoneName);
                     if (obj.Placement == "NearZone" && obj.PlacementArgs?.FirstOrDefault() == zoneName)
                     { obj.Placement = "Uniform"; obj.PlacementArgs = null; }
                 }
@@ -318,13 +326,33 @@ namespace Olden_Era___Template_Editor.Services
             return warnings;
         }
 
-        /// <summary>NearZone belongs to main-object placement; only its confirmed first zone argument is remapped.</summary>
+        /// <summary>Remaps NearZone's first argument and known Zone anchors when copying a zone.</summary>
         public static void RemapMainObjectPlacementZones(Zone zone, IReadOnlyDictionary<string, string> zones)
         {
             ArgumentNullException.ThrowIfNull(zone); ArgumentNullException.ThrowIfNull(zones);
             foreach (var obj in zone.MainObjects ?? [])
+            {
                 if (obj is { Placement: "NearZone", PlacementArgs.Count: > 0 } && zones.TryGetValue(obj.PlacementArgs[0], out var target))
                     obj.PlacementArgs[0] = target;
+                foreach (var anchor in obj?.UniformPlacementAnchors ?? [])
+                    if (anchor is { Type: "Zone", ZoneName: { } name } && zones.TryGetValue(name, out var replacement))
+                        anchor.ZoneName = replacement;
+            }
+        }
+
+        private static void RenameUniformPlacementAnchors(MainObject obj, string oldName, string newName)
+        {
+            foreach (var anchor in obj.UniformPlacementAnchors ?? [])
+                if (anchor is { Type: "Zone" } && anchor.ZoneName == oldName)
+                    anchor.ZoneName = newName;
+        }
+
+        private static void RemoveUniformPlacementAnchors(MainObject obj, Predicate<string> shouldRemove)
+        {
+            if (obj.UniformPlacementAnchors is { } anchors
+                && anchors.RemoveAll(anchor => anchor is { Type: "Zone", ZoneName: { Length: > 0 } target } && shouldRemove(target)) > 0
+                && anchors.Count == 0)
+                obj.UniformPlacementAnchors = null;
         }
 
         private static IEnumerable<ContentPlacementRule> PortalRules(Connection connection) =>

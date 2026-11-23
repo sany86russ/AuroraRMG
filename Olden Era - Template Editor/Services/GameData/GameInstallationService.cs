@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Win32;
+using Olden_Era___Template_Editor.Models;
 
 namespace Olden_Era___Template_Editor.Services.GameData;
 
@@ -24,18 +25,26 @@ public sealed record GameCompatibilityProfile(string Id, GameProfileStatus Statu
 
     // Hashes are provenance only; no proprietary configuration resources are embedded in the app.
     public const string InspectedCoreSha256 = "F11B90C19AAE60908A4D503E639F2ABF7A02C5D706CDB072879EF9773812D954";
+    public const string InspectedCore08210Sha256 = "39A99BA481C0DC3ED02884BA61E4A1590864423FFF8218E688E125C2B1562A0D";
     public const string InspectedSchemaSha256 = "CB77341C51860E4E1B4F6225B6BC380660B794986FD4407BF10432F3250B7509";
     public static GameCompatibilityProfile FromEvidence(string? version, string? build, string? coreFingerprint = null, string? schemaFingerprint = null)
-        => version == "0.81.04" && build == "25672315" &&
-            string.Equals(coreFingerprint, InspectedCoreSha256, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(schemaFingerprint, InspectedSchemaSha256, StringComparison.OrdinalIgnoreCase)
-            ? new("olden-era-0.81.04", GameProfileStatus.InspectedGameData, Enum.GetValues<GameCapability>(),
-                "Inspected 0.81.04 data/build 25672315. Game-level placement and victory validation remain separate.")
-            : version == "0.81.04" && build == "25672315"
-                ? new("olden-era-unverified-data", GameProfileStatus.UnknownVersion, Array.Empty<GameCapability>(),
-                    "The version/build is recognized, but content or schema fingerprints differ from the inspected snapshot. Existing Aurora generation remains available.")
-            : new("olden-era-unverified", GameProfileStatus.UnknownVersion, Array.Empty<GameCapability>(),
+    {
+        (string ProfileId, string CoreFingerprint)? inspected = (version, build) switch
+        {
+            ("0.81.04", "25672315") => (GenerationProfileOptions.PreviousProfile, InspectedCoreSha256),
+            (GenerationProfileOptions.CurrentGameVersion, "26640613") => (GenerationProfileOptions.CurrentProfile, InspectedCore08210Sha256),
+            _ => null
+        };
+        if (inspected is not { } evidence)
+            return new("olden-era-unverified", GameProfileStatus.UnknownVersion, Array.Empty<GameCapability>(),
                 "This version/build has not been audited. Existing Aurora generation remains available.");
+        if (!string.Equals(coreFingerprint, evidence.CoreFingerprint, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(schemaFingerprint, InspectedSchemaSha256, StringComparison.OrdinalIgnoreCase))
+            return new("olden-era-unverified-data", GameProfileStatus.UnknownVersion, Array.Empty<GameCapability>(),
+                "The version/build is recognized, but content or schema fingerprints differ from the inspected snapshot. Existing Aurora generation remains available.");
+        return new(evidence.ProfileId, GameProfileStatus.InspectedGameData, Enum.GetValues<GameCapability>(),
+            $"Inspected {version} data/build {build}. Game-level placement and victory validation remain separate.");
+    }
 }
 
 public sealed record GameInstallation

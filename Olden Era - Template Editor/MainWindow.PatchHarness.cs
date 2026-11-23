@@ -51,6 +51,7 @@ public partial class MainWindow
         Directory.CreateDirectory(directory);
         var checks = new List<string>();
         var catalog = await CurrentPatchCatalog(true);
+        SetMode(advanced: false, persist: false);
         CmbSimpleType.SelectedIndex = 0; ApplySimplePlayerSelection(5, false);
         Require(CmbSimpleType.SelectedIndex == 1 && SldSimplePlayers.Value == 5, "Duel options silently clamped the new player count.");
         CmbSimpleType.SelectedIndex = 5; ApplySimplePlayerSelection(2, false);
@@ -101,6 +102,7 @@ public partial class MainWindow
         SetMode(false); BtnSimpleGenerate_Click(this, new());
         Require(_generatedTemplate is not null && !_templateOutdated && _generatedSettingsSnapshot is not null, "Simple generation did not finish.");
         Require(_generatedTemplate!.SpawnInfos?.Count == 5, "Odd team assignment was lost in Simple.");
+        BtnSimpleOpenAdvanced_Click(this, new());
         TxtTemplateName.Text = "Patch UI verification";
         Require(!_templateOutdated && _generatedSettingsSnapshot!.TemplateName == _generatedTemplate.Name && _lastQuickSettings?.TemplateName == _generatedTemplate.Name,
             "Renaming a generated template did not update its reproducible input.");
@@ -110,6 +112,7 @@ public partial class MainWindow
         Require(JsonSerializer.Serialize(regenerated, JsonExport.Options) == JsonSerializer.Serialize(_generatedTemplate, JsonExport.Options), "Captured Simple settings do not reproduce the template.");
         checks.Add("Simple: 5 players, 2v2v1 teams, full settings snapshot reproduces JSON.");
         checks.Add("Name: cosmetic renaming updates the template, snapshot and Advanced input.");
+        SetMode(advanced: false, persist: false);
         if (SimplePreviewBox.Visibility != Visibility.Visible) BtnSimpleTogglePreview_Click(this, new());
         Require(ImgSimplePreview.Source is not null, "Showing the Simple preview did not render the generated graph.");
         await CaptureMainPatchAsync(directory, "main-simple");
@@ -134,8 +137,65 @@ public partial class MainWindow
             "Advanced generation changed the captured Simple input.");
         checks.Add("Advanced: restored inputs generate the same current template and preview.");
         await CaptureMainPatchAsync(directory, "main-advanced");
+
+        var previousPreview = ImgPreview.Source;
+        SetMode(advanced: false, persist: false);
+        TxtSimpleSeed.Text = "00067932";
+        BtnSimpleGenerate_Click(this, new());
+        var quickResult = CurrentGeneratedTemplate;
+        Require(quickResult is not null, "Simple did not produce a second result.");
+        SetMode(advanced: true, persist: false);
+        Require(ImgPreview.Source is not null && !ReferenceEquals(ImgPreview.Source, previousPreview)
+            && ReferenceEquals(ImgPreview.Source, _generatedPreview) && CurrentGeneratedTemplate is null && !BtnSaveGenerated.IsEnabled,
+            "Advanced showed or exported the wrong result after switching from Simple.");
+        SetMode(advanced: false, persist: false);
+        BtnSimpleOpenAdvanced_Click(this, new());
+        Require(ReferenceEquals(CurrentGeneratedTemplate, quickResult) && BtnSaveGenerated.IsEnabled,
+            "Transferring Simple settings did not activate the matching Advanced result.");
+        SldBorderGuardStrength.Value = SldBorderGuardStrength.Value < SldBorderGuardStrength.Maximum
+            ? SldBorderGuardStrength.Value + 25 : SldBorderGuardStrength.Value - 25;
+        Require(_templateOutdated && CurrentGeneratedTemplate is null && !BtnSaveGenerated.IsEnabled,
+            "The stale result remained usable by export or the editor.");
+        checks.Add("Mode switching: both previews use the latest result, and only matching settings allow export or editing.");
+
+        string settingsPath = Path.Combine(directory, "settings-workflow.oetgs");
+        WriteSettingsDocument(settingsPath);
+        string savedSettings = File.ReadAllText(settingsPath);
+        TxtTemplateName.Text = "Unsaved settings test";
+        Require(_isDirty && !AcceptSettingsTransition(MessageBoxResult.Cancel, () => throw new InvalidOperationException("Cancel tried to save."))
+            && AcceptSettingsTransition(MessageBoxResult.No, () => throw new InvalidOperationException("Discard tried to save.")),
+            "Cancel or discard did not preserve the save/discard choice.");
+        bool saveFailed = false;
+        try { WriteSettingsDocument(directory); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { saveFailed = true; }
+        Require(saveFailed && _isDirty && _currentSettingsPath == settingsPath && File.ReadAllText(settingsPath) == savedSettings
+            && !AcceptSettingsTransition(MessageBoxResult.Yes, () => false),
+            "A failed save replaced the active settings path, touched the saved document or allowed the transition.");
+        Require(AcceptSettingsTransition(MessageBoxResult.Yes, () => SaveToPath(settingsPath)) && !_isDirty,
+            "Saving before transition did not commit the selected settings.");
+        savedSettings = File.ReadAllText(settingsPath);
+        SetMode(advanced: false, persist: false);
+        Require(ReusableSettingsPath is null, "Simple settings could overwrite an Advanced document after changing modes.");
+        ResetSimpleToDefaults();
+        Require(_currentSettingsPath is null && !_isDirty && _generatedSettingsSnapshot is null && CurrentGeneratedTemplate is null
+            && ImgPreview.Source is null && ImgSimplePreview.Source is null && File.ReadAllText(settingsPath) == savedSettings,
+            "Simple reset did not detach from the previous settings document and clear both previews.");
+        checks.Add("Settings: save/discard/cancel, a failed atomic save and Simple reset protect the previous .oetgs.");
+
+        var availableSkills = catalog.Search(kind: GameContentKind.Skill).ToArray();
+        Require(availableSkills.Length > 0, "The installed game catalog did not expose any skills.");
+        string skillId = availableSkills[0].Sid;
         await CapturePatchWindowAsync(new GenerationOptionsWindow(generated.ProfileOptions, 5, AppSettings.Current.GameInstallPath, catalog.Source,
-            catalog.GetReferenceCatalog().CustomAI), directory, "options");
+            catalog.GetReferenceCatalog().CustomAI, availableSkills), directory, "options", window =>
+        {
+            var options = (GenerationOptionsWindow)window;
+            options.DebugSelectPatchRules(ChampionSelection.HellLightSpire, skillId);
+            options.CommitDraft();
+            Require(options.ResultOptions.ChampionSelection == ChampionSelection.HellLightSpire
+                && options.ResultOptions.BannedSkills?.Contains(skillId) == true,
+                "The options dialog did not retain the selected champion rule and installed skill.");
+        });
+        checks.Add("Options: the champion rule and a real skill selected from the installed catalog survive Apply.");
         var rewardObject = catalog.Search("", GameContentKind.Object, true).Where(entry => entry.RewardVariants.Count > 0)
             .OrderByDescending(entry => entry.Sid.Contains("scroll", StringComparison.OrdinalIgnoreCase)).First();
         await CapturePatchWindowAsync(new GameContentCatalogWindow(catalog), directory, "catalog", window => ((GameContentCatalogWindow)window).DebugSelectRewardObject(rewardObject.Sid));
@@ -149,11 +209,35 @@ public partial class MainWindow
         await CapturePatchWindowAsync(new ContentPoolCreatorWindow(regenerated, examplePool), directory, "pool-creator");
         await CapturePatchWindowAsync(new TemplateEditorWindow(regenerated), directory, "editor", window =>
         {
-            ((TemplateEditorWindow)window).DebugVerifySavedInspectorEditing();
-            ((TemplateEditorWindow)window).DebugVerifyJsonFieldDuplicateRejection();
+            var editor = (TemplateEditorWindow)window;
+            editor.DebugVerifySavedInspectorEditing();
+            editor.DebugVerifyJsonFieldDuplicateRejection();
+            editor.DebugVerifyVariantEditing();
         });
         checks.Add("Editor: committing the saved copy retains live inspector bindings for subsequent edits.");
         checks.Add("Editor: duplicate raw portal JSON is rejected; correcting it clears the save blocker.");
+        checks.Add("Editor: selected variant edits and history are scoped to the active graph.");
+        if (catalog.Source is { Profile.Id: GenerationProfileOptions.CurrentProfile } source)
+        {
+            var pandora = catalog.Search("pandora_box", GameContentKind.Object, rmgReferenced: true).Single(entry => entry.Sid == "pandora_box");
+            Require(pandora.RewardVariants.Any(reward => reward.RewardApplyType == "OnlySelected")
+                && pandora.RewardVariants.Any(reward => reward.RollChance == 0)
+                && catalog.Search("gladiator_spire", GameContentKind.Object, rmgReferenced: true).Any(entry => entry.Sid == "gladiator_spire"),
+                "Pandora reward modes or the mandatory Hell Light Spire are missing from the installed RMG catalog.");
+            await CapturePatchWindowAsync(new GameContentCatalogWindow(catalog), directory, "catalog-pandora",
+                window => ((GameContentCatalogWindow)window).DebugSelectRewardObject(pandora.Sid, variantIndex: 55));
+            checks.Add("Catalog: Pandora shows the configured choice mode and weight, and the RMG filter includes the mandatory Hell Light Spire.");
+
+            string stockPath = Path.Combine(source.TemplatesPath, "Jebus Cross.rmg.json");
+            if (File.Exists(stockPath))
+            {
+                var stock = TemplateJsonReader.Deserialize(File.ReadAllText(stockPath), JsonExport.Options)
+                    ?? throw new InvalidOperationException("The stock Jebus Cross template could not be opened.");
+                await CapturePatchWindowAsync(new TemplateEditorWindow(stock), directory, "editor-stock-variant",
+                    window => ((TemplateEditorWindow)window).DebugSelectVariant(1));
+                checks.Add("Editor: Jebus Cross's second stock variant renders in the active graph.");
+            }
+        }
         using (var stream = File.Create(Path.Combine(directory, "teams-preview.png")))
         {
             var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(TemplatePreviewPngWriter.Render(regenerated, generated.Topology))); encoder.Save(stream);

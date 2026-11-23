@@ -23,6 +23,12 @@
                                Foreground="{StaticResource BrushGold}" FontWeight="SemiBold"
                                FontSize="14" VerticalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <StackPanel x:Name="VariantPicker" Orientation="Horizontal" Margin="0,0,12,0" Visibility="Collapsed">
+                        <TextBlock x:Name="VariantCaption" Text="{DynamicResource S.Patch08210.Variant}" Foreground="{DynamicResource BrushText}"
+                                   VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox x:Name="CmbVariant" MinWidth="76" SelectionChanged="CmbVariant_SelectionChanged"
+                                  AutomationProperties.LabeledBy="{Binding ElementName=VariantCaption}"/>
+                    </StackPanel>
                     <Button x:Name="BtnGridSnap" Style="{StaticResource ToolbarButton}"
                             Content="{DynamicResource S.EC.GridSnap}" Margin="0,0,12,0"
                             Click="BtnGridSnap_Click" ToolTip="{DynamicResource S.EC.GridSnapTip}"/>
@@ -56,7 +62,7 @@
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,6" Click="BtnDelete_Click"/>
                         <Button x:Name="BtnValidate" Content="{DynamicResource S.Ed.006}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,6" Click="BtnValidate_Click"/>
-                        <Button Content="{DynamicResource S.TemplateProperties.Title}"
+                        <Button x:Name="BtnProperties" Content="{DynamicResource S.TemplateProperties.Title}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,6" Click="BtnProperties_Click"/>
                         <Button Content="{DynamicResource S.Patch.BulkTitle}"
                                 Style="{StaticResource ToolbarButton}" Margin="0,0,8,6" Click="BtnBulkProperties_Click"/>

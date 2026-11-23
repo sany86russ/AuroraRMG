@@ -100,6 +100,47 @@ public sealed class PatchAcceptanceSuiteTests
     }
 
     [Fact]
+    public void Patch08210AcceptanceRejectsLostSkillBansUnlinkedSpireAndExcessTournamentPortals()
+    {
+        var settings = new GeneratorSettings
+        {
+            Seed = 1729,
+            PlayerStartsWithCastles = true,
+            RandomPortals = true,
+            MaxPortalConnections = 1,
+            ZoneCfg = new() { NeutralZoneCount = 12 },
+            ProfileOptions = GenerationProfileOptions.CurrentDefaults(),
+            GameEndConditions = new() { VictoryCondition = "win_condition_6" }
+        };
+        settings.ProfileOptions.Tempo = MapTempo.Legacy;
+        settings.ProfileOptions.ChampionSelection = ChampionSelection.HellLightSpire;
+        settings.ProfileOptions.BannedSkills = ["skill_logistic", "skill_siege"];
+        var template = TemplateGenerator.Generate(settings);
+        PatchAcceptanceSuite.VerifySettingsContract(template, settings);
+
+        var missingSkill = TemplateRefactor.CreateEditingCopy(template);
+        missingSkill.GlobalBans!.Skills!.RemoveAt(0);
+        var skillError = Assert.Throws<InvalidOperationException>(() => PatchAcceptanceSuite.VerifySettingsContract(missingSkill, settings));
+        Assert.Contains("skill bans", skillError.Message, StringComparison.Ordinal);
+
+        var wrongChampion = TemplateRefactor.CreateEditingCopy(template);
+        wrongChampion.GameRules!.WinConditions!.ChampionSelectRule = "StartHero";
+        var championError = Assert.Throws<InvalidOperationException>(() => PatchAcceptanceSuite.VerifySettingsContract(wrongChampion, settings));
+        Assert.Contains("champion selection rule", championError.Message, StringComparison.Ordinal);
+
+        var unlinkedSpire = TemplateRefactor.CreateEditingCopy(template);
+        foreach (var zone in Assert.Single(unlinkedSpire.Variants!).Zones!) zone.MandatoryContent = null;
+        var spireError = Assert.Throws<InvalidOperationException>(() => PatchAcceptanceSuite.VerifySettingsContract(unlinkedSpire, settings));
+        Assert.Contains("no linked Hell Light Spire", spireError.Message, StringComparison.Ordinal);
+
+        var connections = Assert.Single(template.Variants!).Connections!;
+        var portal = Assert.Single(connections, connection => connection.ConnectionType == "Portal");
+        connections.Add(portal);
+        var portalError = Assert.Throws<InvalidOperationException>(() => PatchAcceptanceSuite.VerifySettingsContract(template, settings));
+        Assert.Contains("map-wide limit", portalError.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CancelledSuiteSavesAPartialReceiptAndNeverTouchesTheInstalledCorpus()
     {
         string root = Path.Combine(Path.GetTempPath(), "aurora-acceptance-test-" + Guid.NewGuid().ToString("N"));

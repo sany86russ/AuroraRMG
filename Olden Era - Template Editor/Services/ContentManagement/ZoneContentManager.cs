@@ -195,9 +195,9 @@ public static class ZoneContentManager
 
             foreach (var sidLimit in sidLimits)
             {
-                if (mandatorySidCounts.TryGetValue(sidLimit.Sid, out int configuredCount))
+                if (sidLimit is { Sid: { } sid, MaxCount: { } maximum } && mandatorySidCounts.TryGetValue(sid, out int configuredCount))
                 {
-                    sidLimit.MaxCount = Math.Max(sidLimit.MaxCount, configuredCount);
+                    sidLimit.MaxCount = Math.Max(maximum, configuredCount);
                 }
             }
 

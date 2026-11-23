@@ -16,6 +16,8 @@ public sealed class GameReferenceSnapshot
     public List<string> NativeMandatory { get; set; } = [];
     public List<string> NativeCountLimits { get; set; } = [];
     public List<string>? CustomAI { get; set; }
+    public List<string> Skills { get; set; } = [];
+    public bool SkillCompleteness { get; set; }
     public string AiEvidence { get; set; } = "AI identifiers have not been read; no behavior has been verified.";
     public bool CoreReadComplete { get; set; }
     public TemplateReferenceCatalog ToReferenceCatalog(GameInstallation? source, bool includeNativeSchemaDefinitions = false,
@@ -28,6 +30,8 @@ public sealed class GameReferenceSnapshot
         CountLimits = source is null ? null : (includeNativeSchemaDefinitions ? NativeCountLimits.AsEnumerable() : Enumerable.Empty<string>()).ToHashSet(StringComparer.Ordinal),
         Objects = source is null ? null : Objects.ToHashSet(StringComparer.Ordinal),
         CustomAI = source is null ? null : CustomAI?.ToHashSet(StringComparer.Ordinal),
+        Skills = source is null || Skills.Count == 0 && !SkillCompleteness ? null : Skills.ToHashSet(StringComparer.Ordinal),
+        SkillCompleteness = source is not null && SkillCompleteness,
         ObjectRewardVariantIndices = source is null ? null : objectRewardVariantIndices,
         IsComplete = source is not null && CoreReadComplete,
         Source = source is null ? "No installed-game reference data" : $"Core.zip {source.SourceFingerprint}; build {source.SteamBuildId ?? "unknown"}"
@@ -36,6 +40,7 @@ public sealed class GameReferenceSnapshot
 
 public static class GameReferenceSnapshotBuilder
 {
+    internal const string SkillsPath = "DB/heroes_skills/skills/skills.json";
     private static readonly JsonDocumentOptions Options = new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip };
     public static GameReferenceSnapshot Build(ZipArchive core, GameInstallation? source = null, ICollection<string>? warnings = null)
     {
@@ -44,6 +49,7 @@ public static class GameReferenceSnapshotBuilder
         var lists = new HashSet<string>(StringComparer.Ordinal);
         var layouts = new HashSet<string>(StringComparer.Ordinal);
         var objects = new HashSet<string>(StringComparer.Ordinal);
+        if (core.GetEntry(SkillsPath) is { } skillsEntry) ReadSkills(skillsEntry, snapshot, warnings);
         foreach (var entry in core.Entries)
         {
             string path = entry.FullName.Replace('\\', '/');
@@ -113,6 +119,29 @@ public static class GameReferenceSnapshotBuilder
             { warnings?.Add("Native schema references could not be read: " + ex.Message); }
         return snapshot;
     }
+    private static void ReadSkills(ZipArchiveEntry entry, GameReferenceSnapshot snapshot, ICollection<string>? warnings)
+    {
+        try
+        {
+            using var stream = entry.Open();
+            using var document = JsonDocument.Parse(stream, Options);
+            if (document.RootElement.ValueKind == JsonValueKind.Object &&
+                document.RootElement.TryGetProperty("array", out var rows) && rows.ValueKind == JsonValueKind.Array)
+            {
+                var ids = new HashSet<string>(StringComparer.Ordinal);
+                AddRows(rows, "id", ids);
+                snapshot.Skills = ids.Order(StringComparer.Ordinal).ToList();
+                snapshot.SkillCompleteness = ids.Count > 0 && ids.Count == rows.GetArrayLength();
+            }
+            if (!snapshot.SkillCompleteness)
+                warnings?.Add("The normal-game skill database is empty, incomplete or unrecognized: " + entry.FullName);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or InvalidDataException)
+        {
+            warnings?.Add($"Skill identifiers could not be read from {entry.FullName}: {ex.Message}");
+        }
+    }
+
     private static List<string> Names(JsonElement root, string property)
     { var names = new HashSet<string>(StringComparer.Ordinal); if (root.TryGetProperty(property, out var array)) AddRows(array, "name", names); return names.Order(StringComparer.Ordinal).ToList(); }
     private static void AddRows(JsonElement array, string property, HashSet<string> target)

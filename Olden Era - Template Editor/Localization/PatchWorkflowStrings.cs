@@ -9,7 +9,7 @@ public static partial class Strings
         ("S.Patch.BalanceTreasure", "Охраняемое наполнение: минимум {0} переходов; минимальный бюджет охраны пути: {1}.", "Guarded content: minimum {0} hops; minimum path guard budget: {1}."),
         ("S.Patch.BalancePortal", "Портал {0}: {1} → {2}; объект со стороны from: {3}; объект со стороны to: {4}; охрана: {5}.", "Portal {0}: {1} → {2}; from-side object: {3}; to-side object: {4}; guard budget: {5}."),
         ("S.Patch.BalancePortalHelp", "Флаги показывают настроенные объекты на концах соединения. Отчёт не определяет по ним односторонность перемещения в игре. Минимумы переходов и охраны могут относиться к разным путям.", "Flags describe the configured endpoint objects. The report does not infer one-way in-game travel from them. Minimum hops and guard budgets can belong to different paths."),
-        ("S.Patch.CurrentPresets", "Пресеты: профиль 0.81.04", "Presets: 0.81.04 profile"),
+        ("S.Patch.CurrentPresets", "Пресеты для Olden Era 0.82.10", "Presets for Olden Era 0.82.10"),
         ("S.Patch.TeamPresets", "Пресеты: команды и кооператив", "Presets: teams and co-op"),
         ("S.Patch.LegacyPresets", "Прежние пресеты Aurora 1.11", "Legacy Aurora 1.11 presets"),
         ("S.Bal.Find.AreaBudgets", "Сравниваются коэффициенты плотности. Итоговые бюджеты зависят от пригодной площади зон внутри игры.", "Density coefficients are compared. Final budgets depend on eligible zone area inside the game."),
