@@ -586,10 +586,10 @@ Diagnostics contain reduced settings, validation results and bounded portions of
 | <img src="docs/ui-calendar-en.png" alt="Victory rules and battle calendar" width="100%"/> | <img src="docs/ui-environment-en.png" alt="Rivers, troop growth and game rules" width="100%"/> |
 | **Game catalog** | **Native schema** |
 | <img src="docs/ui-game-catalog-en.png" alt="IDs and actual reward variants" width="100%"/> | <img src="docs/ui-native-schema-en.png" alt="Conditional native schema editor" width="100%"/> |
-
-<img src="docs/ui-artifact-picker-en.png" alt="Banning an artifact from the installed catalog" width="65%"/>
 | **Template properties** | **Pool creator** |
 | <img src="docs/ui-template-properties-en.png" alt="Template properties and rules" width="100%"/> | <img src="docs/ui-pool-creator-en.png" alt="Fractional weights and object variants" width="100%"/> |
+
+<img src="docs/ui-artifact-picker-en.png" alt="Banning an artifact from the installed catalog" width="65%"/>
 
 ---
 

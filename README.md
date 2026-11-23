@@ -586,10 +586,10 @@ Seed шаблона Aurora определяет `.rmg.json`. В Простом �
 | <img src="docs/ui-calendar.png" alt="Победа и календарь боёв" width="100%"/> | <img src="docs/ui-environment.png" alt="Реки, рост войск и игровые правила" width="100%"/> |
 | **Каталог игры** | **Нативная схема** |
 | <img src="docs/ui-game-catalog.png" alt="SID и реальные варианты наград" width="100%"/> | <img src="docs/ui-native-schema.png" alt="Редактор условных параметров нативной схемы" width="100%"/> |
-
-<img src="docs/ui-artifact-picker.png" alt="Запрет артефакта из каталога игры" width="65%"/>
 | **Свойства шаблона** | **Конструктор пула** |
 | <img src="docs/ui-template-properties.png" alt="Свойства и правила шаблона" width="100%"/> | <img src="docs/ui-pool-creator.png" alt="Дробные веса и варианты объектов" width="100%"/> |
+
+<img src="docs/ui-artifact-picker.png" alt="Запрет артефакта из каталога игры" width="65%"/>
 
 ---
 
