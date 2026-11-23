@@ -225,12 +225,10 @@ namespace Olden_Era___Template_Editor
             }
 
             RememberCurrentLayout();
+            try { TemplateRefactor.RemoveZones(Variant, right, _template); }
+            catch (InvalidOperationException ex) { ShowReferenceEditError(ex); return; }
             foreach (Zone z in right)
-            {
-                TemplateRefactor.RemoveZoneReferences(Variant, z.Name);
-                Zones.Remove(z);
                 _positions.Remove(z.Name);
-            }
 
             _mirrorMap.Clear();
             var kept = new HashSet<string>(left.Concat(axis).Select(z => z.Name), StringComparer.Ordinal);
@@ -310,7 +308,7 @@ namespace Olden_Era___Template_Editor
                     GuardValue = 20000,
                     GuardWeeklyIncrement = 0.15,
                 };
-                Connections.Add(link);
+                (Variant.Connections ??= []).Add(link);
                 MirrorConnection(link);
             }
         }
@@ -338,7 +336,7 @@ namespace Olden_Era___Template_Editor
             // Roads anchor on this zone's own connections, which the twin does not have yet.
             twin.Roads = twin.Roads is { Count: > 0 } ? [] : twin.Roads;
 
-            Zones.Add(twin);
+            (Variant.Zones ??= []).Add(twin);
             _positions[twin.Name] = MirrorPoint(sourcePos);
             _mirrorMap[source.Name] = twin.Name;
             _mirrorMap[twin.Name] = source.Name;
@@ -411,17 +409,6 @@ namespace Olden_Era___Template_Editor
             RepositionZone(twin, mirrored);
         }
 
-        /// <summary>Returns the twin that should be deleted alongside <paramref name="z"/>.</summary>
-        private Zone? MirrorTwinToDelete(Zone z)
-        {
-            if (!_mirrorMode) return null;
-            Zone? twin = TwinOf(z);
-            if (twin is null) return null;
-            _mirrorMap.Remove(z.Name);
-            _mirrorMap.Remove(twin.Name);
-            return twin;
-        }
-
         /// <summary>Duplicates a freshly created connection between the two twins.</summary>
         private void MirrorAfterConnectionAdded(Connection c)
         {
@@ -448,7 +435,7 @@ namespace Olden_Era___Template_Editor
             twin.From = from;
             twin.To = to;
             twin.Name = MakeUniqueConnectionName($"{StripMirrorSuffix(source.Name ?? "Direct")}-M");
-            Connections.Add(twin);
+            (Variant.Connections ??= []).Add(twin);
             if (!deferReferences)
             {
                 var warnings = ApplyMirrorConnectionReferences([(source, twin)]);

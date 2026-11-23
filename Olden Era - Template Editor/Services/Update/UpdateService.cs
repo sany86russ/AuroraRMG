@@ -180,7 +180,7 @@ namespace Olden_Era___Template_Editor.Services.Update
         /// <summary>
         /// Replaces the running executable with <paramref name="newExePath"/>
         /// and relaunches. A detached PowerShell helper waits for this process
-        /// to exit, copies the new file over the current one, and starts it.
+        /// to exit, swaps the executables, and watches for an early startup failure.
         /// The caller should shut the app down immediately after this returns.
         /// </summary>
         public static void InstallAndRestart(string newExePath)
@@ -234,7 +234,7 @@ namespace Olden_Era___Template_Editor.Services.Update
         }
 
         // PowerShell helper: wait for the app to exit, swap the exe, relaunch.
-        internal const string HelperScript = @"
+        internal const string HelperScript = """
 param(
     [Parameter(Mandatory=$true)][int]$ProcessId,
     [Parameter(Mandatory=$true)][string]$Source,
@@ -244,6 +244,15 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $replaced = $false
+
+function Start-InstalledApp {
+    $startup = [System.Diagnostics.ProcessStartInfo]::new($Target)
+    $startup.UseShellExecute = $false
+    $startup.CreateNoWindow = $true
+    $startup.WorkingDirectory = Split-Path -LiteralPath $Target
+    [System.Diagnostics.Process]::Start($startup)
+}
+
 try {
     if (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) {
         Wait-Process -Id $ProcessId -Timeout 60 -ErrorAction Stop
@@ -259,7 +268,18 @@ try {
         }
     }
     if (!$replaced) { throw 'The update was not installed.' }
-    if (!$NoRestart) { Start-Process -FilePath $Target }
+    if (!$NoRestart) {
+        # Use a process handle so an executable that exits immediately still has a readable exit code.
+        $child = Start-InstalledApp
+        if ($null -eq $child) { throw 'The updated app could not be started.' }
+        try {
+            if ($child.WaitForExit(10000) -and $child.ExitCode -ne 0) {
+                throw "The updated app exited during startup (exit $($child.ExitCode))."
+            }
+        } finally {
+            $child.Dispose()
+        }
+    }
 } catch {
     try {
         $_ | Out-String | Set-Content -LiteralPath ($Target + '.update-error.log') -Encoding UTF8
@@ -267,14 +287,15 @@ try {
         Write-Warning 'Could not write the update error log.'
     }
     if ($replaced) {
-        [System.IO.File]::Replace($Target + '.previous', $Target, $null)
+        [System.IO.File]::Replace($Target + '.previous', $Target, [NullString]::Value)
     }
     if (!$NoRestart -and !(Get-Process -Id $ProcessId -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $Target)) {
-        Start-Process -FilePath $Target
+        $previous = Start-InstalledApp
+        if ($null -ne $previous) { $previous.Dispose() }
     }
     exit 1
 }
-";
+""";
 
         // ── Helpers ───────────────────────────────────────────────────────────
 

@@ -15,8 +15,8 @@ public static class PatchPresets
         // Keep the established topology/pacing while modernizing the confirmed format and metadata.
         settings.ProfileOptions.Tempo = MapTempo.Legacy;
         return new PatchPreset("patch-" + index, preset.Name, preset.ShortNameLocalized(true),
-            preset.Description + " Профиль данных 0.81.04; seed относится к шаблону Aurora.",
-            preset.DescriptionLocalized(true) + " 0.81.04 data profile; this seed controls the Aurora template.", settings);
+            preset.Description + $" Профиль данных {GenerationProfileOptions.CurrentGameVersion}. Seed относится к шаблону Aurora.",
+            preset.DescriptionLocalized(true) + $" {GenerationProfileOptions.CurrentGameVersion} data profile. This seed controls the Aurora template.", settings);
     }).ToArray();
 
     public static IReadOnlyList<PatchPreset> Cooperative { get; } =

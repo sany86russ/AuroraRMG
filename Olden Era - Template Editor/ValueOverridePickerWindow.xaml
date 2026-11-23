@@ -51,6 +51,10 @@
                              Height="28"/>
                 </StackPanel>
 
+                <Button DockPanel.Dock="Top" Content="{DynamicResource S.Vov.Catalog}"
+                        ToolTip="{DynamicResource S.Vov.CatalogHelp}" Click="BtnCatalog_Click"
+                        HorizontalAlignment="Left" Height="28" Margin="0,0,0,8"/>
+
                 <!-- Guard value row -->
                 <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>

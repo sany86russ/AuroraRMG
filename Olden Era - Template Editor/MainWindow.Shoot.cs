@@ -61,35 +61,6 @@ namespace Olden_Era___Template_Editor
             encoder.Save(fs);
         }
 
-        /// <summary>
-        /// Headless ReadyMaps regeneration (<c>--gen-readymaps &lt;dir&gt;</c>): writes every built-in
-        /// preset to "[Gen] &lt;TemplateName&gt;.rmg.json" via the shared export options (literal UTF-8,
-        /// no BOM), then exits. Refreshes the repo ReadyMaps after preset/name changes.
-        /// </summary>
-        private void GenerateReadyMaps(string dir)
-        {
-            try
-            {
-                Directory.CreateDirectory(dir);
-                foreach (var preset in Presets.All)
-                {
-                    var settings = Presets.ToGeneratorSettings(preset.Settings);
-                    var template = TemplateGenerator.Generate(settings);
-                    string json = System.Text.Json.JsonSerializer.Serialize(template, JsonExport.Options);
-                    string file = $"[Gen] {preset.Settings.TemplateName}.rmg.json";
-                    File.WriteAllText(Path.Combine(dir, file), json);
-                }
-            }
-            catch
-            {
-                // Best-effort dev tool; never hard-crash.
-            }
-            finally
-            {
-                Application.Current.Shutdown();
-            }
-        }
-
         private async Task ShootTabsAsync(string dir)
         {
             try

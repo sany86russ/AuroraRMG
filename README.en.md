@@ -17,6 +17,19 @@
 
 </div>
 
+## New in v1.12.1 · Olden Era 0.82.10
+
+- **Map and tools → Teams and map options** offers the **Olden Era 0.82.10** profile. **0.81.04** and **Aurora 1.11** are available for previously saved settings. Aurora checks installed game data by version, Steam build, and checksums.
+- In **Rules and calendar**, you can ban skills from the installed catalog and enable champion selection at the Hell Light Spire for tournaments and final battles. The generator checks that each tournament start can reach a spire when this option is enabled.
+- The Pandora catalog identifies rewards that let the player choose one option and marks entries with zero roll weight. The RMG filter includes mandatory objects from stock templates. The graph editor can switch among map variants, edit them, and save their layouts separately.
+- Aurora applies the extra portal limit to the entire template. Each seed in a Simple batch follows the same path as a single generation. The main window offers to save changed settings before replacing them or closing.
+- Simple and Advanced keep separate settings. Bulk editing starts on the active variant. The editor validates connection and object references before saving. The artifact picker includes entries from the installed game.
+- Switching languages and updating custom pools are faster. The schema editor keeps the selected node after applying a change. Turning off PNG output keeps the current template ready to export.
+
+[v1.12.1 RU/EN changelog](docs/release-notes-v1.12.1.md) · [Download v1.12.1](https://github.com/sany86russ/AuroraRMG/releases/tag/v1.12.1) · [Report a generator or in-game issue](https://github.com/sany86russ/AuroraRMG/issues/new?template=aurorarmg-bug.yml)
+
+Run the built EXE with `--make-patch-kit <new-folder>` outside the game directory to prepare in-game scenarios. Use `--gen-readymaps <folder> --lang ru` to reproduce the 53 checked-in ReadyMaps, including team presets.
+
 ## New in v1.12.0
 
 Updated for **Olden Era 0.81.04**: actual alliances and cooperative layouts, **53 current presets** (43 updated + 10 team presets), a separate set of 43 Legacy presets, map richness and challenge, battle calendars, rivers and troop growth. The catalog reads IDs, names and reward variants from your installed game; the editor adds template properties, bulk zone editing and fractional pool weights.
@@ -169,7 +182,7 @@ Before installation, the app checks file size, Windows executable format and SHA
 
 1. Launch AuroraRMG — it opens in **Simple Mode** by default (the **Simple / Advanced** toggle is in the header, next to the language).
 2. Pick a few options: players, game type, size, length, victory condition.
-3. Open **Map and tools → Teams and map options** and select **Olden Era 0.81.04**. For co-op, configure the **Alliances** tab. You can also set the game install path here.
+3. Open **Map and tools → Teams and map options** and select your game version's profile. For co-op, configure the **Alliances** tab. You can also set the game install path here.
 4. Click **"⚔ Create map"** — preview, summary and warnings appear on the right. Resolve errors before saving.
 5. Click **"💾 Save to game folder"** and enter the template name.
 6. Launch Olden Era → start a new game → pick your template; assign human/AI players, factions, AI difficulty and the game seed in lobby/hotseat.
@@ -179,7 +192,7 @@ More in [Working modes](#-working-modes-simple-and-advanced).
 **Way 2 — via a preset (Advanced mode):**
 
 1. Switch to **Advanced** mode.
-2. On the **"Map Rules"** tab, open **"Preset ▾"** and choose the **Olden Era 0.81.04** group, a team preset, or the separate **Aurora 1.11 / Legacy** group.
+2. On the **Map Rules** tab, open **Preset ▾** and choose the Olden Era group, a team preset, or the separate **Aurora 1.11 / Legacy** group.
 3. Click **"⚔ Create template"** in the right panel, then save.
 4. Launch Olden Era → start a new game → pick the template.
 
@@ -206,7 +219,7 @@ For players who **don't want to learn templates**. You set a few clear options a
 |---|---|
 | **Players** | How many players (starting castles) are on the map. |
 | **Game type** | **Duel (1×1)**, **Free-for-all**, **Versus monsters (PvE)**, **Lanes (corridors)**, **Team game** with actual alliances, or **Single player (RPG/PvE, experimental)**. Refine team assignments through Map and tools; select human/AI players in game. |
-| **Map size** | Small / Medium / Large / Huge. In the **0.81.04** profile, Huge uses **256×256**; **Legacy** retains its earlier experimental **256–400** band. |
+| **Map size** | Small / Medium / Large / Huge. In **0.82.10** and **0.81.04**, Huge uses **256×256**. **Legacy** retains its earlier experimental **256–400** band. |
 | **Game length** | Short / Medium / Long — affects size, zone count and guard strength. |
 | **Chaos level** | Tame / Normal / Wild — how wild and unpredictable the map gets. |
 | **Victory condition** | Classic, City Hold, Capital Hold, Final Battle, Tournament and Guardian's Demise; see [conditions and limits](#-victory-conditions--special-modes). |
@@ -235,7 +248,7 @@ The window has three areas:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  🧭 AuroraRMG  [v1.12]  —  file_name    🔄 📂 💾 💾… RU EN  _ ☐ ✕ │   ← Header
+│  🧭 AuroraRMG [v1.12.1] —  file_name    🔄 📂 💾 💾… RU EN  _ ☐ ✕ │   ← Header
 ├───────────────┬──────────────────────────────┬───────────────┤
 │  Rules        │                              │  ⚔ Create      │
 │  Map & Zones  │     Selected tab content     │   template     │
@@ -475,7 +488,7 @@ Buttons: a dropdown + **"Add"** adds a content entry; **`x`** on a row removes t
 
 ### Profile, seeds and map options
 
-1. On **Map**, select **Olden Era 0.81.04** for current content tables or **Aurora 1.11** for older configurations.
+1. On **Map**, select the profile for your game version or **Aurora 1.11** for older configurations.
 2. On **Game and profile**, check the source. An empty path enables Steam-library discovery; an explicit path must point to the game's install root. The dialog shows version, Steam build and data fingerprints. Unknown versions are shown as unknown; bundled settings remain available.
 3. Configure the map, click **Apply**, then **Create template**. The detailed card adds the selected rules and tags to the in-game template picker.
 
@@ -538,6 +551,8 @@ For **Bulk zone edits**, choose the map variant, property and target zones. Ente
 
 <img src="docs/ui-bulk-edit-en.png" alt="Bulk property edits for selected zones" width="100%"/>
 
+<img src="docs/ui-editor-variants-en.png" alt="Map variant picker in the graph editor" width="100%"/>
+
 </details>
 
 ### Native schemas and configuration import
@@ -574,6 +589,8 @@ Diagnostics contain reduced settings, validation results and bounded portions of
 | <img src="docs/ui-game-catalog-en.png" alt="IDs and actual reward variants" width="100%"/> | <img src="docs/ui-native-schema-en.png" alt="Conditional native schema editor" width="100%"/> |
 | **Template properties** | **Pool creator** |
 | <img src="docs/ui-template-properties-en.png" alt="Template properties and rules" width="100%"/> | <img src="docs/ui-pool-creator-en.png" alt="Fractional weights and object variants" width="100%"/> |
+
+<img src="docs/ui-artifact-picker-en.png" alt="Banning an artifact from the installed catalog" width="65%"/>
 
 ---
 
@@ -691,7 +708,7 @@ AuroraRMG is **fully bilingual** — Russian and English.
 
 ## 🎲 Built-in presets (53 and 43 Legacy)
 
-**Preset ▾** contains **53 current presets**: 43 updated Olden Era 0.81.04 configurations and 10 team presets. **43 Aurora 1.11 / Legacy presets** remain in a separate group. They retain the earlier content tables and ordinary seed conversion; shared bug fixes and format checks apply to both profiles. The same seed does not promise the same result across different profiles.
+**Preset ▾** contains **53 Olden Era presets**, including 10 team presets, and a separate group of **43 Aurora 1.11 / Legacy presets**. To reproduce a template from `.oetgs`, use the profile recorded in the file.
 
 The 43 base scenarios below are available in current and Legacy profiles. Automated tests check structure and settings; actual play still requires in-game validation. For PvE, assign human/AI roles and difficulty in lobby, and configure alliances through Teams and map options.
 

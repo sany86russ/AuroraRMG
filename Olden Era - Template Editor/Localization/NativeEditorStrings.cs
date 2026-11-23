@@ -26,6 +26,7 @@ public static partial class Strings
         ("S.NativeEditor.Saved", "Копия сохранена: {0}", "Copy saved: {0}"),
         ("S.NativeEditor.Unapplied", "Примените или отмените текущую правку перед переходом к другому узлу или разделу.", "Apply or revert the current edit before switching to another node or section."),
         ("S.NativeEditor.InvalidTarget", "Выбранный узел больше недоступен.", "The selected node is no longer available."),
+        ("S.NativeEditor.MaximumDepth", "Максимальная глубина вложенности схемы — {0} уровней.", "The schema can be nested up to {0} levels deep."),
         ("S.NativeEditor.ConditionsObject", "Условия должны быть JSON объектом.", "Conditions must be a JSON object."),
         ("S.NativeEditor.InvalidWeight", "Укажите неотрицательный вес в диапазоне native float (до 3.4e38); дробную часть вводите через точку.", "Enter a non-negative weight representable as a native float (up to 3.4e38), using a decimal point."),
         ("S.NativeEditor.ReferenceErrors", "Исправьте ссылки перед сохранением:\n{0}", "Fix references before saving:\n{0}"),

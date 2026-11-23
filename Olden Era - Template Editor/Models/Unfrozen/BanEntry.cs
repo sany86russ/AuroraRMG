@@ -33,7 +33,18 @@ namespace OldenEraTemplateEditor.Models
 
         public string Id          { get; set; } = "";
         private string _displayName = "";
-        public string DisplayName { get => GameLabels.Name(Id, _displayName); set => _displayName = value; }
+        public string? GameNameRu { get; init; }
+        public string? GameNameEn { get; init; }
+        public string? AvailabilityResource { get; init; }
+        public string DisplayName
+        {
+            get
+            {
+                string? name = LocalizationManager.Instance.CurrentLanguage == AppLanguage.En ? GameNameEn : GameNameRu;
+                return string.IsNullOrWhiteSpace(name) ? GameLabels.Name(Id, _displayName) : name;
+            }
+            set => _displayName = value;
+        }
         public string Category    { get; set; } = "";
         public string CategoryLabel => GameLabels.Category(Category);
         public event PropertyChangedEventHandler? PropertyChanged;

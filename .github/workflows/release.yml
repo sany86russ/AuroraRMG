@@ -115,30 +115,70 @@ jobs:
         with:
           subject-path: ${{ env.ASSET }}
 
-      - name: Create release & upload asset
-        shell: bash
+      - name: Publish release with verified asset
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.ver.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.ver.outputs.version }}
           RELEASE_COMMIT: ${{ steps.source.outputs.commit }}
         run: |
-          TAG="${{ steps.ver.outputs.tag }}"
-          NOTES="docs/release-notes-$TAG.md"
-          NOTE_ARGS=(--generate-notes)
-          if [ -f "$NOTES" ]; then
-            NOTE_ARGS=(--notes-file "$NOTES")
-          fi
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Релиз $TAG уже существует — обновляю ассет."
-            gh release upload "$TAG" "$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
-            if [ -f "$NOTES" ]; then
-              gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES"
-            fi
-          else
-            echo "Создаю релиз $TAG."
-            gh release create "$TAG" "$ASSET" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "AuroraRMG $TAG" \
-              "${NOTE_ARGS[@]}" \
-              --latest \
-              --target "$RELEASE_COMMIT"
-          fi
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+          $repo = $env:GITHUB_REPOSITORY
+          $asset = Get-Item -LiteralPath $env:ASSET
+          if ($asset.VersionInfo.FileVersion -ne "$($env:RELEASE_VERSION).0") {
+            throw "The executable version does not match $tag."
+          }
+          $digest = 'sha256:' + (Get-FileHash -LiteralPath $asset.FullName -Algorithm SHA256).Hash
+
+          function Read-Release {
+            $PSNativeCommandUseErrorActionPreference = $false
+            $response = gh release view $tag --repo $repo --json isDraft,assets 2>$null
+            if ($LASTEXITCODE -eq 0) { $response | ConvertFrom-Json }
+          }
+          function Invoke-GitHub {
+            gh @args
+            if ($LASTEXITCODE -ne 0) { throw "GitHub CLI failed (exit $LASTEXITCODE)." }
+          }
+          function Find-Asset($release) {
+            $release.assets | Where-Object name -eq $asset.Name
+          }
+          function Assert-Asset($release) {
+            $uploaded = @(Find-Asset $release)
+            if ($uploaded.Count -ne 1 -or $uploaded[0].state -ne 'uploaded' -or
+                $uploaded[0].size -ne $asset.Length -or $uploaded[0].digest -ne $digest) {
+              throw "The release asset differs from the verified build. Existing assets were left intact."
+            }
+          }
+
+          $release = Read-Release
+          if ($release -and !$release.isDraft) {
+            Assert-Asset $release
+            Write-Output "Published $tag already contains the verified asset."
+            exit 0
+          }
+          if (!$release) {
+            $notes = "docs/release-notes-$tag.md"
+            $noteArgs = if (Test-Path -LiteralPath $notes) { @('--notes-file', $notes) } else { @('--generate-notes') }
+            Invoke-GitHub release create $tag --repo $repo --verify-tag --draft --target $env:RELEASE_COMMIT --title "AuroraRMG $tag" @noteArgs
+            $release = Read-Release
+          }
+          if (!$release -or !$release.isDraft) { throw "Could not verify the draft for $tag." }
+
+          # A failed GitHub upload can leave an empty starter asset that blocks a retry.
+          $existing = @(Find-Asset $release)
+          if ($existing.Count -eq 1 -and $existing[0].state -ceq 'starter' -and $existing[0].size -eq 0) {
+            $assetUrl = '^https://api\.github\.com/repos/' + [regex]::Escape($repo) + '/releases/assets/([1-9][0-9]*)$'
+            if ($existing[0].apiUrl -notmatch $assetUrl) { throw "Could not verify the incomplete asset in $tag." }
+            Invoke-GitHub api --method DELETE "repos/$repo/releases/assets/$($Matches[1])"
+            $release = Read-Release
+            if (!$release -or !$release.isDraft) { throw "Could not verify the draft after removing the incomplete asset for $tag." }
+          }
+          if (!(Find-Asset $release)) {
+            Invoke-GitHub release upload $tag $asset.FullName --repo $repo
+            $release = Read-Release
+          }
+          if (!$release -or !$release.isDraft) { throw "Could not verify the uploaded draft for $tag." }
+          Assert-Asset $release
+          Invoke-GitHub release edit $tag --repo $repo --draft=false --latest

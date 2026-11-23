@@ -34,6 +34,8 @@ internal sealed class SyntheticInstalledGame : IDisposable
         Add(zip, "Lang/russian/texts/heroInfo.json", "{\"tokens\":[{\"sid\":\"" + hero + "\",\"text\":\"Имя героя\"}]}");
         Add(zip, "generator/content_pools/current.json", "[{\"name\":\"" + pool + "\",\"groups\":[{\"weight\":100,\"includeLists\":[\"current_list\"]}]}]");
         Add(zip, "generator/content_lists/current.json", "[{\"name\":\"current_list\",\"content\":[{\"sid\":\"scroll_box\",\"weight\":100}]}]");
+        Add(zip, "generator/zone_layouts/layouts.json", """[{"name":"current_layout"}]""");
+        Add(zip, "generator/generator_config.json", """{"metaObjects":[{"sid":"zz_fixture_alias","type":"RandomHire"}]}""");
         Add(zip, "DB/objects_logic/chests/scroll_box.json", "{\"array\":[{\"id\":\"scroll_box\",\"variants\":[{\"rollChance\":100,\"value\":500,\"rewardSet\":{\"rewards\":[{\"rewardType\":\"HeroItemReward\",\"parameters\":[\"actual_scroll_artifact\"]}]}}]}]}");
         Add(zip, "DB/map/objects/4_interactables.json", "{\"array\":[{\"id\":\"scroll_box\",\"tag\":\"Interact\",\"generatorConfig\":{}},{\"id\":\"unreferenced_object\",\"tag\":\"Interact\"}]}");
         Add(zip, "Lang/russian/texts/mapObjects.json", "{\"tokens\":[{\"sid\":\"scroll_box_name\",\"text\":\"Сундук свитков\"}]}");
@@ -65,6 +67,23 @@ public class GameInstallationTests
         Assert.Equal(Path.Combine(game.InstallPath, "HeroesOldenEra_Data", "StreamingAssets", "map_templates"), source.TemplatesPath);
         Assert.DoesNotContain("private-account", System.Text.Json.JsonSerializer.Serialize(source));
         Assert.Contains("PlayerSettings", source.VersionEvidence);
+    }
+
+    [Fact]
+    public void VerifiedArchiveReadsOnlyTheBytesThatMatchTheCapturedFingerprint()
+    {
+        using var game = new SyntheticInstalledGame();
+        var source = Assert.IsType<GameInstallation>(game.Service().Discover());
+        using var opened = GameInstallationService.OpenVerifiedDataFile(source.CoreZipPath, source.SourceFingerprint);
+        File.Move(game.CorePath, Path.Combine(game.Root, "previous-core.zip"));
+        game.WriteCore(pool: "replaced_pool");
+
+        Assert.Throws<InstalledGameDataChangedException>(() =>
+            GameInstallationService.OpenVerifiedDataFile(source.CoreZipPath, source.SourceFingerprint));
+        using var archive = new ZipArchive(opened, ZipArchiveMode.Read, leaveOpen: true);
+        var snapshot = GameReferenceSnapshotBuilder.Build(archive);
+        Assert.Contains("current_pool", snapshot.Pools);
+        Assert.DoesNotContain("replaced_pool", snapshot.Pools);
     }
 
     [Fact]

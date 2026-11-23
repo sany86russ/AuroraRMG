@@ -130,15 +130,22 @@ namespace Olden_Era___Template_Editor
                 Margin = new Thickness(0, 0, 7, 0),
                 VerticalAlignment = VerticalAlignment.Center,
             });
-            sp.Children.Add(new TextBlock
+            var title = new StackPanel { Width = 220, Margin = new Thickness(0, 0, 14, 0), VerticalAlignment = VerticalAlignment.Center };
+            title.Children.Add(new TextBlock
             {
                 Text       = entry.DisplayName,
-                Width      = 220,
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xD5, 0xA3)),
-                Margin     = new Thickness(0, 0, 14, 0),
                 VerticalAlignment = VerticalAlignment.Center,
             });
+            if (entry.AvailabilityResource is { } resource)
+            {
+                var availability = new TextBlock { FontSize = 11, TextWrapping = TextWrapping.Wrap };
+                availability.SetResourceReference(TextBlock.ForegroundProperty, "BrushTextDim");
+                availability.SetResourceReference(TextBlock.TextProperty, resource);
+                title.Children.Add(availability);
+            }
+            sp.Children.Add(title);
             sp.Children.Add(new TextBlock
             {
                 Text       = entry.Id,
@@ -152,6 +159,15 @@ namespace Olden_Era___Template_Editor
             if (_checkedLeaves.Contains(entry.Id))
             { leaf.Background = CheckedBrush; if (GetCheckMark(leaf) is { } mark) mark.Text = "✓"; }
             return leaf;
+        }
+
+        internal void DebugToggleEntry(string id)
+        {
+            TxtSearch.Text = id;
+            var leaf = TvItems.Items.OfType<TreeViewItem>().SelectMany(group => group.Items.OfType<TreeViewItem>())
+                .Single(item => item.Tag is BanEntry entry && entry.Id == id);
+            ToggleLeaf(leaf);
+            if (!_checkedLeaves.Contains(id)) throw new InvalidOperationException("The installed artifact could not be selected for banning.");
         }
 
         // ── Check-toggle helpers ─────────────────────────────────────────────────

@@ -11,6 +11,9 @@ public static class TemplateBulkEditor
         "guardWeeklyIncrement", "diplomacyModifier", "guardedContentValue", "unguardedContentValue", "resourcesValue",
         "guardedContentValuePerArea", "unguardedContentValuePerArea", "resourcesValuePerArea", "mandatoryContent", "contentCountLimits"];
 
+    internal static int[] GetEditableVariants(RmgTemplate source) => Enumerable.Range(0, source.Variants?.Count ?? 0)
+        .Where(index => source.Variants![index]?.Zones?.Any(zone => !string.IsNullOrWhiteSpace(zone?.Name)) == true).ToArray();
+
     public static RmgTemplate Apply(RmgTemplate source, int variantIndex, IReadOnlyCollection<string> names, string property, string jsonValue)
     {
         ArgumentNullException.ThrowIfNull(source); ArgumentNullException.ThrowIfNull(names);
@@ -23,7 +26,8 @@ public static class TemplateBulkEditor
         var zones = variants[variantIndex]?["zones"] as JsonArray ?? throw new ArgumentException("The variant has no zones.");
         var wanted = names.ToHashSet(StringComparer.Ordinal);
         var targets = zones.OfType<JsonObject>().Where(z => wanted.Contains(z["name"]?.GetValue<string>() ?? "")).ToArray();
-        if (targets.Length != names.Count) throw new ArgumentException("Some selected zone names are missing or duplicated.");
+        if (targets.Length != wanted.Count || targets.Select(zone => zone["name"]!.GetValue<string>()).Distinct(StringComparer.Ordinal).Count() != wanted.Count)
+            throw new ArgumentException("Some selected zone names are missing or duplicated.");
         var value = JsonNode.Parse(jsonValue);
         foreach (var zone in targets)
         {

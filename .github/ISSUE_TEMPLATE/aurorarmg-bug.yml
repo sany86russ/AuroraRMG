@@ -1,0 +1,33 @@
+name: Ошибка AuroraRMG / Bug report
+description: Проблема с генератором, шаблоном или картой в игре / Generator, template or in-game issue
+title: '[Bug] '
+body:
+  - type: input
+    id: aurora-version
+    attributes:
+      label: Версия AuroraRMG / AuroraRMG version
+      placeholder: v1.12.1
+    validations:
+      required: true
+  - type: input
+    id: game-version
+    attributes:
+      label: Версия Olden Era и Steam build / Olden Era version and Steam build
+      placeholder: 0.82.10 / 26640613
+  - type: input
+    id: seeds
+    attributes:
+      label: Seed шаблона и seed карты / Template seed and in-game seed
+      description: Укажите seed из Aurora и отдельно seed из игры, если проблема возникает в партии. / Include the Aurora seed and, for in-game issues, the separate game seed if available.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Шаги, результат и ожидаемое поведение / Steps, result and expected behavior
+      description: Укажите режим, пресет и изменённые параметры. / Include the mode, preset and any settings you changed.
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Файлы и снимки / Files and screenshots
+      description: Если можете, приложите `.oetgs` и `.rmg.json` в ZIP. Перед отправкой проверьте файлы на личные данные. / Attach `.oetgs` and `.rmg.json` in a ZIP if possible. Check for personal data before posting.

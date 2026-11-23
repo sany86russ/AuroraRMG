@@ -17,7 +17,6 @@ namespace Olden_Era___Template_Editor
         private string _placeholder = "";
         private readonly RmgTemplate? _template;
         private readonly List<GamePool> _templatePools;
-        private PoolContentInspection? _inspection;
 
         private static string L(string key, params object[] args) => LocalizationManager.T(key, args);
 
@@ -167,7 +166,7 @@ namespace Olden_Era___Template_Editor
         {
             if (PoolList.SelectedItem is GamePool pool)
                 ShowPool(pool);
-            else { PoolDataGrid.ItemsSource = null; GroupSummary.Text = ""; _inspection = null; }
+            else { PoolDataGrid.ItemsSource = null; GroupSummary.Text = ""; }
         }
 
         private void RefreshExtraHeaders()
@@ -179,12 +178,12 @@ namespace Olden_Era___Template_Editor
 
         private void ShowPool(GamePool pool)
         {
-            _inspection = GamePoolDataLoader.InspectPool(pool, _template);
-            PoolDataGrid.ItemsSource = GamePoolDataLoader.GetPoolItems(pool, _template);
-            GroupSummary.Text = string.Join("\n", _inspection.Groups.Select(group => L("S.PV.GroupSummary", group.Index, group.Weight,
+            var inspection = GamePoolDataLoader.InspectPool(pool, _template);
+            PoolDataGrid.ItemsSource = GamePoolDataLoader.FormatPoolItems(inspection);
+            GroupSummary.Text = string.Join("\n", inspection.Groups.Select(group => L("S.PV.GroupSummary", group.Index, group.Weight,
                 group.DirectItemCount, group.Dependencies.Count == 0 ? L("S.PV.DependenciesEmpty") : string.Join(", ", group.Dependencies.Select(dependency =>
                     dependency.Name + " [" + L("S.PV.Origin." + dependency.Origin) + "]")))))
-                + (_inspection.Warnings.Count == 0 ? "" : "\n⚠ " + string.Join("\n⚠ ", _inspection.Warnings));
+                + (inspection.Warnings.Count == 0 ? "" : "\n⚠ " + string.Join("\n⚠ ", inspection.Warnings));
         }
 
         private void DebugBtn_Click(object sender, RoutedEventArgs e)

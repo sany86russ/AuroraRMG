@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using OldenEraTemplateEditor.Models;
+using Olden_Era___Template_Editor.Services.Localization;
 
 namespace Olden_Era___Template_Editor.Services
 {
@@ -27,10 +28,30 @@ namespace Olden_Era___Template_Editor.Services
         }
 
         public static int RemoveMainObject(Variant variant, Zone zone, int index)
+            => RemoveMainObjects(variant, [(zone, index)]);
+
+        /// <summary>Prepares all affected content definitions before touching either side of a mirrored edit.</summary>
+        public static int RemoveMainObjects(Variant variant, IReadOnlyList<(Zone Zone, int Index)> removals,
+            RmgTemplate? template = null)
         {
-            if (zone.MainObjects is not { } objects || index < 0 || index >= objects.Count)
-                throw new ArgumentOutOfRangeException(nameof(index));
-            objects.RemoveAt(index);
+            var indices = new Dictionary<Zone, int>();
+            foreach (var (zone, index) in removals)
+            {
+                if (zone.MainObjects is not { } objects || index < 0 || index >= objects.Count)
+                    throw new ArgumentOutOfRangeException(nameof(removals));
+                indices.Add(zone, index);
+            }
+            var applyMandatory = MandatoryPlacementEdits.Prepare(template, indices.Keys,
+                (zone, rule) => MandatoryPlacementEdits.ReindexMainObject(rule, indices[zone]));
+            int reset = 0;
+            foreach (var (zone, index) in removals) reset += RemoveMainObjectCore(variant, zone, index);
+            applyMandatory();
+            return reset;
+        }
+
+        private static int RemoveMainObjectCore(Variant variant, Zone zone, int index)
+        {
+            zone.MainObjects!.RemoveAt(index);
             int reset = 0;
             foreach (var z in variant.Zones ?? [])
             foreach (var obj in z.MainObjects ?? [])
@@ -55,9 +76,13 @@ namespace Olden_Era___Template_Editor.Services
                 System.Text.Json.JsonSerializer.Serialize(source, JsonExport.Options), JsonExport.Options)!;
 
         /// <summary>A copied start becomes a neutral town instead of duplicating a player side.</summary>
-        public static bool PreparePastedZone(Zone clone, IReadOnlyList<Zone> existingZones, string? sourceName = null)
+        public static bool PreparePastedZone(Zone clone, IReadOnlyList<Zone> existingZones, string? sourceName = null,
+            RmgTemplate? template = null)
         {
+            var applyMandatory = MandatoryPlacementEdits.Prepare(template, [clone],
+                (_, rule) => rule.Type == "Connection" ? new MandatoryPlacementEdits.RuleChange(true, null) : default);
             var taken = new HashSet<string>(StringComparer.Ordinal);
+            var availableAnchorTargets = existingZones.Select(zone => zone.Name).Append(clone.Name).ToHashSet(StringComparer.Ordinal);
             foreach (var zone in existingZones)
             foreach (var obj in zone.MainObjects ?? [])
             {
@@ -67,7 +92,13 @@ namespace Olden_Era___Template_Editor.Services
             bool cleared = false;
             foreach (var obj in clone.MainObjects ?? [])
             {
-                if (!string.IsNullOrEmpty(sourceName)) FactionSelectors.RenameZone(obj.Faction, sourceName, clone.Name);
+                if (!string.IsNullOrEmpty(sourceName))
+                {
+                    FactionSelectors.RenameZone(obj.Faction, sourceName, clone.Name);
+                    RenameUniformPlacementAnchors(obj, sourceName, clone.Name);
+                }
+                RemoveUniformPlacementAnchors(obj, target => !availableAnchorTargets.Contains(target));
+                if (obj.Placement == "Connection") ClearConnectionPlacement(obj);
                 if (!string.IsNullOrEmpty(obj.Owner) && taken.Contains(obj.Owner))
                 { obj.Owner = null; obj.IsStartCity = false; cleared = true; }
                 if (!string.IsNullOrEmpty(obj.Spawn) && taken.Contains(obj.Spawn))
@@ -80,26 +111,51 @@ namespace Olden_Era___Template_Editor.Services
             }
             // Connections are not pasted with a zone; their road anchors belong to the source zone.
             clone.Roads?.RemoveAll(r => r.From?.Type == "Connection" || r.To?.Type == "Connection");
+            applyMandatory();
             return cleared;
         }
 
-        /// <summary>Renames roads in one pass, including swaps of two connection names.</summary>
-        public static void RenameConnectionReferences(Variant variant, IReadOnlyDictionary<string, string> names)
+        private static void ClearConnectionPlacement(MainObject obj)
+        {
+            obj.Placement = "Uniform";
+            obj.PlacementArgs = null;
+        }
+
+        /// <summary>Renames connection references in one pass, including swaps of two connection names.</summary>
+        public static void RenameConnectionReferences(Variant variant, IReadOnlyDictionary<string, string> names,
+            RmgTemplate? template = null)
+        {
+            EnsureUniqueRenameSources(variant, names);
+            var changes = names.ToDictionary(pair => pair.Key,
+                pair => new MandatoryPlacementEdits.RuleChange(false, pair.Value), StringComparer.Ordinal);
+            var applyMandatory = PrepareMandatoryConnectionEdits(variant, template, changes);
+            RenameLocalConnectionReferences(variant, names);
+            applyMandatory();
+        }
+
+        private static void RenameLocalConnectionReferences(Variant variant, IReadOnlyDictionary<string, string> names)
         {
             foreach (var zone in variant.Zones ?? [])
-            foreach (var road in zone.Roads ?? [])
-            foreach (var endpoint in new[] { road.From, road.To })
-                if (endpoint is { Type: "Connection", Args.Count: > 0 }
-                    && names.TryGetValue(endpoint.Args[0], out string? replacement))
-                    endpoint.Args[0] = replacement;
+            {
+                foreach (var obj in zone.MainObjects ?? [])
+                    if (obj is { Placement: "Connection", PlacementArgs.Count: > 0 } && obj.PlacementArgs[0] is { } target
+                        && names.TryGetValue(target, out string? updated))
+                        obj.PlacementArgs[0] = updated;
+                foreach (var road in zone.Roads ?? [])
+                foreach (var endpoint in new[] { road.From, road.To })
+                    if (endpoint is { Type: "Connection", Args.Count: > 0 } && endpoint.Args[0] is { } roadTarget
+                        && names.TryGetValue(roadTarget, out string? replacement))
+                        endpoint.Args[0] = replacement;
+            }
             foreach (var connection in variant.Connections ?? [])
                 foreach (var rule in PortalRules(connection))
-                    if (rule is { Type: "Connection", Args.Count: > 0 } && names.TryGetValue(rule.Args[0], out string? replacement))
+                    if (rule is { Type: "Connection", Args.Count: > 0 } && rule.Args[0] is { } portalTarget
+                        && names.TryGetValue(portalTarget, out string? replacement))
                         rule.Args[0] = replacement;
         }
 
         /// <summary>Commits a connection-manager draft only after every row has been validated.</summary>
-        public static void ApplyConnectionEdits(Variant variant, IReadOnlyList<Connection> edited)
+        public static void ApplyConnectionEdits(Variant variant, IReadOnlyList<Connection> edited, RmgTemplate? template = null)
         {
             var original = variant.Connections ?? [];
             if (original.Count != edited.Count) throw new InvalidOperationException(Localization.LocalizationManager.T("S.Label.ConnectionCount"));
@@ -117,11 +173,70 @@ namespace Olden_Era___Template_Editor.Services
                     if (!renamed.TryAdd(before.Name, after.Name))
                         throw new InvalidOperationException(Localization.LocalizationManager.T("S.CM.InvalidName"));
             }
-            if (original.Where(c => !string.IsNullOrEmpty(c.Name)).GroupBy(c => c.Name, StringComparer.Ordinal)
-                .Any(group => group.Count() > 1 && renamed.ContainsKey(group.Key!)))
-                throw new InvalidOperationException(Localization.LocalizationManager.T("S.CM.InvalidName"));
+            EnsureUniqueRenameSources(variant, renamed);
+            var changes = renamed.ToDictionary(pair => pair.Key,
+                pair => new MandatoryPlacementEdits.RuleChange(false, pair.Value), StringComparer.Ordinal);
+            var applyMandatory = PrepareMandatoryConnectionEdits(variant, template, changes);
             variant.Connections = new List<Connection>(edited);
-            RenameConnectionReferences(variant, renamed);
+            RenameLocalConnectionReferences(variant, renamed);
+            applyMandatory();
+        }
+
+        private static void EnsureUniqueRenameSources(Variant variant, IReadOnlyDictionary<string, string> renamed)
+        {
+            foreach (var group in (variant.Connections ?? []).Where(c => c.Name is { } name && renamed.ContainsKey(name))
+                .GroupBy(c => c.Name, StringComparer.Ordinal))
+                if (group.Count() > 1)
+                    throw new InvalidOperationException(LocalizationManager.T("S.EC.AmbiguousConnectionPlacement", group.Key!));
+        }
+
+        private static Action PrepareMandatoryConnectionEdits(Variant variant, RmgTemplate? template,
+            IReadOnlyDictionary<string, MandatoryPlacementEdits.RuleChange> changes, IReadOnlySet<string>? excludedZones = null)
+        {
+            if (template is null || changes.Count == 0) return static () => { };
+            var namesAtZone = (variant.Connections ?? []).Where(connection => connection.Name is { } name && changes.ContainsKey(name))
+                .SelectMany(connection => new[] { (Zone: connection.From, Connection: connection.Name!), (Zone: connection.To, Connection: connection.Name!) })
+                .ToLookup(target => target.Zone, target => target.Connection, StringComparer.Ordinal);
+            return MandatoryPlacementEdits.Prepare(template,
+                (variant.Zones ?? []).Where(zone => zone is not null && excludedZones?.Contains(zone.Name) != true && namesAtZone.Contains(zone.Name)),
+                (zone, rule) => rule is { Type: "Connection", Args.Count: > 0 } && rule.Args[0] is { } target
+                    && namesAtZone[zone.Name].Contains(target, StringComparer.Ordinal) ? changes[target] : default);
+        }
+
+        /// <summary>Removes a zone set together so references pointing into its mirrored half are edited atomically.</summary>
+        public static int RemoveZones(Variant variant, IReadOnlyList<Zone> zones, RmgTemplate template)
+        {
+            var removed = zones.Select(zone => zone.Name).ToHashSet(StringComparer.Ordinal);
+            var connections = (variant.Connections ?? [])
+                .Where(connection => removed.Contains(connection.From) || removed.Contains(connection.To)).ToHashSet();
+            var applyMandatory = PrepareRemovedConnections(variant, template, connections, removed);
+            int count = 0;
+            foreach (var zone in zones)
+            {
+                count += RemoveZoneReferences(variant, zone.Name);
+                variant.Zones?.Remove(zone);
+            }
+            applyMandatory();
+            return count;
+        }
+
+        public static void RemoveConnection(Variant variant, Connection connection, RmgTemplate template)
+        {
+            var applyMandatory = PrepareRemovedConnections(variant, template, new HashSet<Connection> { connection });
+            variant.Connections?.Remove(connection);
+            if (!string.IsNullOrEmpty(connection.Name)) RemoveRoadsFor(variant, connection.Name);
+            applyMandatory();
+        }
+
+        private static Action PrepareRemovedConnections(Variant variant, RmgTemplate template, IReadOnlySet<Connection> removed,
+            IReadOnlySet<string>? excludedZones = null)
+        {
+            var changes = removed.Where(connection => !string.IsNullOrEmpty(connection.Name)).Select(connection => connection.Name!)
+                .Distinct(StringComparer.Ordinal).ToDictionary(name => name, _ => new MandatoryPlacementEdits.RuleChange(true, null), StringComparer.Ordinal);
+            foreach (var connection in variant.Connections ?? [])
+                if (!removed.Contains(connection) && connection.Name is { } name && changes.ContainsKey(name))
+                    throw new InvalidOperationException(LocalizationManager.T("S.EC.AmbiguousConnectionPlacement", name));
+            return PrepareMandatoryConnectionEdits(variant, template, changes, excludedZones);
         }
 
         /// <summary>
@@ -164,6 +279,7 @@ namespace Olden_Era___Template_Editor.Services
             foreach (var obj in zone.MainObjects ?? [])
             {
                 FactionSelectors.RenameZone(obj.Faction, oldName, newName);
+                RenameUniformPlacementAnchors(obj, oldName, newName);
                 if (obj.Placement == "NearZone" && obj.PlacementArgs is { Count: > 0 } args && args[0] == oldName)
                     args[0] = newName;
             }
@@ -208,6 +324,7 @@ namespace Olden_Era___Template_Editor.Services
                 foreach (var obj in zone.MainObjects ?? [])
                 {
                     FactionSelectors.RemoveSource(obj.Faction, zone.Name, zoneName, null);
+                    RemoveUniformPlacementAnchors(obj, target => target == zoneName);
                     if (obj.Placement == "NearZone" && obj.PlacementArgs?.FirstOrDefault() == zoneName)
                     { obj.Placement = "Uniform"; obj.PlacementArgs = null; }
                 }
@@ -242,7 +359,12 @@ namespace Olden_Era___Template_Editor.Services
                 && string.Equals(args[0], name, StringComparison.Ordinal);
 
             foreach (Zone zone in variant.Zones ?? [])
+            {
                 zone.Roads?.RemoveAll(r => Points(r.From, connectionName) || Points(r.To, connectionName));
+                foreach (var obj in zone.MainObjects ?? [])
+                    if (obj is { Placement: "Connection", PlacementArgs.Count: > 0 } && obj.PlacementArgs[0] == connectionName)
+                        ClearConnectionPlacement(obj);
+            }
             foreach (var connection in variant.Connections ?? [])
             {
                 connection.PortalPlacementRulesFrom?.RemoveAll(rule => rule is { Type: "Connection", Args.Count: > 0 } && rule.Args[0] == connectionName);
@@ -318,13 +440,33 @@ namespace Olden_Era___Template_Editor.Services
             return warnings;
         }
 
-        /// <summary>NearZone belongs to main-object placement; only its confirmed first zone argument is remapped.</summary>
+        /// <summary>Remaps NearZone's first argument and known Zone anchors when copying a zone.</summary>
         public static void RemapMainObjectPlacementZones(Zone zone, IReadOnlyDictionary<string, string> zones)
         {
             ArgumentNullException.ThrowIfNull(zone); ArgumentNullException.ThrowIfNull(zones);
             foreach (var obj in zone.MainObjects ?? [])
+            {
                 if (obj is { Placement: "NearZone", PlacementArgs.Count: > 0 } && zones.TryGetValue(obj.PlacementArgs[0], out var target))
                     obj.PlacementArgs[0] = target;
+                foreach (var anchor in obj?.UniformPlacementAnchors ?? [])
+                    if (anchor is { Type: "Zone", ZoneName: { } name } && zones.TryGetValue(name, out var replacement))
+                        anchor.ZoneName = replacement;
+            }
+        }
+
+        private static void RenameUniformPlacementAnchors(MainObject obj, string oldName, string newName)
+        {
+            foreach (var anchor in obj.UniformPlacementAnchors ?? [])
+                if (anchor is { Type: "Zone" } && anchor.ZoneName == oldName)
+                    anchor.ZoneName = newName;
+        }
+
+        private static void RemoveUniformPlacementAnchors(MainObject obj, Predicate<string> shouldRemove)
+        {
+            if (obj.UniformPlacementAnchors is { } anchors
+                && anchors.RemoveAll(anchor => anchor is { Type: "Zone", ZoneName: { Length: > 0 } target } && shouldRemove(target)) > 0
+                && anchors.Count == 0)
+                obj.UniformPlacementAnchors = null;
         }
 
         private static IEnumerable<ContentPlacementRule> PortalRules(Connection connection) =>

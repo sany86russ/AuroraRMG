@@ -11,10 +11,12 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using OldenEraTemplateEditor.Models;
 using Olden_Era___Template_Editor.Models;
 using Olden_Era___Template_Editor.Services;
+using Olden_Era___Template_Editor.Services.Analysis;
 using IOPath = System.IO.Path;
 
 namespace Olden_Era___Template_Editor
@@ -117,14 +119,17 @@ namespace Olden_Era___Template_Editor
 
         // Undo/redo: whole-template JSON snapshots. _undoBaseline always mirrors the current
         // model state; every MarkDirty pushes the previous baseline, so one commit = one undo step.
-        private readonly List<string> _undoStack = [];
-        private readonly List<string> _redoStack = [];
-        private readonly Dictionary<string, Dictionary<string, Point>> _snapshotPositions = new(StringComparer.Ordinal);
+        private readonly List<EditorSnapshot> _undoStack = [];
+        private readonly List<EditorSnapshot> _redoStack = [];
+        private readonly Dictionary<EditorSnapshot, Dictionary<string, Point>> _snapshotPositions = [];
+        private readonly record struct EditorSnapshot(string Json, int VariantIndex);
         private string _undoBaseline = "";
         private bool _restoringHistory;
         private const int MaxUndoDepth = 50;
         /// <summary>Memory ceiling for the undo history (~16 MB of UTF-16 chars), independent of depth.</summary>
         private const long MaxUndoChars = 8_000_000;
+        private readonly Dictionary<(string Path, int Variant), Dictionary<string, Point>> _pendingLayoutSaves = [];
+        private DispatcherTimer? _layoutSaveTimer;
 
         internal void DebugDiscardAndClose()
         {
@@ -139,9 +144,14 @@ namespace Olden_Era___Template_Editor
             _saveValidationBaseline = new TemplatePropertiesDraft(_template);
             _topology = topology;
             Services.Localization.LocalizationManager.Instance.LanguageChanged += EditorLanguageChanged;
-            Closed += (_, _) => Services.Localization.LocalizationManager.Instance.LanguageChanged -= EditorLanguageChanged;
+            Closed += (_, _) =>
+            {
+                FlushPendingLayoutSaves();
+                Services.Localization.LocalizationManager.Instance.LanguageChanged -= EditorLanguageChanged;
+            };
             Loaded += (_, _) =>
             {
+                RefreshVariantChoices(0);
                 ComputePositions();
                 RebuildGraph();
                 FitToView();
@@ -162,12 +172,12 @@ namespace Olden_Era___Template_Editor
             {
                 _template.Variants ??= [];
                 if (_template.Variants.Count == 0) _template.Variants.Add(new Variant());
-                return _template.Variants[0];
+                return _template.Variants[_variantIndex];
             }
         }
 
-        private List<Zone> Zones => Variant.Zones ??= [];
-        private List<Connection> Connections => Variant.Connections ??= [];
+        private List<Zone> Zones => Variant.Zones ?? [];
+        private List<Connection> Connections => Variant.Connections ?? [];
 
         private static RmgTemplate NewEmptyTemplate() => new()
         {
@@ -182,7 +192,7 @@ namespace Olden_Era___Template_Editor
             _positions.Clear();
             try
             {
-                var layout = TemplatePreviewPngWriter.ComputeLayout(_template, _topology);
+                var layout = TemplatePreviewPngWriter.ComputeVariantLayout(Variant, _topology);
                 foreach (var kv in layout) _positions[kv.Key] = kv.Value;
                 _radius = Math.Max(16, TemplatePreviewPngWriter.GetLastZoneRadius());
             }
@@ -192,7 +202,7 @@ namespace Olden_Era___Template_Editor
             // used to throw away the user's dragging the moment a template was saved and reopened.
             if (restoreSaved && _currentPath is not null)
             {
-                var remembered = EditorLayoutStore.Load(_currentPath);
+                var remembered = EditorLayoutStore.LoadVariant(_currentPath, _variantIndex);
                 if (remembered is not null)
                 {
                     var known = new HashSet<string>(Zones.Select(z => z.Name), StringComparer.Ordinal);
@@ -846,8 +856,18 @@ namespace Olden_Era___Template_Editor
                 {
                     if (string.IsNullOrWhiteSpace(v) || Connections.Any(other => !ReferenceEquals(other, c) && other.Name == v))
                     { UpdateStatus(L("S.CM.InvalidName")); BuildInspector(); return; }
-                    if (!string.IsNullOrEmpty(c.Name))
-                        TemplateRefactor.RenameConnectionReferences(Variant, new Dictionary<string, string> { [c.Name] = v });
+                    if (c.Name == v) return;
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(c.Name))
+                            TemplateRefactor.RenameConnectionReferences(Variant, new Dictionary<string, string> { [c.Name] = v }, _template);
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        ShowReferenceEditError(ex);
+                        BuildInspector();
+                        return;
+                    }
                     c.Name = v;
                     MarkDirty();
                 }, mainPanel);
@@ -1042,7 +1062,7 @@ namespace Olden_Era___Template_Editor
             }
 
             // Function to update visibility based on type
-            void UpdateFieldVisibility(string type)
+            void UpdateFieldVisibility(string? type)
             {
                 bool isGladiator = type == "GladiatorArena";
                 bool isAbandonedOutpost = type == "AbandonedOutpost";
@@ -2239,7 +2259,10 @@ namespace Olden_Era___Template_Editor
         private void CanvasHost_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             if (_dragZone is not null && _movedWhileDragging)
+            {
+                QueueLayoutSave();
                 UpdateStatus(L("S.EC.ZoneMoved", _dragZone.Name));
+            }
             _dragZone = null;
             _isPanning = false;
             if (CanvasHost.IsMouseCaptured) CanvasHost.ReleaseMouseCapture();
@@ -2312,7 +2335,7 @@ namespace Olden_Era___Template_Editor
             // the engine cannot tell apart (and the validator flags on save).
             string autoName = MakeUniqueConnectionName($"{connType}-{_connectFrom.Name}-{z.Name}");
             var conn = new Connection { Name = autoName, From = _connectFrom.Name, To = z.Name, ConnectionType = connType };
-            Connections.Add(conn);
+            (Variant.Connections ??= []).Add(conn);
             MirrorAfterConnectionAdded(conn);
             UpdateStatus(L("S.EC.ConnAdded", conn.From, conn.To));
             _connectFrom = null;
@@ -2397,7 +2420,7 @@ namespace Olden_Era___Template_Editor
                 MetaObjectsBiome = new BiomeSelector { Type = "MatchZone", Args = [] },
                 CrossroadsPosition = 0,
             };
-            Zones.Add(z);
+            (Variant.Zones ??= []).Add(z);
             _positions[name] = pos;
             MirrorAfterZoneAdded(z, pos);
             MarkDirty();
@@ -2508,6 +2531,7 @@ namespace Olden_Era___Template_Editor
                 H3TImportResult result = H3TImporter.Parse(dlg.FileName);
 
                 _template = result.Template;
+                ResetVariantLayouts();
                 _saveValidationBaseline = new TemplatePropertiesDraft(_template);
                 _topology = MapTopology.Default;
                 _currentPath = null;             // an import is a new template, not an edit of the .h3t
@@ -2553,6 +2577,7 @@ namespace Olden_Era___Template_Editor
             if (dlg.ShowDialog() != true || dlg.Result is not { } result) return;
 
             _template = result.Template;
+            ResetVariantLayouts();
             _saveValidationBaseline = new TemplatePropertiesDraft(_template);
             _topology = MapTopology.Default;
             _currentPath = null;
@@ -2574,7 +2599,7 @@ namespace Olden_Era___Template_Editor
             FitToView();
             BuildInspector();
 
-            var variant = _template.Variants![0];
+            var variant = Variant;
             UpdateStatus(L("S.IM.Imported", variant.Zones!.Count, variant.Connections!.Count));
         }
 
@@ -2670,18 +2695,14 @@ namespace Olden_Era___Template_Editor
             RememberCurrentLayout();
             if (_selected is Zone z)
             {
-                // Also prunes the roads, biome selectors and orientation anchor that pointed at it —
-                // leaving those behind produces a template the engine cannot generate.
-                int removedConns = TemplateRefactor.RemoveZoneReferences(Variant, z.Name);
-                Zones.Remove(z);
-                _positions.Remove(z.Name);
-
-                // Mirror mode: the twin goes with it, otherwise the map stops being symmetric.
-                if (MirrorTwinToDelete(z) is { } twin)
+                Zone[] removed = _mirrorMode && TwinOf(z) is { } twin ? [z, twin] : [z];
+                int removedConns;
+                try { removedConns = TemplateRefactor.RemoveZones(Variant, removed, _template); }
+                catch (InvalidOperationException ex) { ShowReferenceEditError(ex); return; }
+                foreach (var zone in removed)
                 {
-                    removedConns += TemplateRefactor.RemoveZoneReferences(Variant, twin.Name);
-                    Zones.Remove(twin);
-                    _positions.Remove(twin.Name);
+                    _positions.Remove(zone.Name);
+                    _mirrorMap.Remove(zone.Name);
                 }
 
                 MarkDirty();
@@ -2691,8 +2712,8 @@ namespace Olden_Era___Template_Editor
             }
             else if (_selected is Connection c)
             {
-                Connections.Remove(c);
-                if (!string.IsNullOrEmpty(c.Name)) TemplateRefactor.RemoveRoadsFor(Variant, c.Name!);
+                try { TemplateRefactor.RemoveConnection(Variant, c, _template); }
+                catch (InvalidOperationException ex) { ShowReferenceEditError(ex); return; }
                 MarkDirty();
                 RebuildGraph();
                 Select(null);
@@ -2701,9 +2722,27 @@ namespace Olden_Era___Template_Editor
             else UpdateStatus(L("S.EC.NothingToDelete"));
         }
 
-        private void BtnValidate_Click(object sender, RoutedEventArgs e)
+        private void ShowReferenceEditError(InvalidOperationException error) =>
+            MessageBox.Show(this, error.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+
+        private async void BtnValidate_Click(object sender, RoutedEventArgs e)
         {
-            var issues = Validate();
+            Keyboard.ClearFocus();
+            var template = _template;
+            BtnValidate.IsEnabled = false;
+            List<string> issues;
+            try
+            {
+                var catalog = await Services.GameData.GameCatalogService.Instance.GetCatalogAsync();
+                if (!IsLoaded || !ReferenceEquals(template, _template)) return;
+                issues = Validate(catalog.GetReferenceCatalog());
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+            {
+                MessageBox.Show(this, ex.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            finally { BtnValidate.IsEnabled = true; }
             if (issues.Count == 0)
             {
                 UpdateStatus(L("S.EC.NoIssues"));
@@ -2716,10 +2755,12 @@ namespace Olden_Era___Template_Editor
                 MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        private List<string> Validate() => ZoneGraphValidator.Validate(Zones, Connections)
-            .Concat(Services.Analysis.TemplateCompatibilityValidator.Validate(_template, Services.Analysis.TemplateValidationMode.TolerantImport)
-                .Where(i => i.Severity != Services.Analysis.TemplateIssueSeverity.Information)
-                .Select(i => i.Path + ": " + i.Message)).Distinct().ToList();
+        private List<string> Validate(TemplateReferenceCatalog? catalog = null) =>
+            FormatValidationIssues(TemplateCompatibilityValidator.Validate(_template, TemplateValidationMode.TolerantImport, catalog));
+
+        private static List<string> FormatValidationIssues(IEnumerable<TemplateValidationIssue> findings) =>
+            findings.Where(issue => issue.Severity != TemplateIssueSeverity.Information)
+                .Select(issue => issue.Path + ": " + issue.Message).Distinct(StringComparer.Ordinal).ToList();
 
         private void BtnRelayout_Click(object sender, RoutedEventArgs e)
         {
@@ -2727,7 +2768,29 @@ namespace Olden_Era___Template_Editor
             if (_mirrorMode) RebuildMirrorPairs();
             RebuildGraph();
             FitToView();
+            QueueLayoutSave();
             UpdateStatus(L("S.EC.Relayout"));
+        }
+
+        private void QueueLayoutSave()
+        {
+            if (_currentPath is not { } path) return;
+            _pendingLayoutSaves[(path, _variantIndex)] = new(_positions, StringComparer.Ordinal);
+            if (_layoutSaveTimer is null)
+            {
+                _layoutSaveTimer = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(250) };
+                _layoutSaveTimer.Tick += (_, _) => FlushPendingLayoutSaves();
+            }
+            _layoutSaveTimer.Stop();
+            _layoutSaveTimer.Start();
+        }
+
+        private void FlushPendingLayoutSaves()
+        {
+            _layoutSaveTimer?.Stop();
+            foreach (var (target, positions) in _pendingLayoutSaves)
+                EditorLayoutStore.SaveVariant(target.Path, target.Variant, positions);
+            _pendingLayoutSaves.Clear();
         }
 
         private void BtnZoomReset_Click(object sender, RoutedEventArgs e) => FitToView();
@@ -2756,9 +2819,11 @@ namespace Olden_Era___Template_Editor
             var dlg = new JsonPreviewWindow(_template, JsonOptions) { Owner = this };
             if (dlg.ShowDialog() == true && dlg.Result is not null)
             {
+                RememberVariantLayout();
                 _template = dlg.Result;
-                _selected = null; _connectFrom = null; _connectMode = false;
-                ComputePositions();
+                RefreshVariantChoices(_variantIndex);
+                ResetVariantInteraction(disableMirror: true);
+                RestoreVariantLayout();
                 RebuildGraph();
                 FitToView();
                 BuildInspector();
@@ -2775,10 +2840,10 @@ namespace Olden_Era___Template_Editor
             var dlg = new ConnectionManagerWindow(Connections) { Owner = this };
             if (dlg.ShowDialog() == true)
             {
-                try { TemplateRefactor.ApplyConnectionEdits(Variant, dlg.EditedConnections); }
+                try { TemplateRefactor.ApplyConnectionEdits(Variant, dlg.EditedConnections, _template); }
                 catch (InvalidOperationException ex)
                 {
-                    MessageBox.Show(this, ex.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ShowReferenceEditError(ex);
                     return;
                 }
                 _selected = null;
@@ -2829,9 +2894,11 @@ namespace Olden_Era___Template_Editor
             var clone = CloneZone(_zoneClipboard);
             clone.Name = MakeUniqueZoneName(_zoneClipboardSource);
 
-            bool ownerCleared = TemplateRefactor.PreparePastedZone(clone, Zones, _zoneClipboardSource);
+            bool ownerCleared;
+            try { ownerCleared = TemplateRefactor.PreparePastedZone(clone, Zones, _zoneClipboardSource, _template); }
+            catch (InvalidOperationException ex) { ShowReferenceEditError(ex); return; }
 
-            Zones.Add(clone);
+            (Variant.Zones ??= []).Add(clone);
             Point basePos = _positions.TryGetValue(_zoneClipboardSource, out var sp) ? sp : new Point(160, 160);
             _positions[clone.Name] = new Point(basePos.X + 40, basePos.Y + 40);
 
@@ -2884,8 +2951,10 @@ namespace Olden_Era___Template_Editor
                 var json = File.ReadAllText(dlg.FileName);
                 var loaded = TemplateJsonReader.Deserialize(json, JsonOptions);
                 if (loaded is null) { UpdateStatus(L("S.EC.LoadFail")); return; }
+                FlushPendingLayoutSaves();
                 if (_mirrorMode) DisableMirrorMode();
                 _template = loaded;
+                ResetVariantLayouts();
                 _saveValidationBaseline = new TemplatePropertiesDraft(_template);
                 _topology = MapTopology.Default;
                 _currentPath = dlg.FileName;
@@ -2909,29 +2978,45 @@ namespace Olden_Era___Template_Editor
         {
             Keyboard.ClearFocus();
             if (_invalidWeightEditors.Count > 0) { MessageBox.Show(L("S.Patch.InvalidEditor"), Title); return; }
-            var dialog = new TemplateBulkEditWindow(_template) { Owner = this };
+            var dialog = new TemplateBulkEditWindow(_template, _variantIndex) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.ResultTemplate is not { } result) return;
-            _selected = null; _template = result; MarkDirty(); RebuildGraph(); BuildInspector();
+            bool changedVariant = _variantIndex != dialog.SelectedVariantIndex;
+            if (changedVariant) RememberVariantLayout();
+            _template = result;
+            RefreshVariantChoices(dialog.SelectedVariantIndex);
+            ResetVariantInteraction(disableMirror: changedVariant);
+            if (changedVariant) RestoreVariantLayout();
+            MarkDirty();
+            RebuildGraph();
+            if (changedVariant) FitToView();
+            BuildInspector();
         }
 
-        private void BtnProperties_Click(object sender, RoutedEventArgs e)
+        private async void BtnProperties_Click(object sender, RoutedEventArgs e)
         {
             Keyboard.ClearFocus();
             if (_invalidWeightEditors.Count > 0) { MessageBox.Show(L("S.Patch.InvalidEditor"), Title); return; }
-            var dialog = new TemplatePropertiesWindow(_template) { Owner = this };
+            BtnProperties.IsEnabled = false;
+            Services.GameData.GameCatalog catalog;
+            try { catalog = await Services.GameData.GameCatalogService.Instance.GetCatalogAsync(); }
+            finally { BtnProperties.IsEnabled = true; }
+            if (!IsLoaded) return;
+            var dialog = new TemplatePropertiesWindow(_template, catalog) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.ResultTemplate is not { } result) return;
             _selected = null; _template = result; MarkDirty(); RebuildGraph(); BuildInspector();
             if (dialog.ValidationIssues.Count > 0) UpdateStatus(string.Join("; ", dialog.ValidationIssues.Take(5).Select(i => i.Message)));
         }
 
-        private async void BtnSave_Click(object sender, RoutedEventArgs e)
+        private async void BtnSave_Click(object sender, RoutedEventArgs e) => await SaveTemplateAsync();
+
+        private async Task<bool> SaveTemplateAsync()
         {
-            if (_saveCheckingReferences) return;
+            if (_saveCheckingReferences) return false;
             Keyboard.ClearFocus();
             if (_invalidWeightEditors.Count > 0)
             {
                 MessageBox.Show(L("S.Patch.InvalidEditor"), Title, MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                return false;
             }
 
             // Hard-blocking validation: empty connection names
@@ -2942,12 +3027,13 @@ namespace Olden_Era___Template_Editor
                 MessageBox.Show(this,
                     L("S.EC.SaveEmptyNames", emptyNameConns.Count, connList),
                     L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                return false;
             }
 
             RmgTemplate savable;
             IReadOnlyList<string> addedLayouts;
-            IReadOnlyList<Services.Analysis.TemplateValidationIssue> catalogFindings;
+            IReadOnlyList<TemplateValidationIssue> catalogFindings;
+            bool wasEnabled = IsEnabled;
             try
             {
                 _saveCheckingReferences = true; IsEnabled = false;
@@ -2961,18 +3047,16 @@ namespace Olden_Era___Template_Editor
             catch (Exception ex) when (ex is InvalidOperationException or JsonException or IOException or UnauthorizedAccessException or ArgumentException or System.ComponentModel.Win32Exception)
             {
                 MessageBox.Show(this, ex.Message, L("S.EC.SaveValidateTitle"), MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                return false;
             }
-            finally { IsEnabled = true; _saveCheckingReferences = false; }
-            var issues = Validate().Concat(catalogFindings
-                .Where(finding => finding.Severity != Services.Analysis.TemplateIssueSeverity.Information)
-                .Select(finding => finding.Path + ": " + finding.Message)).Distinct(StringComparer.Ordinal).ToList();
+            finally { IsEnabled = wasEnabled; _saveCheckingReferences = false; }
+            var issues = FormatValidationIssues(catalogFindings);
             if (issues.Count > 0)
             {
                 var go = MessageBox.Show(this,
                     L("S.EC.SaveValidate", issues.Count, string.Join("\n", issues.Take(10))),
                     L("S.EC.SaveValidateTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (go != MessageBoxResult.Yes) return;
+                if (go != MessageBoxResult.Yes) return false;
             }
 
             var dlg = new SaveFileDialog
@@ -2984,7 +3068,7 @@ namespace Olden_Era___Template_Editor
                                                     : $"{_template.Name}.rmg.json",
             };
             if (_currentPath is not null) dlg.InitialDirectory = IOPath.GetDirectoryName(_currentPath);
-            if (dlg.ShowDialog(this) != true) return;
+            if (dlg.ShowDialog(this) != true) return false;
 
             try
             {
@@ -2994,17 +3078,20 @@ namespace Olden_Era___Template_Editor
                 CommitSavedTemplate(savable);
                 // Remember the hand-arranged graph so reopening this template restores it (sidecar in
                 // %LOCALAPPDATA%, never next to the game's template file).
-                EditorLayoutStore.Save(dlg.FileName, _positions);
+                FlushPendingLayoutSaves();
+                SaveVariantLayouts(dlg.FileName);
                 _currentPath = dlg.FileName;
                 _dirty = false;
                 UpdateTitle();
                 UpdateStatus(addedLayouts.Count > 0
                     ? L("S.EC.SavedFixedLayouts", IOPath.GetFileName(dlg.FileName), string.Join(", ", addedLayouts))
                     : L("S.EC.Saved", IOPath.GetFileName(dlg.FileName)));
+                return true;
             }
             catch (Exception ex)
             {
                 MessageBox.Show(this, L("S.EC.SaveErr", ex.Message), L("S.EC.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
             }
         }
 
@@ -3015,6 +3102,7 @@ namespace Olden_Era___Template_Editor
             var selected = _selected;
             string? connectFromName = _connectFrom?.Name;
             _template = saved;
+            RefreshVariantChoices(_variantIndex);
             _selected = selected switch
             {
                 Zone zone => Zones.FirstOrDefault(item => item.Name == zone.Name),
@@ -3102,21 +3190,22 @@ namespace Olden_Era___Template_Editor
             if (_restoringHistory) return;
             string now = JsonSerializer.Serialize(_template, SnapshotOptions);
             if (string.Equals(now, _undoBaseline, StringComparison.Ordinal)) return;
-            _undoStack.Add(_undoBaseline);
+            _undoStack.Add(new(_undoBaseline, _variantIndex));
             if (_undoStack.Count > MaxUndoDepth) _undoStack.RemoveAt(0);
             // A 48-zone template serializes to a few hundred KB; a deep history of those adds up, so
             // the depth limit is backed by a hard memory ceiling as well.
             long chars = 0;
-            foreach (string snapshot in _undoStack) chars += snapshot.Length;
+            foreach (var snapshot in _undoStack) chars += snapshot.Json.Length;
             while (_undoStack.Count > 1 && chars > MaxUndoChars)
             {
-                chars -= _undoStack[0].Length;
+                chars -= _undoStack[0].Json.Length;
                 _undoStack.RemoveAt(0);
             }
             _redoStack.Clear();
             _undoBaseline = now;
-            var retained = new HashSet<string>(_undoStack.Concat(_redoStack), StringComparer.Ordinal) { _undoBaseline };
-            foreach (var expired in _snapshotPositions.Keys.Where(key => !retained.Contains(key)).ToList())
+            var retained = _undoStack.Concat(_redoStack).Select(snapshot => snapshot.Json).ToHashSet(StringComparer.Ordinal);
+            retained.Add(_undoBaseline);
+            foreach (var expired in _snapshotPositions.Keys.Where(key => !retained.Contains(key.Json)).ToList())
                 _snapshotPositions.Remove(expired);
             UpdateUndoButtons();
         }
@@ -3129,9 +3218,9 @@ namespace Olden_Era___Template_Editor
             Keyboard.ClearFocus(); // commit a pending inspector edit as its own undo step first
             if (_undoStack.Count == 0) { UpdateStatus(L("S.EC.UndoEmpty")); return; }
             RememberCurrentLayout();
-            string previous = _undoStack[^1];
+            var previous = _undoStack[^1];
             _undoStack.RemoveAt(_undoStack.Count - 1);
-            _redoStack.Add(_undoBaseline);
+            _redoStack.Add(new(_undoBaseline, previous.VariantIndex));
             RestoreSnapshot(previous);
             UpdateStatus(L("S.EC.Undone"));
         }
@@ -3141,30 +3230,35 @@ namespace Olden_Era___Template_Editor
             Keyboard.ClearFocus();
             if (_redoStack.Count == 0) { UpdateStatus(L("S.EC.RedoEmpty")); return; }
             RememberCurrentLayout();
-            string next = _redoStack[^1];
+            var next = _redoStack[^1];
             _redoStack.RemoveAt(_redoStack.Count - 1);
-            _undoStack.Add(_undoBaseline);
+            _undoStack.Add(new(_undoBaseline, next.VariantIndex));
             RestoreSnapshot(next);
             UpdateStatus(L("S.EC.Redone"));
         }
 
-        private void RestoreSnapshot(string json)
+        private void RestoreSnapshot(EditorSnapshot snapshot)
         {
             _restoringHistory = true;
             try
             {
-                _template = JsonSerializer.Deserialize<RmgTemplate>(json, SnapshotOptions)!;
-                _undoBaseline = json;
-                _selected = null; _connectFrom = null; _connectMode = false;
-                BtnConnectMode.Background = null;
+                RememberVariantLayout();
+                int previousVariant = _variantIndex;
+                _template = JsonSerializer.Deserialize<RmgTemplate>(snapshot.Json, SnapshotOptions)!;
+                RefreshVariantChoices(snapshot.VariantIndex);
+                bool changedVariant = previousVariant != _variantIndex;
+                _undoBaseline = snapshot.Json;
+                ResetVariantInteraction(disableMirror: changedVariant);
+                if (changedVariant) RestoreVariantLayout();
                 // Restore only missing positions: manual moves of surviving zones stay as they are.
-                if (_snapshotPositions.TryGetValue(json, out var layout))
+                if (_snapshotPositions.TryGetValue(new(snapshot.Json, _variantIndex), out var layout))
                     foreach (var zone in Zones)
                         if (!_positions.ContainsKey(zone.Name) && layout.TryGetValue(zone.Name, out var position))
                             _positions[zone.Name] = position;
                 EnsurePositions();
                 if (_mirrorMode) RebuildMirrorPairs();
                 RebuildGraph();
+                if (changedVariant) FitToView();
                 BuildInspector();
                 _dirty = true;
                 UpdateTitle();
@@ -3202,7 +3296,7 @@ namespace Olden_Era___Template_Editor
             UpdateUndoButtons();
         }
 
-        private void RememberCurrentLayout() => _snapshotPositions[_undoBaseline] = new(_positions, StringComparer.Ordinal);
+        private void RememberCurrentLayout() => _snapshotPositions[new(_undoBaseline, _variantIndex)] = new(_positions, StringComparer.Ordinal);
 
         private void UpdateUndoButtons()
         {
@@ -3224,7 +3318,8 @@ namespace Olden_Era___Template_Editor
             BuildInspector();
             UpdateTitle();
             UpdateZoneCounter();
-            foreach (var zone in _template.Variants?.FirstOrDefault()?.Zones ?? [])
+            RefreshVariantChoices(_variantIndex);
+            foreach (var zone in Zones)
                 if (_nodeShapes.TryGetValue(zone.Name, out var visual)) visual.ToolTip = ZoneTooltip(zone);
             ApplyHotkeyTooltips();
             RefreshGridSnap();
@@ -3234,14 +3329,86 @@ namespace Olden_Era___Template_Editor
         /// <summary>Localization shortcut.</summary>
         private static string L(string key, params object[] args) => Services.Localization.LocalizationManager.T(key, args);
 
+        private bool _templateCloseApproved;
+        private bool _templateClosePending;
+
+        internal void ApproveClose() => _templateCloseApproved = true;
+
+        internal void DebugMarkDirtyForClose() => MarkDirty();
+
+        internal void DebugVerifyLayoutOnlySave(string directory)
+        {
+            string path = IOPath.Combine(directory, "layout-verification.rmg.json");
+            string gameplay = JsonSerializer.Serialize(_template, JsonOptions);
+            File.WriteAllText(path, gameplay);
+            var zone = Zones.First();
+            Point initial = _positions[zone.Name];
+            Point moved = new(initial.X + 23, initial.Y + 37);
+            var previousPath = _currentPath;
+            bool wasDirty = _dirty;
+            try
+            {
+                _currentPath = path;
+                _positions[zone.Name] = moved;
+                _dragZone = zone;
+                _movedWhileDragging = true;
+                CanvasHost_MouseLeftButtonUp(this, null!);
+                FlushPendingLayoutSaves();
+                if (EditorLayoutStore.LoadVariant(path, _variantIndex)?.GetValueOrDefault(zone.Name) != moved
+                    || File.ReadAllText(path) != gameplay || _dirty != wasDirty)
+                    throw new InvalidOperationException("A layout-only drag did not save its sidecar independently of the gameplay file.");
+            }
+            finally
+            {
+                _positions[zone.Name] = initial;
+                _currentPath = previousPath;
+                _movedWhileDragging = false;
+                RebuildGraph();
+            }
+        }
+
+        internal List<string> DebugValidateWithReferences(TemplateReferenceCatalog catalog) => Validate(catalog);
+
+        private void CommitFocusedInspectorInput()
+        {
+            if (Keyboard.FocusedElement is DependencyObject focused && GetWindow(focused) == this)
+                Keyboard.ClearFocus();
+        }
+
+        internal async Task<bool> RequestCloseApprovalAsync(Func<MessageBoxResult>? choose = null, Func<Task<bool>>? save = null)
+        {
+            CommitFocusedInspectorInput();
+            if (_saveCheckingReferences) return false;
+            if (!_dirty && _invalidWeightEditors.Count == 0) return true;
+            var choice = choose?.Invoke() ?? MessageBox.Show(this, L("S.Settings.SaveTemplateBeforeClosing", _template.Name),
+                L("S.EC.UnsavedTitle"), MessageBoxButton.YesNoCancel, MessageBoxImage.Warning, MessageBoxResult.Cancel);
+            return choice == MessageBoxResult.No ||
+                (choice == MessageBoxResult.Yes && await (save?.Invoke() ?? SaveTemplateAsync()));
+        }
+
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
-            if (_dirty)
+            if (!_templateCloseApproved)
             {
-                var r = MessageBox.Show(this,
-                    L("S.EC.UnsavedMsg"),
-                    L("S.EC.UnsavedTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                if (r != MessageBoxResult.Yes) { e.Cancel = true; return; }
+                CommitFocusedInspectorInput();
+                if (_dirty || _invalidWeightEditors.Count > 0 || _saveCheckingReferences)
+                {
+                    e.Cancel = true;
+                    if (!_templateClosePending && !_saveCheckingReferences)
+                    {
+                        _templateClosePending = true;
+                        Dispatcher.BeginInvoke(new Action(async () =>
+                        {
+                            try
+                            {
+                                if (!await RequestCloseApprovalAsync()) return;
+                                ApproveClose();
+                                Close();
+                            }
+                            finally { _templateClosePending = false; }
+                        }));
+                    }
+                }
             }
             base.OnClosing(e);
         }

@@ -96,7 +96,7 @@ namespace OldenEraTemplateEditor.Models
         /// <summary>Known values for WinConditions.ChampionSelectRule.</summary>
         public static readonly string[] ChampionSelectRules =
         [
-            "StartHero",
+            "StartHero", "Selected",
         ];
 
         // ── Value overrides ──────────────────────────────────────────────────────

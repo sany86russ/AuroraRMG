@@ -22,11 +22,31 @@ public class SettingsSnapshotMapperTests
         Assert.DoesNotContain("DotBrush", persisted); Assert.DoesNotContain("DisplayName", persisted);
         Assert.DoesNotContain("ReceiverLabel", persisted);
         restored.PlayerZoneMandatoryContent[0].Rules![0].Args![0] = "changed";
-        restored.ProfileOptions.ImportedNativeSchema!["future"] = 99;
+        restored.ProfileOptions.ImportedNativeSchema = JsonSerializer.SerializeToElement(new { future = 99 });
         restored.Bonuses[0].Param = "changed";
         Assert.Equal("original", original.PlayerZoneMandatoryContent[0].Rules![0].Args![0]);
-        Assert.Equal(0.75, original.ProfileOptions.ImportedNativeSchema!["future"]!.GetValue<double>());
+        Assert.Equal(0.75, original.ProfileOptions.ImportedNativeSchema!.Value.GetProperty("future").GetDouble());
         Assert.Equal("1250", original.Bonuses[0].Param);
+    }
+
+    [Fact]
+    public void NativeSchemaCopiesOutliveTheImportDocumentAndKeepTheSamePersistedShape()
+    {
+        var options = GenerationProfileOptions.CurrentDefaults();
+        using (var document = JsonDocument.Parse("""{"future":{"value":0.75}}"""))
+            options.ImportedNativeSchema = document.RootElement;
+        options.TournamentBattleDays.Add(7);
+        var clone = options.Clone();
+        var captured = SettingsSnapshotMapper.Clone(new GeneratorSettings { ProfileOptions = options });
+        Assert.Equal(0.75, clone.ImportedNativeSchema!.Value.GetProperty("future").GetProperty("value").GetDouble());
+        Assert.Equal(0.75, captured.ProfileOptions.ImportedNativeSchema!.Value.GetProperty("future").GetProperty("value").GetDouble());
+        clone.TournamentBattleDays.Add(8);
+        Assert.Equal(new[] { 7 }, options.TournamentBattleDays);
+        string json = JsonSerializer.Serialize(options, JsonExport.Options);
+        using var serialized = JsonDocument.Parse(json);
+        Assert.Equal(JsonValueKind.Object, serialized.RootElement.GetProperty("ImportedNativeSchema").ValueKind);
+        var restored = JsonSerializer.Deserialize<GenerationProfileOptions>(json, JsonExport.Options)!;
+        Assert.Equal(json, JsonSerializer.Serialize(restored, JsonExport.Options));
     }
 
     [Fact]
@@ -159,7 +179,7 @@ public class SettingsSnapshotMapperTests
         ZoneCfg = new() { BorderGuardStrengthPercent = 78, ResourceDensityPercent = 140, StructureDensityPercent = 75, Advanced = new() { Enabled = false, NeutralHighCastleCount = 3, PlayerZoneSize = 1.75, GuardRandomization = 0.125 } },
         BannedItems = "artifact", BannedMagics = "spell", BannedHeroes = "hero", ValueOverridesText = "object=1.75",
         Bonuses = [new() { PresetType = BonusPresetType.StartingGold, Param = "1250" }],
-        ProfileOptions = new() { ProfileId = "future-profile", TemplateSeed = 12345, ImportedNativeConfiguration = new JsonObject { ["future"] = "keep" }, ImportedNativeSchema = new JsonObject { ["future"] = 0.75 }, Alliances = new() { Enabled = true, Preset = "custom", Slots = [new() { Player = 1, Alliance = 0, Locked = true }] } },
+        ProfileOptions = new() { ProfileId = "future-profile", TemplateSeed = 12345, ImportedNativeConfiguration = new JsonObject { ["future"] = "keep" }, ImportedNativeSchema = JsonSerializer.SerializeToElement(new { future = 0.75 }), Alliances = new() { Enabled = true, Preset = "custom", Slots = [new() { Player = 1, Alliance = 0, Locked = true }] } },
         PlayerZoneMandatoryContent = [JsonSerializer.Deserialize<ContentItem>("{\"sid\":\"scroll_box\",\"variant\":2,\"isGuarded\":true,\"future\":{\"weight\":0.125},\"rules\":[{\"type\":\"FuturePlacement\",\"args\":[\"original\"],\"weight\":0.25,\"futureRule\":true}]}", JsonExport.Options)!],
         LowNeutralMandatoryContent = [new() { IncludeLists = ["custom_list", "other"], SoloEncounter = true }],
         GameEndConditions = new() { VictoryCondition = "win_condition_3", LostStartCity = true, LostStartCityDay = 4, CityHold = true, CityHoldDays = 9, HeroLighting = false },

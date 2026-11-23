@@ -77,7 +77,8 @@ public static class PatchAcceptanceSuite
         {
             token.ThrowIfCancellationRequested(); VerifySourceFingerprints(source);
             var files = EnumerateCorpus(source.TemplatesPath);
-            var cases = Cases(references).ToArray(); total = files.Length + cases.Length * FixedSeeds.Count;
+            var cases = Cases(references, source.Profile.Id == GenerationProfileOptions.CurrentProfile).ToArray();
+            total = files.Length + cases.Length * FixedSeeds.Count;
             foreach (string file in files)
             {
                 token.ThrowIfCancellationRequested(); string filename = Path.GetRelativePath(source.TemplatesPath, file).Replace('\\', '/'); string sha = "";
@@ -166,7 +167,7 @@ public static class PatchAcceptanceSuite
         return receipt;
     }
 
-    private static IEnumerable<AcceptanceCase> Cases(TemplateReferenceCatalog references)
+    private static IEnumerable<AcceptanceCase> Cases(TemplateReferenceCatalog references, bool inspectedCurrentPatch)
     {
         foreach (var preset in PatchPresets.Current.Concat(PatchPresets.Cooperative))
             yield return new(preset.Id, "patch-preset", preset.NameRu, preset.NameEn, preset.Settings, false);
@@ -194,6 +195,31 @@ public static class PatchAcceptanceSuite
         yield return Focus("magic-disabled", "Отключённое обучение магии и законы", "Disabled spell learning and laws", file => { file.ProfileOptions.DisableMagicGuild = true; file.ProfileOptions.DisableMagicCustomLearning = true; file.ProfileOptions.DisableFactionLaws = true; });
         yield return Focus("area-rich", "Богатая карта с бюджетами по площади", "Rich map with area budgets", file => { file.ProfileOptions.UseAreaBudgets = true; file.ProfileOptions.Richness = MapRichness.VeryRich; });
         yield return Focus("portal-endpoints", "Порталовые объекты у концов связи", "Portal objects at connection endpoints", file => { file.RandomPortals = true; file.MaxPortalConnections = 8; file.ProfileOptions.PortalFromEnabled = false; file.ProfileOptions.PortalToEnabled = true; });
+        yield return Focus("tournament-portal-cap", "Турнир с общим лимитом в один портал", "Tournament with one additional portal", file =>
+        {
+            file.VictoryCondition = "win_condition_6";
+            file.NeutralZoneCount = 12;
+            file.RandomPortals = true;
+            file.MaxPortalConnections = 1;
+        });
+        if (inspectedCurrentPatch)
+        {
+            if (references.Objects?.Contains(ChampionSpirePlacement.SpireSid) != true)
+                throw new InvalidOperationException("The inspected catalog must contain the Hell Light Spire for the champion acceptance case.");
+            yield return Focus("final-champion-spire", "Финальная битва с выбором героя через Hell Light Spire",
+                "Final battle with champion selection at the Hell Light Spire", file =>
+                {
+                    file.VictoryCondition = "win_condition_4";
+                    file.ProfileOptions.UseNativeFinalBattleSchedule = true;
+                    file.ProfileOptions.FinalBattleDay = 17;
+                    file.ProfileOptions.ChampionSelection = ChampionSelection.HellLightSpire;
+                });
+            string[] skillBans = ["skill_logistic", "skill_siege"];
+            if (!references.SkillCompleteness || skillBans.Any(skill => references.Skills?.Contains(skill) != true))
+                throw new InvalidOperationException("The inspected catalog must contain the two skill identifiers used by Sprint.");
+            yield return Focus("skill-bans", "Запрет логистики и осады по примеру Sprint",
+                "Logistics and Siege banned as in Sprint", file => file.ProfileOptions.BannedSkills = [.. skillBans]);
+        }
         string ai = references.CustomAI?.Contains("multi_hero_normal") == true ? "multi_hero_normal"
             : throw new InvalidOperationException("Confirmed multi_hero_normal identifier is required for the acceptance AI case.");
         yield return Focus("custom-ai", "Подтверждённый профиль ИИ", "Confirmed AI profile", file => file.ProfileOptions.CustomAI = ai);
@@ -217,6 +243,15 @@ public static class PatchAcceptanceSuite
         bool capital = settings.GameEndConditions.LostStartCity || settings.GameEndConditions.VictoryCondition == "win_condition_3";
         bool city = settings.GameEndConditions.CityHold || settings.GameEndConditions.VictoryCondition == "win_condition_5";
         bool guardian = settings.GameEndConditions.LostStartHero || settings.GameEndConditions.VictoryCondition == "win_condition_8";
+        bool tournament = settings.TournamentRules.Enabled || settings.GameEndConditions.VictoryCondition == "win_condition_6";
+        bool arena = settings.GladiatorArenaRules.Enabled || settings.GameEndConditions.VictoryCondition == "win_condition_4";
+        bool currentPatch = profile.ProfileId == GenerationProfileOptions.CurrentProfile;
+        bool championSpire = currentPatch && (tournament || arena) && profile.ChampionSelection == ChampionSelection.HellLightSpire;
+        if (championSpire && win.ChampionSelectRule != ChampionSpirePlacement.SelectedRule)
+            Fail("The requested champion selection rule was not exported.");
+        if (currentPatch && profile.BannedSkills is { Count: > 0 } bannedSkills
+            && !(template.GlobalBans?.Skills ?? []).SequenceEqual(bannedSkills, StringComparer.Ordinal))
+            Fail("The exported skill bans differ from the request.");
         if (capital && (win.LostStartCity != true || win.LostStartCityDay != Math.Clamp(settings.GameEndConditions.LostStartCityDay, 1, 30))) Fail("Requested capital hold rules are inactive or changed.");
         if (city && (win.CityHold != true || win.CityHoldDays != Math.Clamp(settings.GameEndConditions.CityHoldDays, 1, 30))) Fail("Requested city hold rules are inactive or changed.");
         if (guardian && win.LostStartHero != true) Fail("Requested starting-hero loss condition is inactive.");
@@ -236,6 +271,10 @@ public static class PatchAcceptanceSuite
         {
             var objects = (variant.Zones ?? []).SelectMany(zone => zone.MainObjects ?? []).ToArray();
             if (city && !objects.Any(obj => obj.HoldCityWinCon == true && obj.Type is "City" or "Spawn")) Fail("Requested city hold has no marked town.");
+            if (championSpire && !ChampionSpirePlacement.HasLinkedSpire(template, variant))
+                Fail("A champion selection variant has no linked Hell Light Spire.");
+            if (championSpire && tournament && ChampionSpirePlacement.StartsWithoutSpireAccess(template, variant).Count > 0)
+                Fail("A tournament start cannot reach a linked Hell Light Spire.");
             foreach (int player in Enumerable.Range(1, settings.PlayerCount))
             {
                 string spawn = "Player" + player;
@@ -264,7 +303,15 @@ public static class PatchAcceptanceSuite
                     if (settings.GameEndConditions.VictoryCondition == "win_condition_8" && obj.Type == "Spawn" && obj.IsKeyObject != true) Fail("Guardian start is not a key object.");
                 }
             }
-            foreach (var portal in (variant.Connections ?? []).Where(connection => connection.ConnectionType == "Portal"))
+            var portals = (variant.Connections ?? []).Where(connection => connection.ConnectionType == "Portal").ToArray();
+            if (tournament && settings.RandomPortals)
+            {
+                int limit = Math.Max(0, settings.MaxPortalConnections);
+                if (portals.Length > limit) Fail("The tournament exceeded its map-wide limit for additional portals.");
+                if (limit > 0 && (variant.Zones?.Count ?? 0) > 2 && portals.Length == 0)
+                    Fail("The tournament omitted additional portals despite a positive limit and eligible zones.");
+            }
+            foreach (var portal in portals)
                 if (portal.PortalFromEnabled != profile.PortalFromEnabled || portal.PortalToEnabled != profile.PortalToEnabled) Fail("Portal direction flags changed.");
         }
         if (profile.Alliances.Enabled)
@@ -291,6 +338,26 @@ public static class PatchAcceptanceSuite
         text.AppendLine(english ? "4. Generate at least three actual maps per scenario; Aurora template seeds do not fix the game's map seed. Verify start towns/heroes, neutral travel, portals, rivers and balanced team branches." : "4. Сгенерируйте минимум три настоящие карты на сценарий: seed шаблона Aurora не фиксирует seed карты игры. Проверьте города и героев на старте, проходы, порталы, реки и условия команд.");
         text.AppendLine(english ? "5. Advance to scheduled battle days and at least the second week. Verify army preservation, growth, spell learning, capital/city timers and Guardian defeat." : "5. Дойдите до дат боёв и минимум второй недели. Проверьте сохранение армии, прирост, обучение магии, таймеры столицы/города и поражение при потере стража.");
         text.AppendLine(english ? "6. Save, reload and continue; record exact game version/seed, result and observations in manual-results.json. Keep screenshots/logs for failures. Release requires separate approval." : "6. Сохраните игру, загрузите и продолжите; внесите точную версию/seed, результат и наблюдения в manual-results.json. Для ошибок сохраните скриншоты/логи. Релиз требует отдельного согласования.");
+        bool championCheck = receipt.Generation.Any(item => item.Id == "final-champion-spire" && item.ManualTemplateFile is not null);
+        bool skillCheck = receipt.Generation.Any(item => item.Id == "skill-bans" && item.ManualTemplateFile is not null);
+        bool portalCheck = receipt.Generation.Any(item => item.Id == "tournament-portal-cap" && item.ManualTemplateFile is not null);
+        if (championCheck || skillCheck || portalCheck)
+        {
+            text.AppendLine();
+            text.AppendLine(english ? "## New rule checks" : "## Проверка новых правил");
+        }
+        if (championCheck)
+            text.AppendLine(english
+                ? "- final-champion-spire. In a two-player lobby or hotseat, locate the Spire on both sides, select a hero different from the starting hero, then check who enters the battle on day 17."
+                : "- final-champion-spire. В лобби или hotseat на двоих найдите Шпиль у обоих игроков, выберите героя помимо стартового и проверьте, кто вступит в битву в день 17.");
+        if (skillCheck)
+            text.AppendLine(english
+                ? "- skill-bans. Check that Logistics and Siege are absent from level-up offers across several heroes. Record the skill source and exact steps if either appears."
+                : "- skill-bans. У нескольких героев проверьте, что Логистика и Осада не предлагаются при повышении уровня. Если умение появилось, запишите его источник и точные шаги.");
+        if (portalCheck)
+            text.AppendLine(english
+                ? "- tournament-portal-cap. Confirm the template contains one additional portal within a region and the two opponents start in separate regions. Record any extra portals produced by the game separately."
+                : "- tournament-portal-cap. Подтвердите один дополнительный портал в шаблоне и раздельные стартовые территории соперников. Дополнительные порталы, созданные игрой, запишите отдельно.");
         text.AppendLine(); foreach (var failure in receipt.Generation.Where(item => !item.Success)) text.AppendLine($"- {failure.Id}:{failure.Seed}: {failure.Error}");
         foreach (var item in receipt.Corpus.Where(item => item.SafelyRejected)) text.AppendLine($"- {item.FileName}: {(english ? "safely rejected" : "безопасно отклонён")}; {item.RejectionReason}");
         foreach (var failure in receipt.Corpus.Where(item => !item.PassedOfflineAudit)) text.AppendLine($"- {failure.FileName}: {failure.Error ?? string.Join("; ", failure.Differences.Select(item => item.Path + ": " + item.Message))}");

@@ -1876,11 +1876,24 @@ public class TemplateGeneratorTests
     }
 
     [Fact]
+    public void Generate_UsesTheChosenOverrideIndexAndPreservesLegacyAllVariants()
+    {
+        var settings = new GeneratorSettings
+        {
+            ValueOverridesText = "pandora_box=1000\npandora_box[0]=2000\npandora_box[ 55 ]=3000\nsparse_reward [2]=4000"
+        };
+        var result = TemplateGenerator.Generate(settings).ValueOverrides!;
+        Assert.Equal(new int?[] { -1, 0, 55, 2 }, result.Select(value => value.Variant));
+        Assert.Equal(new int?[] { 1000, 2000, 3000, 4000 }, result.Select(value => value.GuardValue));
+        Assert.Equal("sparse_reward ", result[3].Sid);
+    }
+
+    [Fact]
     public void Generate_SkipsMalformedAndBlankValueOverrideLines()
     {
         var settings = new GeneratorSettings
         {
-            ValueOverridesText = "arena=5000\n\nbadline\n=1000\nalchemy_lab=3000"
+            ValueOverridesText = "arena=5000\n\nbadline\n=1000\nalchemy_lab=3000\narena[wrong]=5000\narena[-2]=5000"
         };
 
         RmgTemplate template = TemplateGenerator.Generate(settings);

@@ -121,10 +121,10 @@ public class TemplatePackageTests
     {
         using var fixture = new SyntheticInstalledGame(); string path = Path.Combine(fixture.Root, "package.zip"); File.WriteAllText(path, "existing");
         var input = new GeneratorSettings { Seed = 7 };
-        input.ProfileOptions.ImportedNativeSchema = new System.Text.Json.Nodes.JsonObject { [key] = "synthetic-private" };
+        input.ProfileOptions.ImportedNativeSchema = JsonSerializer.SerializeToElement(new System.Text.Json.Nodes.JsonObject { [key] = "synthetic-private" });
         var request = Request() with { Settings = SettingsSnapshotMapper.FromGeneratorSettings(input) };
         await Assert.ThrowsAsync<InvalidOperationException>(() => TemplatePackageService.CreateAsync(path, request));
-        Assert.Equal("existing", File.ReadAllText(path)); Assert.Equal("synthetic-private", input.ProfileOptions.ImportedNativeSchema[key]!.GetValue<string>());
+        Assert.Equal("existing", File.ReadAllText(path)); Assert.Equal("synthetic-private", input.ProfileOptions.ImportedNativeSchema!.Value.GetProperty(key).GetString());
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public class TemplatePackageTests
     {
         using var fixture = new SyntheticInstalledGame(); string path = Path.Combine(fixture.Root, "package.zip");
         var input = new GeneratorSettings { Seed = 7 }; input.ProfileOptions.AuthorDescription = "My map source: C:\\Author Folder\\own-map";
-        input.ProfileOptions.ImportedNativeSchema = new System.Text.Json.Nodes.JsonObject { ["futureBudget"] = 0.125 };
+        input.ProfileOptions.ImportedNativeSchema = JsonSerializer.SerializeToElement(new System.Text.Json.Nodes.JsonObject { ["futureBudget"] = 0.125 });
         var request = Request() with { Settings = SettingsSnapshotMapper.FromGeneratorSettings(input) };
         await TemplatePackageService.CreateAsync(path, request); using var zip = ZipFile.OpenRead(path);
         Assert.Equal(JsonSerializer.SerializeToUtf8Bytes(request.Settings, JsonExport.Options), Read(zip, "settings.oetgs"));

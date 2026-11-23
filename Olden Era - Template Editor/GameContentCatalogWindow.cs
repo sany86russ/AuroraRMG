@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -62,12 +63,20 @@ public sealed class GameContentCatalogWindow : Window
         var grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) }); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
         content.Children.Add(grid); grid.Children.Add(_entries);
         var side = new DockPanel(); Grid.SetColumn(side, 2); grid.Children.Add(side);
-        var detailTop = new StackPanel(); DockPanel.SetDock(detailTop, Dock.Top); side.Children.Add(detailTop); detailTop.Children.Add(_details); detailTop.Children.Add(Label("S.Patch.CatalogVariants")); side.Children.Add(_rewards);
+        var detailTop = new StackPanel(); DockPanel.SetDock(detailTop, Dock.Top); side.Children.Add(detailTop); detailTop.Children.Add(_details); detailTop.Children.Add(Label("S.Patch.CatalogVariants"));
+        var parameters = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) };
+        var selectedParameters = new ScrollViewer { Content = parameters, MaxHeight = 100, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = Visibility.Collapsed };
+        DockPanel.SetDock(selectedParameters, Dock.Bottom); side.Children.Add(selectedParameters); side.Children.Add(_rewards);
+        _rewards.SelectionChanged += (_, _) =>
+        {
+            parameters.Text = (_rewards.SelectedItem as RewardRow)?.Parameters ?? "";
+            selectedParameters.Visibility = parameters.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        };
         _entries.Columns.Add(Column("SID", "Sid", 200));
         _entries.Columns.Add(Column("S.Patch.CatalogNameRu", "NameRu", 170)); _entries.Columns.Add(Column("S.Patch.CatalogNameEn", "NameEn", 150));
         _entries.Columns.Add(Column("S.Patch.CatalogCategory", "Category", 100)); _entries.Columns.Add(Column("S.Patch.CatalogLevel", "Level", 60));
         _rewards.Columns.Add(Column("S.Patch.CatalogVariant", "Index", 65)); _rewards.Columns.Add(Column("S.Patch.CatalogValue", "Value", 85));
-        _rewards.Columns.Add(Column("S.Patch.CatalogWeight", "Weight", 70)); _rewards.Columns.Add(Column("S.Patch.CatalogReward", "Type", 140));
+        _rewards.Columns.Add(Column("S.Patch.CatalogWeight", "Weight", 100)); _rewards.Columns.Add(Column("S.Patch.CatalogRewardMode", "Mode", 125));
         _rewards.Columns.Add(Column("S.Patch.CatalogLevel", "SpellRanks", 65));
         _rewards.Columns.Add(Column("S.Patch.CatalogParameters", "Parameters", 240));
         _search.TextChanged += (_, _) => Filter(); _kind.SelectionChanged += (_, _) => Filter(); _rmgOnly.Checked += (_, _) => Filter(); _rmgOnly.Unchecked += (_, _) => Filter();
@@ -89,12 +98,19 @@ public sealed class GameContentCatalogWindow : Window
         int selection = Math.Max(0, _kind.SelectedIndex);
         if (_allowedKind is { } fixedKind)
         {
-            _kind.ItemsSource = new[] { LocalizationManager.T("S.Patch." + (fixedKind == GameContentKind.Object ? "CatalogObjects" : fixedKind == GameContentKind.Spell ? "CatalogSpells" : "CatalogArtifacts")) };
+            _kind.ItemsSource = new[] { LocalizationManager.T(fixedKind switch
+            {
+                GameContentKind.Object => "S.Patch.CatalogObjects",
+                GameContentKind.Spell => "S.Patch.CatalogSpells",
+                GameContentKind.Artifact => "S.Patch.CatalogArtifacts",
+                GameContentKind.Skill => "S.Patch.CatalogSkills",
+                _ => "S.Patch.CatalogAll"
+            }) };
             _kind.SelectedIndex = 0; _kind.IsEnabled = false;
         }
         else
         {
-            _kind.ItemsSource = new[] { "CatalogAll", "CatalogObjects", "CatalogSpells", "CatalogArtifacts" }.Select(k => LocalizationManager.T("S.Patch." + k)).ToArray();
+            _kind.ItemsSource = new[] { "CatalogAll", "CatalogObjects", "CatalogSpells", "CatalogArtifacts", "CatalogSkills" }.Select(k => LocalizationManager.T("S.Patch." + k)).ToArray();
             _kind.SelectedIndex = selection;
         }
         Filter();
@@ -102,7 +118,7 @@ public sealed class GameContentCatalogWindow : Window
     private void Filter()
     {
         if (_catalog is null) return;
-        GameContentKind? kind = _allowedKind ?? (_kind.SelectedIndex switch { 1 => GameContentKind.Object, 2 => GameContentKind.Spell, 3 => GameContentKind.Artifact, _ => (GameContentKind?)null });
+        GameContentKind? kind = _allowedKind ?? (_kind.SelectedIndex switch { 1 => GameContentKind.Object, 2 => GameContentKind.Spell, 3 => GameContentKind.Artifact, 4 => GameContentKind.Skill, _ => (GameContentKind?)null });
         var found = _catalog.Search(_search.Text, kind, _rmgOnly.IsChecked == true ? true : null).ToArray();
         _entries.ItemsSource = found;
         _status.Text = _catalog.Source is null ? LocalizationManager.T("S.Patch.CatalogOffline") :
@@ -117,16 +133,34 @@ public sealed class GameContentCatalogWindow : Window
             LocalizationManager.T(entry.ReferencedByRmgContent ? "S.Patch.CatalogStatusRmg" : "S.Patch.CatalogStatusData") + "\n" +
             LocalizationManager.T("S.Patch.CatalogSource") + ": " + entry.SourceEntry;
         bool russian = LocalizationManager.Instance.CurrentLanguage == AppLanguage.Ru;
-        _rewards.ItemsSource = entry.RewardVariants.Select(v => new RewardRow(v, string.Join(", ", v.RewardTypes), string.Join(", ", v.RewardParameters) +
-            (v.Spells.Count == 0 ? "" : " · " + string.Join(", ", v.Spells.Select(s => russian ? s.NameRu : s.NameEn))))).ToArray();
+        _rewards.ItemsSource = entry.RewardVariants.Select(variant =>
+        {
+            string mode = variant.RewardApplyType switch
+            {
+                "OnlySelected" => LocalizationManager.T("S.Patch.CatalogRewardChooseOne"),
+                "ForAll" => LocalizationManager.T("S.Patch.CatalogRewardGrantAll"),
+                _ => variant.RewardApplyType
+            };
+            string weight = variant.RollChance is 0
+                ? LocalizationManager.T("S.Patch.CatalogRewardZeroWeight")
+                : variant.RollChance?.ToString("G", CultureInfo.CurrentCulture) ?? "";
+            string options = string.Join(" · ", variant.Rewards.Select(reward => reward.Parameters.Count == 0
+                ? reward.Type
+                : $"{reward.Type} ({string.Join(", ", reward.Parameters)})"));
+            if (variant.Spells.Count > 0)
+                options += " · " + string.Join(", ", variant.Spells.Select(spell => russian ? spell.NameRu : spell.NameEn));
+            return new RewardRow(variant, mode, weight, options);
+        }).ToArray();
     }
 
-    internal void DebugSelectRewardObject(string sid)
+    internal void DebugSelectRewardObject(string sid, int? variantIndex = null)
     {
         _kind.SelectedIndex = 1; _rmgOnly.IsChecked = true; _search.Text = sid; Filter();
         _entries.SelectedItem = _entries.Items.OfType<GameContentEntry>().Single(entry => entry.Sid == sid);
         if (SelectedEntry?.RewardVariants.Count is not > 0) throw new InvalidOperationException("The selected object has no configured reward variants.");
-        _rewards.SelectedIndex = 0;
+        if (variantIndex is int index) _rewards.SelectedItem = _rewards.Items.OfType<RewardRow>().Single(row => row.Index == index);
+        else _rewards.SelectedIndex = 0;
+        _rewards.ScrollIntoView(_rewards.SelectedItem);
     }
     private void Choose()
     {
@@ -137,7 +171,14 @@ public sealed class GameContentCatalogWindow : Window
     { var label = new TextBlock { TextWrapping = TextWrapping.Wrap }; label.SetResourceReference(TextBlock.TextProperty, key); return label; }
     private static DataGridTextColumn Column(string key, string path, double width)
     {
-        return new DataGridTextColumn { Header = key == "SID" ? "SID" : Label(key), Binding = new Binding(path), Width = width };
+        var column = new DataGridTextColumn { Header = key == "SID" ? "SID" : Label(key), Binding = new Binding(path), Width = width };
+        if (path == "Parameters")
+        {
+            var style = new Style(typeof(TextBlock));
+            style.Setters.Add(new Setter(ToolTipService.ToolTipProperty, new Binding(path)));
+            column.ElementStyle = style;
+        }
+        return column;
     }
     private static DataGrid GridView()
     {
@@ -153,9 +194,9 @@ public sealed class GameContentCatalogWindow : Window
         var selected = new Trigger { Property = DataGridRow.IsSelectedProperty, Value = true }; selected.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension("BrushHover"))); row.Triggers.Add(selected); grid.RowStyle = row;
         return grid;
     }
-    private sealed record RewardRow(GameRewardVariant Variant, string Type, string Parameters)
+    private sealed record RewardRow(GameRewardVariant Variant, string Mode, string Weight, string Parameters)
     {
-        public int Index => Variant.Index; public double? Value => Variant.Value; public double? Weight => Variant.RollChance;
+        public int Index => Variant.Index; public double? Value => Variant.Value;
         public string SpellRanks => string.Join(", ", Variant.Spells.Where(s => s.Rank.HasValue).Select(s => s.Rank).Distinct());
     }
 }

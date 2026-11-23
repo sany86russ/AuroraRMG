@@ -1,9 +1,11 @@
+using System.IO;
 using System.IO.Compression;
+using System.Text.Json.Serialization;
 using System.Text.Json;
 
 namespace Olden_Era___Template_Editor.Services.GameData;
 
-public enum GameContentKind { Object, Spell, Artifact }
+public enum GameContentKind { Object, Spell, Artifact, Skill }
 
 public sealed class GameRewardVariant
 {
@@ -11,11 +13,13 @@ public sealed class GameRewardVariant
     public int Index { get; set; }
     public double? RollChance { get; set; }
     public double? Value { get; set; }
-    public List<string> RewardTypes { get; set; } = [];
-    public List<string> RewardParameters { get; set; } = [];
+    public string RewardApplyType { get; set; } = "";
+    public List<GameRewardOption> Rewards { get; set; } = [];
+    [JsonIgnore] public IEnumerable<string> RewardParameters => Rewards.SelectMany(reward => reward.Parameters);
     public List<GameRewardSpell> Spells { get; set; } = [];
 }
 
+public sealed record GameRewardOption(string Type, IReadOnlyList<string> Parameters);
 public sealed record GameRewardSpell(string Sid, string NameRu, string NameEn, int? Rank);
 
 public sealed class GameContentEntry
@@ -29,6 +33,7 @@ public sealed class GameContentEntry
     public int? Level { get; set; }
     public string SourceEntry { get; set; } = "";
     public bool HasGeneratorConfig { get; set; }
+    public bool HasMapPickup { get; set; }
     public bool ReferencedByRmgContent { get; set; }
     // No parser-only observation can set this to true. It needs a separate game-validation receipt.
     public bool PlacementVerified { get; set; }
@@ -47,17 +52,24 @@ public static class GameContentCatalogBuilder
     private static readonly JsonDocumentOptions Options = new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip };
 
     public static List<GameContentEntry> Build(ZipArchive core, ICollection<string>? warnings = null)
+        => Build(core, warnings, null, []);
+
+    internal static List<GameContentEntry> Build(ZipArchive core, ICollection<string>? warnings, string? templatesDirectory,
+        IReadOnlyList<RmgTemplateStamp> templates)
     {
         var namesRu = ReadNames(core, "russian", warnings);
         var namesEn = ReadNames(core, "english", warnings);
         var rmgSids = ReadRmgSids(core, warnings);
+        if (templatesDirectory is not null) ReadInstalledTemplateSids(templatesDirectory, templates, rmgSids, warnings);
         var entries = new Dictionary<(GameContentKind Kind, string Sid), GameContentEntry>();
+        var artifactPickups = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in core.Entries.OrderBy(e => e.FullName, StringComparer.Ordinal))
         {
             string path = entry.FullName.Replace('\\', '/');
             GameContentKind kind;
             if (path.StartsWith("DB/magics/", StringComparison.Ordinal)) kind = GameContentKind.Spell;
             else if (path.StartsWith("DB/items/items/", StringComparison.Ordinal)) kind = GameContentKind.Artifact;
+            else if (path == GameReferenceSnapshotBuilder.SkillsPath) kind = GameContentKind.Skill;
             else if (path.StartsWith("DB/map/objects/", StringComparison.Ordinal) || path.StartsWith("DB/objects_logic/", StringComparison.Ordinal)) kind = GameContentKind.Object;
             else continue;
             if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) continue;
@@ -70,6 +82,8 @@ public static class GameContentCatalogBuilder
                 if (row.ValueKind != JsonValueKind.Object) continue;
                 string sid = Text(row, "id");
                 if (sid.Length == 0) continue;
+                if (path.StartsWith("DB/map/objects/", StringComparison.Ordinal) && Text(row, "tag") == "Artifact")
+                    artifactPickups.Add(sid);
                 var key = (kind, sid);
                 bool existed = entries.TryGetValue(key, out var item);
                 item ??= new() { Sid = sid, Kind = kind, ReferencedByRmgContent = rmgSids.Contains(sid) };
@@ -85,6 +99,7 @@ public static class GameContentCatalogBuilder
                 {
                     GameContentKind.Spell => Text(row, "school_"),
                     GameContentKind.Artifact => Text(row, "rarity"),
+                    GameContentKind.Skill => "",
                     _ => path.StartsWith("DB/objects_logic/", StringComparison.Ordinal) ? path.Split('/')[2] : Text(row, "tag")
                 };
                 item.Level = kind == GameContentKind.Spell ? Integer(row, "rank") : Integer(row, "maxLevel");
@@ -102,16 +117,21 @@ public static class GameContentCatalogBuilder
                     {
                         if (variant.ValueKind != JsonValueKind.Object) { index++; continue; }
                         var reward = new GameRewardVariant { Index = index++, RollChance = Number(variant, "rollChance"), Value = Number(variant, "value") };
-                        if (variant.TryGetProperty("rewardSet", out var set) && set.ValueKind == JsonValueKind.Object &&
-                            set.TryGetProperty("rewards", out var rewards) && rewards.ValueKind == JsonValueKind.Array)
-                            foreach (var r in rewards.EnumerateArray())
-                            {
-                                if (r.ValueKind != JsonValueKind.Object) continue;
-                                string type = Text(r, "rewardType");
-                                if (type.Length > 0) reward.RewardTypes.Add(type);
-                                if (r.TryGetProperty("parameters", out var parameters) && parameters.ValueKind == JsonValueKind.Array)
-                                    reward.RewardParameters.AddRange(parameters.EnumerateArray().Where(p => p.ValueKind == JsonValueKind.String).Select(p => p.GetString()!));
-                            }
+                        if (variant.TryGetProperty("rewardSet", out var set) && set.ValueKind == JsonValueKind.Object)
+                        {
+                            reward.RewardApplyType = Text(set, "rewardSetApplyType");
+                            if (set.TryGetProperty("rewards", out var rewards) && rewards.ValueKind == JsonValueKind.Array)
+                                foreach (var option in rewards.EnumerateArray())
+                                {
+                                    if (option.ValueKind != JsonValueKind.Object) continue;
+                                    string type = Text(option, "rewardType");
+                                    if (type.Length == 0) continue;
+                                    string[] parameters = option.TryGetProperty("parameters", out var values) && values.ValueKind == JsonValueKind.Array
+                                        ? values.EnumerateArray().Where(p => p.ValueKind == JsonValueKind.String).Select(p => p.GetString()!).ToArray()
+                                        : [];
+                                    reward.Rewards.Add(new(type, parameters));
+                                }
+                        }
                         item.RewardVariants.Add(reward);
                     }
                 }
@@ -139,6 +159,9 @@ public static class GameContentCatalogBuilder
                     });
                 }
         }
+        foreach (var artifact in entries.Values.Where(entry => entry.Kind == GameContentKind.Artifact))
+            artifact.HasMapPickup = artifactPickups.Contains(artifact.Sid);
+
         foreach (var variant in entries.Values.SelectMany(e => e.RewardVariants))
         {
             var spellIds = new HashSet<string>(StringComparer.Ordinal);
@@ -157,7 +180,7 @@ public static class GameContentCatalogBuilder
     private static Dictionary<string, string> ReadNames(ZipArchive core, string language, ICollection<string>? warnings)
     {
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (string file in new[] { "mapObjects", "artifacts", "magic", "cities" })
+        foreach (string file in new[] { "mapObjects", "artifacts", "magic", "cities", "heroSkills" })
         {
             var entry = core.GetEntry($"Lang/{language}/texts/{file}.json");
             if (entry is null) continue;
@@ -182,6 +205,59 @@ public static class GameContentCatalogBuilder
             if (doc is not null) CollectSids(doc.RootElement, sids);
         }
         return sids;
+    }
+
+    internal static List<RmgTemplateStamp> ReadTemplateStamps(ZipArchive core, string templatesDirectory,
+        ICollection<string>? warnings)
+    {
+        // Jebus Arena is shipped outside the Quick Start roster.
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Jebus Arena" };
+        if (core.GetEntry("DB/quickStart.json") is { } quickStart)
+        {
+            using var document = TryRead(quickStart, warnings);
+            if (document?.RootElement is { ValueKind: JsonValueKind.Object } root)
+                foreach (string mode in new[] { "classicMaps", "singleHeroMaps" })
+                    if (root.TryGetProperty(mode, out var maps) && maps.ValueKind == JsonValueKind.Array)
+                        foreach (var map in maps.EnumerateArray())
+                            if (map.ValueKind == JsonValueKind.String && map.GetString() is { Length: > 0 } name &&
+                                name.IndexOfAny(Path.GetInvalidFileNameChars()) < 0 && name is not ("." or ".."))
+                                names.Add(name);
+        }
+        return names.Order(StringComparer.OrdinalIgnoreCase)
+            .Select(name => RmgTemplateStamp.Read(templatesDirectory, name + ".rmg.json")).ToList();
+    }
+
+    private static void ReadInstalledTemplateSids(string templatesDirectory, IReadOnlyList<RmgTemplateStamp> templates,
+        HashSet<string> sids, ICollection<string>? warnings)
+    {
+        foreach (var stamp in templates)
+        {
+            if (stamp.Length < 0) continue;
+            string path = Path.Combine(templatesDirectory, stamp.FileName);
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                if (stream.Length > 2 * 1024 * 1024)
+                {
+                    warnings?.Add("Template exceeds the catalog scan size: " + Path.GetFileName(path));
+                    continue;
+                }
+                using var document = JsonDocument.Parse(stream, Options);
+                var template = document.RootElement;
+                if (template.ValueKind != JsonValueKind.Object) continue;
+                if (template.TryGetProperty("mandatoryContent", out var mandatory) && mandatory.ValueKind == JsonValueKind.Array)
+                    CollectSids(mandatory, sids);
+                if (template.TryGetProperty("globalBans", out var bans) && bans.ValueKind == JsonValueKind.Object &&
+                    bans.TryGetProperty("skills", out var skills) && skills.ValueKind == JsonValueKind.Array)
+                    foreach (var skill in skills.EnumerateArray())
+                        if (skill.ValueKind == JsonValueKind.String && skill.GetString() is { Length: > 0 } sid)
+                            sids.Add(sid);
+            }
+            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+            {
+                warnings?.Add("Could not inspect RMG references in " + Path.GetFileName(path) + ": " + ex.Message);
+            }
+        }
     }
 
     private static void CollectSids(JsonElement value, HashSet<string> sids)

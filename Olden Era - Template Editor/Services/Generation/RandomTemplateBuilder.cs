@@ -35,7 +35,7 @@ namespace Olden_Era___Template_Editor.Services.Generation
             var rng = new Random(opts.Seed);
 
             bool solo = opts.GameType == QuickGameType.Solo;
-            int playerCount = opts.GameType == QuickGameType.Team && (opts.ProfileOptions.IsCurrentProfile || opts.ProfileOptions.Alliances.Enabled)
+            int playerCount = opts.GameType == QuickGameType.Team && (opts.ProfileOptions.UsesVersionedRules || opts.ProfileOptions.Alliances.Enabled)
                 ? Math.Clamp(opts.PlayerCount, 2, 8) : NormalisePlayerCount(opts.GameType, opts.PlayerCount);
             // Solo forces the "capture & hold a neutral city" goal — the only RMG win condition that reads as
             // an RPG objective ("take this city and you win"). Everything else stays as the player picked.
@@ -46,7 +46,7 @@ namespace Olden_Era___Template_Editor.Services.Generation
                 throw new ArgumentException("Tournament needs two opposing individual players. Select another victory condition for the requested teams.");
             if (tournament) playerCount = 2; // Legacy tournament = two isolated 1v1 clusters.
 
-            int mapSize = PickMapSize(opts.Scale, opts.Length, playerCount, rng, opts.ProfileOptions.IsCurrentProfile);
+            int mapSize = PickMapSize(opts.Scale, opts.Length, playerCount, rng, opts.ProfileOptions.UsesVersionedRules);
             // Lanes and Solo ARE topology choices, so they bypass the random topology pool (no rng draw for
             // them). Every other type keeps its exact historical draw → existing seeds stay byte-identical.
             MapTopology topology = opts.GameType switch
@@ -100,7 +100,7 @@ namespace Olden_Era___Template_Editor.Services.Generation
                 if (tournament) throw new ArgumentException("Team games cannot use the verified two-player individual tournament profile.");
                 settings.ProfileOptions.Alliances.Enabled = true;
             }
-            if (opts.ProfileOptions.IsCurrentProfile) settings.HeroSettings.HeroCountMax = Math.Min(10, settings.HeroSettings.HeroCountMax);
+            if (opts.ProfileOptions.UsesVersionedRules) settings.HeroSettings.HeroCountMax = Math.Min(10, settings.HeroSettings.HeroCountMax);
             settings.ProfileOptions.TemplateSeed = opts.Seed;
             return settings;
         }

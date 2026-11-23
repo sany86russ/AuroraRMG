@@ -39,7 +39,7 @@ public static class GenerationProfileApplier
         if (source.HeroSettings is null || source.ZoneCfg is null || source.ZoneCfg.Advanced is null
             || source.GameEndConditions is null || source.TournamentRules is null || source.GladiatorArenaRules is null)
             throw new ArgumentException("Generator settings are missing hero, zone or victory-rule objects. Explicit null values are invalid.");
-        if (profile.ProfileId != GenerationProfileOptions.LegacyProfile && !profile.IsCurrentProfile)
+        if (profile.ProfileId != GenerationProfileOptions.LegacyProfile && !profile.UsesVersionedRules)
             throw new NotSupportedException($"Unknown generation profile '{profile.ProfileId}'. Select a supported profile before exporting.");
         if (!Enum.IsDefined(profile.Richness) || !Enum.IsDefined(profile.Challenge) || !Enum.IsDefined(profile.Symmetry) || !Enum.IsDefined(profile.Tempo))
             throw new ArgumentException("Generation profile contains an unknown option.");
@@ -47,10 +47,10 @@ public static class GenerationProfileApplier
             throw new ArgumentException("Town and initial-unit counts must be nonnegative.");
         if (profile.EnableRivers && (!double.IsFinite(profile.RiverTributarySpacing) || profile.RiverTributarySpacing <= 0))
             throw new ArgumentException("Enabled rivers need positive finite tributary spacing.");
-        if (profile.IsCurrentProfile && (source.HeroSettings.HeroCountMin < 1 || source.HeroSettings.HeroCountMax < source.HeroSettings.HeroCountMin || source.HeroSettings.HeroCountIncrement < 0))
+        if (profile.UsesVersionedRules && (source.HeroSettings.HeroCountMin < 1 || source.HeroSettings.HeroCountMax < source.HeroSettings.HeroCountMin || source.HeroSettings.HeroCountIncrement < 0))
             throw new ArgumentException("Hero limits need a positive starting minimum, maximum at least the minimum, and nonnegative per-town increment.");
         int ownedStartingTowns = source.PlayerStartsWithCastles ? Math.Max(1, source.ZoneCfg.PlayerZoneCastles) : 1;
-        if (profile.IsCurrentProfile && !source.SingleHeroMode && (long)ownedStartingTowns * source.HeroSettings.HeroCountIncrement > source.HeroSettings.HeroCountMin)
+        if (profile.UsesVersionedRules && !source.SingleHeroMode && (long)ownedStartingTowns * source.HeroSettings.HeroCountIncrement > source.HeroSettings.HeroCountMin)
             throw new ArgumentException("The owned starting towns already grant more hero capacity than the requested starting minimum. Increase that minimum or reduce the per-town increment/starting owned towns.");
         bool copied = false;
         if (!source.Seed.HasValue && profile.TemplateSeed.HasValue)
@@ -65,7 +65,7 @@ public static class GenerationProfileApplier
             throw new ArgumentException("Enable alliance assignments (FFA is also supported) before selecting mirrored team territories, or choose equal starts.");
         bool tournament = source.TournamentRules.Enabled || source.GameEndConditions.VictoryCondition == "win_condition_6";
         bool finalBattle = source.GladiatorArenaRules.Enabled || source.GameEndConditions.VictoryCondition == "win_condition_4";
-        if (profile.IsCurrentProfile && finalBattle && (source.PlayerCount != 2 || plan.Enabled && (plan.Groups.Count != 2 || plan.Groups.Any(g => g.Players.Count != 1))))
+        if (profile.UsesVersionedRules && finalBattle && (source.PlayerCount != 2 || plan.Enabled && (plan.Groups.Count != 2 || plan.Groups.Any(g => g.Players.Count != 1))))
             throw new ArgumentException("The verified final-battle profile requires two opposing individual players. Choose another victory condition for teams or additional players.");
         if (tournament && (source.PlayerCount != 2 || plan.Enabled && (plan.Groups.Count != 2 || plan.Groups.Any(g => g.Players.Count != 1))))
             throw new ArgumentException("The supported tournament export requires two opposing individual players. Choose another victory condition for teams.");
@@ -73,7 +73,7 @@ public static class GenerationProfileApplier
             throw new ArgumentException("Tournament dates are configured but tournament victory is disabled.");
         if (profile.UseNativeFinalBattleSchedule && source.GameEndConditions.VictoryCondition != "win_condition_4" && !source.GladiatorArenaRules.Enabled)
             throw new ArgumentException("The native final-battle calendar needs final-battle victory enabled.");
-        if (!profile.IsCurrentProfile || profile.Tempo is MapTempo.Legacy or MapTempo.EarlyContact || plan.Enabled || tournament) return source;
+        if (!profile.UsesVersionedRules || profile.Tempo is MapTempo.Legacy or MapTempo.EarlyContact || plan.Enabled || tournament) return source;
         // A selected exploration/balanced tempo uses actual neutral buffers. Clone so a generation
         // does not silently change saved UI settings. This is Aurora graph pacing, not AI behavior.
         var prepared = copied ? source : SettingsSnapshotMapper.Clone(source);
@@ -99,16 +99,16 @@ public static class GenerationProfileApplier
         if (alliance.Enabled) { template.SpawnInfos = alliance.ToSpawnInfos(); template.MaxAlliancesCount = alliance.MaximumAlliances; }
         var rules = template.GameRules ??= new();
         var win = rules.WinConditions ??= new();
-        if (profile.IsCurrentProfile || !profile.ClassicVictoryEnabled) win.Classic = profile.ClassicVictoryEnabled;
+        if (profile.UsesVersionedRules || !profile.ClassicVictoryEnabled) win.Classic = profile.ClassicVictoryEnabled;
         if (settings.GameEndConditions.VictoryCondition == "win_condition_8") win.LostStartHero = true;
         if (profile.ResetCityHoldTimer.HasValue) win.IsResetColdownCityHold = profile.ResetCityHoldTimer;
-        if (profile.IsCurrentProfile || profile.DisableFactionLaws) rules.DisableFactionLaws = profile.DisableFactionLaws;
-        if (profile.IsCurrentProfile || profile.DisableMagicGuild) rules.DisableMagicGuild = profile.DisableMagicGuild;
-        if (profile.IsCurrentProfile || profile.DisableMagicCustomLearning) rules.DisableMagicCustomLearning = profile.DisableMagicCustomLearning;
+        if (profile.UsesVersionedRules || profile.DisableFactionLaws) rules.DisableFactionLaws = profile.DisableFactionLaws;
+        if (profile.UsesVersionedRules || profile.DisableMagicGuild) rules.DisableMagicGuild = profile.DisableMagicGuild;
+        if (profile.UsesVersionedRules || profile.DisableMagicCustomLearning) rules.DisableMagicCustomLearning = profile.DisableMagicCustomLearning;
         if (!string.IsNullOrEmpty(profile.CustomAI)) rules.CustomAI = profile.CustomAI;
         if (profile.TournamentBattleDays.Count > 0)
         {
-            var calendar = BattleCalendar.Encode(profile.TournamentBattleDays, profile.TournamentAnnouncementLeadDays ?? (profile.IsCurrentProfile ? 2 : null));
+            var calendar = BattleCalendar.Encode(profile.TournamentBattleDays, profile.TournamentAnnouncementLeadDays ?? (profile.UsesVersionedRules ? 2 : null));
             win.TournamentAnnounceDays = calendar.Announcements.ToList(); win.TournamentDays = calendar.Durations.ToList();
         }
         else if (win.Tournament == true && profile.TournamentAnnouncementLeadDays.HasValue)
@@ -131,19 +131,22 @@ public static class GenerationProfileApplier
             }
             if (profile.EnableRivers) variant.River = new() { CreateRiverSystem = true, TributarySpacing = profile.RiverTributarySpacing };
             if (profile.NeutralTownCount.HasValue || profile.MaximumTownsPerZone.HasValue)
-            { DistributeNeutralTowns(variant, settings); TeamLayoutBuilder.RebuildConnectionRoads(variant, settings.GenerateRoads); }
-            var roles = profile.IsCurrentProfile ? ApplyEconomyAndProgression(variant, settings) : null;
+            {
+                ApplyNeutralTownLimits(template, variant, settings);
+                TeamLayoutBuilder.RebuildConnectionRoads(variant, settings.GenerateRoads);
+            }
+            var roles = profile.UsesVersionedRules ? ApplyEconomyAndProgression(variant, settings) : null;
             if (profile.Symmetry is MapSymmetry.EqualStarts or MapSymmetry.Teams) EqualizeStarts(variant);
             if (alliance.Enabled && profile.Alliances.SmallerTeamEconomyMultiplier > 1) ApplySmallerTeamSupport(variant, alliance, profile.Alliances.SmallerTeamEconomyMultiplier);
             foreach (var zone in variant.Zones ?? [])
             {
                 if (profile.UseAreaBudgets)
                 { zone.GuardedContentValue = 0; zone.UnguardedContentValue = 0; zone.ResourcesValue = 0; }
-                if (profile.IsCurrentProfile || profile.EnableWeeklyUnitIncrement.HasValue)
+                if (profile.UsesVersionedRules || profile.EnableWeeklyUnitIncrement.HasValue)
                     zone.RandomHireEnableWeeklyUnitIncrement ??= Enumerable.Repeat(profile.EnableWeeklyUnitIncrement ?? true, 7).ToList();
-                if (profile.IsCurrentProfile || profile.InitialUnitIncrement.HasValue)
+                if (profile.UsesVersionedRules || profile.InitialUnitIncrement.HasValue)
                     zone.RandomHireInitialUnitIncrement ??= Enumerable.Repeat(profile.InitialUnitIncrement ?? 1, 7).ToList();
-                if (profile.IsCurrentProfile)
+                if (profile.UsesVersionedRules)
                 {
                     zone.GuardReactionDistribution = GuardReaction.NativeDistribution(roles![zone.Name], settings.MonsterAggression);
                 }
@@ -159,7 +162,7 @@ public static class GenerationProfileApplier
                         if (profile.WeekOneOnlyModificatorGrowth.HasValue) obj.WeekOneOnlyModificatorGrowth = profile.WeekOneOnlyModificatorGrowth;
                         if (profile.InitialUnitIncrement.HasValue) obj.InitialUnitIncrement = profile.InitialUnitIncrement;
                     }
-                    if (obj.Type == "Spawn" && (profile.IsCurrentProfile || settings.GameEndConditions.VictoryCondition == "win_condition_8")
+                    if (obj.Type == "Spawn" && (profile.UsesVersionedRules || settings.GameEndConditions.VictoryCondition == "win_condition_8")
                         && (win.LostStartCity == true || win.LostStartHero == true)) obj.IsKeyObject = true;
                 }
             }
@@ -270,6 +273,41 @@ public static class GenerationProfileApplier
         double scaled = Math.Round(value.Value * multiplier);
         if (!double.IsFinite(scaled) || scaled > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(multiplier), "Content or guard budget exceeds the supported integer range.");
         return Math.Max(0, (int)scaled);
+    }
+
+    private static void ApplyNeutralTownLimits(RmgTemplate template, Variant variant, GeneratorSettings settings)
+    {
+        var before = (variant.Zones ?? []).Where(zone => zone.MainObjects is { Count: > 0 })
+            .ToDictionary(zone => zone, zone => zone.MainObjects!.ToArray());
+        DistributeNeutralTowns(variant, settings);
+        var changes = before.Where(pair => !pair.Value.SequenceEqual(pair.Key.MainObjects ?? []))
+            .ToDictionary(pair => pair.Key, pair => RemapTownSlots(pair.Value, pair.Key.MainObjects ?? []));
+        var edit = MandatoryPlacementEdits.Prepare(template, changes.Keys, (zone, rule) =>
+        {
+            var mapping = changes[zone];
+            if (rule is not { Type: "MainObject", Args.Count: > 0 }
+                || !int.TryParse(rule.Args[0], NumberStyles.None, CultureInfo.InvariantCulture, out int index)
+                || index >= mapping.Length) return default;
+            if (mapping[index] is not { } target) return new(true, null);
+            return target != index ? new(false, target.ToString(CultureInfo.InvariantCulture)) : default;
+        });
+        edit();
+    }
+
+    private static int?[] RemapTownSlots(MainObject[] before, List<MainObject> after)
+    {
+        var previous = before.ToHashSet();
+        var replacements = new Queue<int>(after.Select((obj, index) => (obj, index))
+            .Where(pair => pair.obj.Type == "City" && !previous.Contains(pair.obj)).Select(pair => pair.index));
+        var mapping = new int?[before.Length];
+        for (int index = 0; index < before.Length; index++)
+        {
+            var original = before[index];
+            int retained = after.IndexOf(original);
+            if (retained >= 0) mapping[index] = retained;
+            else if (original.Type == "City" && replacements.TryDequeue(out int replacement)) mapping[index] = replacement;
+        }
+        return mapping;
     }
 
     private static void DistributeNeutralTowns(Variant variant, GeneratorSettings settings)

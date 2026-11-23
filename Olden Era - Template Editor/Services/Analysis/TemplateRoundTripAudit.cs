@@ -12,7 +12,7 @@ public sealed record TemplateRoundTripResult(IReadOnlyList<TemplateRoundTripFind
     public bool PreservesValues => Differences.Count == 0;
 }
 
-/// <summary>Checks source values at every depth against the typed export, including JsonExtensionData.</summary>
+/// <summary>Checks missing, added and changed values at every depth, including JsonExtensionData.</summary>
 public static class TemplateRoundTripAudit
 {
     private static readonly JsonDocumentOptions ReadOptions = new() { AllowTrailingCommas = true, CommentHandling = JsonCommentHandling.Skip, MaxDepth = 128 };
@@ -21,9 +21,12 @@ public static class TemplateRoundTripAudit
     {
         using var source = JsonDocument.Parse(originalJson, ReadOptions);
         using var destination = JsonDocument.Parse(exportedJson, ReadOptions);
-        var lost = new List<TemplateRoundTripFinding>(); var normalized = new List<TemplateRoundTripFinding>();
+        var differences = new List<TemplateRoundTripFinding>();
+        var normalized = new List<TemplateRoundTripFinding>();
+        var nullability = new NullabilityInfoContext();
+        var modeledProperties = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
         CompareNode(source.RootElement, destination.RootElement, typeof(RmgTemplate), "$", false);
-        return new(lost.ToArray(), normalized.ToArray());
+        return new(differences.ToArray(), normalized.ToArray());
 
         void CompareNode(JsonElement before, JsonElement after, Type? expected, string path, bool scalarStringList)
         {
@@ -50,22 +53,39 @@ public static class TemplateRoundTripAudit
             switch (before.ValueKind)
             {
                 case JsonValueKind.Object:
-                    var properties = expected is null || expected == typeof(object) ? new Dictionary<string, PropertyInfo>(StringComparer.Ordinal)
-                        : expected.GetProperties().Where(property => property.GetCustomAttribute<JsonPropertyNameAttribute>() is not null)
+                    Dictionary<string, PropertyInfo>? properties = null;
+                    if (expected is not null && expected != typeof(object)
+                        && !modeledProperties.TryGetValue(expected, out properties))
+                    {
+                        properties = expected.GetProperties()
+                            .Where(property => property.GetCustomAttribute<JsonPropertyNameAttribute>() is not null)
                             .ToDictionary(property => property.GetCustomAttribute<JsonPropertyNameAttribute>()!.Name, StringComparer.Ordinal);
+                        modeledProperties.Add(expected, properties);
+                    }
+                    var sourceNames = new HashSet<string>(StringComparer.Ordinal);
                     foreach (var property in before.EnumerateObject())
                     {
-                        properties.TryGetValue(property.Name, out var modeled);
+                        string propertyPath = path + "." + property.Name;
+                        if (!sourceNames.Add(property.Name)) Difference(propertyPath, "The source contains a repeated property.");
+                        PropertyInfo? modeled = properties?.GetValueOrDefault(property.Name);
                         if (!after.TryGetProperty(property.Name, out var written))
                         {
-                            if (property.Value.ValueKind == JsonValueKind.Null && modeled is not null)
-                                normalized.Add(new(path + "." + property.Name, "Optional explicit null was omitted by the export contract."));
-                            else Difference(path + "." + property.Name, "Source property was lost.");
+                            if (property.Value.ValueKind == JsonValueKind.Null && modeled is not null
+                                && nullability.Create(modeled).ReadState == NullabilityState.Nullable)
+                                normalized.Add(new(propertyPath, "Optional explicit null was omitted by the export contract."));
+                            else Difference(propertyPath, "Source property was lost.");
                             continue;
                         }
                         bool collapsedValueArray = modeled?.GetCustomAttribute<JsonConverterAttribute>()?.ConverterType?.IsGenericType == true
                             && modeled.GetCustomAttribute<JsonConverterAttribute>()!.ConverterType!.GetGenericTypeDefinition() == typeof(ScalarOrArrayConverter<>);
-                        CompareNode(property.Value, written, modeled?.PropertyType, path + "." + property.Name, collapsedValueArray);
+                        CompareNode(property.Value, written, modeled?.PropertyType, propertyPath, collapsedValueArray);
+                    }
+                    var outputNames = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var property in after.EnumerateObject())
+                    {
+                        string propertyPath = path + "." + property.Name;
+                        if (!outputNames.Add(property.Name)) Difference(propertyPath, "The output contains a repeated property.");
+                        else if (!sourceNames.Contains(property.Name)) Difference(propertyPath, "Output added a property absent in the source.");
                     }
                     break;
                 case JsonValueKind.Array:
@@ -89,6 +109,6 @@ public static class TemplateRoundTripAudit
                 default: Difference(path, "Unrecognized JSON value."); break;
             }
         }
-        void Difference(string path, string message) => lost.Add(new(path, message));
+        void Difference(string path, string message) => differences.Add(new(path, message));
     }
 }

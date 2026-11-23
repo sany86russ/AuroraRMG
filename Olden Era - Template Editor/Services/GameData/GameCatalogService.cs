@@ -15,6 +15,11 @@ public sealed class GameCatalogService
     private readonly ConcurrentDictionary<string, GameCatalog> _memory = new(StringComparer.OrdinalIgnoreCase);
     private readonly GameInstallationService _installations;
     private readonly string _cacheDir;
+    private SharedSnapshot? _shared;
+
+    // The payload is captured before exposing a view. Each language keeps an independent mutable catalog.
+    private sealed record SharedSnapshot(GameInstallation Source, RmgTemplateStamp[] Stamps, byte[] Payload);
+    private sealed record SharedPayload(List<GameContentEntry> Content, GameReferenceSnapshot References, List<string> Warnings);
     public string? CoreZipPath { get; private set; }
     public bool GameFound => CoreZipPath is not null && File.Exists(CoreZipPath);
 
@@ -32,14 +37,32 @@ public sealed class GameCatalogService
         {
             var source = await Task.Run(() => _installations.Discover(forceRefresh)).ConfigureAwait(false);
             CoreZipPath = source?.CoreZipPath;
-            if (!forceRefresh && _memory.TryGetValue(language, out var cached) && SameSource(cached.Source, source)) return cached;
-            var catalog = await Task.Run(() => LoadOrBuild(language, source, forceRefresh)).ConfigureAwait(false);
+            if (!forceRefresh && _memory.TryGetValue(language, out var cached) && SameSource(cached.Source, source) &&
+                SameTemplates(cached, source)) return cached;
+            var catalog = await Task.Run(() =>
+            {
+                try { return LoadOrBuild(language, source, forceRefresh); }
+                catch (InstalledGameDataChangedException)
+                {
+                    var refreshed = _installations.Discover(forceRefresh: true);
+                    CoreZipPath = refreshed?.CoreZipPath;
+                    return LoadOrBuild(language, refreshed, forceRefresh);
+                }
+            }).ConfigureAwait(false);
+            if (forceRefresh) _memory.Clear();
+            else
+                foreach (var entry in _memory)
+                    if (!SameSource(entry.Value.Source, catalog.Source) ||
+                        !entry.Value.RmgTemplateStamps.SequenceEqual(catalog.RmgTemplateStamps))
+                        _memory.TryRemove(entry.Key, out _);
             _memory[language] = catalog;
             return catalog;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JsonException)
         {
             var empty = new GameCatalog { Language = language, Warnings = ["Installed catalog could not be loaded: " + ex.Message] };
+            _shared = null;
+            _memory.Clear();
             _memory[language] = empty;
             return empty;
         }
@@ -70,28 +93,52 @@ public sealed class GameCatalogService
         if (source is null) return new GameCatalog { Language = language, Warnings = _installations.LastWarnings.ToList() };
         var path = CachePath(language, source);
         string? cacheWarning = null;
-        if (!forceRefresh)
+        var shared = !forceRefresh && _shared is { } candidate && SameSource(candidate.Source, source) &&
+            SameTemplates(candidate.Stamps, source) ? candidate : null;
+        if (!forceRefresh && shared is null)
         {
             var disk = TryLoadCache(path, out cacheWarning);
-            if (disk?.SnapshotFormatVersion == 4 && disk.Language == language && SameSource(disk.Source, source) && !disk.IsEmpty)
+            if (disk?.SnapshotFormatVersion == GameCatalog.CurrentSnapshotFormatVersion && disk.Language == language &&
+                SameSource(disk.Source, source) && SameTemplates(disk, source) && !disk.IsEmpty)
             {
                 // Source capability evidence always comes from the current locator, never a cache's editable metadata.
                 disk.Source = source; disk.SourceStamp = source.SourceStamp;
+                RememberShared(disk, source);
                 return disk;
             }
         }
         var catalog = new GameCatalog { Language = language, SourceStamp = source.SourceStamp, Source = source, Warnings = source.Warnings.ToList() };
         if (cacheWarning is not null) catalog.Warnings.Add(cacheWarning);
-        using (var stream = new FileStream(source.CoreZipPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+        using (var stream = GameInstallationService.OpenVerifiedDataFile(source.CoreZipPath, source.SourceFingerprint))
         using (var zip = new ZipArchive(stream, ZipArchiveMode.Read))
         {
             catalog.Heroes = CatalogBuilder.BuildHeroes(zip, language, catalog.Warnings);
-            catalog.Content = GameContentCatalogBuilder.Build(zip, catalog.Warnings);
-            catalog.References = GameReferenceSnapshotBuilder.Build(zip, source, catalog.Warnings);
+            if (shared is null)
+            {
+                catalog.RmgTemplateStamps = GameContentCatalogBuilder.ReadTemplateStamps(zip, source.TemplatesPath, catalog.SharedWarnings);
+                catalog.Content = GameContentCatalogBuilder.Build(zip, catalog.SharedWarnings, source.TemplatesPath, catalog.RmgTemplateStamps);
+                catalog.References = GameReferenceSnapshotBuilder.Build(zip, source, catalog.SharedWarnings);
+            }
+            else
+            {
+                var payload = JsonSerializer.Deserialize<SharedPayload>(shared.Payload)
+                    ?? throw new JsonException("Shared installed game data could not be read.");
+                catalog.RmgTemplateStamps = shared.Stamps.ToList();
+                catalog.Content = payload.Content;
+                catalog.References = payload.References;
+                catalog.SharedWarnings = payload.Warnings;
+            }
         }
+        catalog.Warnings.AddRange(catalog.SharedWarnings);
+        if (!SameTemplates(catalog, source)) throw new InstalledGameDataChangedException(source.TemplatesPath);
+        if (shared is null) RememberShared(catalog, source);
         TrySaveCache(path, catalog);
         return catalog;
     }
+
+    private void RememberShared(GameCatalog catalog, GameInstallation source) =>
+        _shared = new(source, catalog.RmgTemplateStamps.ToArray(),
+            JsonSerializer.SerializeToUtf8Bytes(new SharedPayload(catalog.Content, catalog.References, catalog.SharedWarnings)));
 
     private string CachePath(string language, GameInstallation source)
     {
@@ -106,6 +153,10 @@ public sealed class GameCatalogService
         try
         {
             using var document = JsonDocument.Parse(File.ReadAllText(path));
+            if (document.RootElement.ValueKind == JsonValueKind.Object &&
+                document.RootElement.TryGetProperty("SnapshotFormatVersion", out var version) &&
+                version.ValueKind == JsonValueKind.Number && version.TryGetInt32(out int format) &&
+                format != GameCatalog.CurrentSnapshotFormatVersion) return null;
             if (!HasRequiredCacheMembers(document.RootElement))
                 throw new JsonException("Required cache members are missing, null or have the wrong shape.");
             var catalog = document.RootElement.Deserialize<GameCatalog>();
@@ -121,7 +172,11 @@ public sealed class GameCatalogService
     {
         if (!Members(root, ("language", JsonValueKind.String), ("SnapshotFormatVersion", JsonValueKind.Number),
             ("heroes", JsonValueKind.Array), ("Content", JsonValueKind.Array), ("Warnings", JsonValueKind.Array),
-            ("Source", JsonValueKind.Object), ("References", JsonValueKind.Object))) return false;
+            ("SharedWarnings", JsonValueKind.Array),
+            ("RmgTemplateStamps", JsonValueKind.Array), ("Source", JsonValueKind.Object), ("References", JsonValueKind.Object))) return false;
+        foreach (var stamp in root.GetProperty("RmgTemplateStamps").EnumerateArray())
+            if (!Members(stamp, ("FileName", JsonValueKind.String), ("LastWriteUtcTicks", JsonValueKind.Number),
+                ("Length", JsonValueKind.Number))) return false;
         var source = root.GetProperty("Source");
         if (!Members(source, ("InstallPath", JsonValueKind.String), ("CoreZipPath", JsonValueKind.String),
             ("TemplatesPath", JsonValueKind.String), ("SchemaPath", JsonValueKind.String), ("VersionEvidence", JsonValueKind.String),
@@ -131,9 +186,10 @@ public sealed class GameCatalogService
             ("ConfirmedCapabilities", JsonValueKind.Array), ("Evidence", JsonValueKind.String))) return false;
         var references = root.GetProperty("References");
         if (!Members(references, ("Pools", JsonValueKind.Array), ("Lists", JsonValueKind.Array), ("Layouts", JsonValueKind.Array),
-            ("Objects", JsonValueKind.Array), ("NativeLayouts", JsonValueKind.Array), ("NativeMandatory", JsonValueKind.Array),
+            ("Objects", JsonValueKind.Array), ("Skills", JsonValueKind.Array), ("NativeLayouts", JsonValueKind.Array), ("NativeMandatory", JsonValueKind.Array),
             ("NativeCountLimits", JsonValueKind.Array), ("AiEvidence", JsonValueKind.String))) return false;
         if (!references.TryGetProperty("CoreReadComplete", out var complete) || complete.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
+        if (!references.TryGetProperty("SkillCompleteness", out var skills) || skills.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
         if (!references.TryGetProperty("CustomAI", out var ai) || ai.ValueKind is not (JsonValueKind.Null or JsonValueKind.Array)) return false;
         foreach (var hero in root.GetProperty("heroes").EnumerateArray())
             if (!Members(hero, ("sid", JsonValueKind.String), ("name", JsonValueKind.String), ("faction", JsonValueKind.String), ("icon", JsonValueKind.String))) return false;
@@ -142,10 +198,13 @@ public sealed class GameCatalogService
             if (!Members(content, ("Sid", JsonValueKind.String), ("Kind", JsonValueKind.Number), ("NameRu", JsonValueKind.String),
                 ("NameEn", JsonValueKind.String), ("Category", JsonValueKind.String), ("Faction", JsonValueKind.String),
                 ("SourceEntry", JsonValueKind.String), ("RewardVariants", JsonValueKind.Array), ("GrantedSpells", JsonValueKind.Array))) return false;
+            if (!content.TryGetProperty("HasMapPickup", out var pickup) || pickup.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
             foreach (var variant in content.GetProperty("RewardVariants").EnumerateArray())
             {
-                if (!Members(variant, ("Index", JsonValueKind.Number), ("RewardTypes", JsonValueKind.Array),
-                    ("RewardParameters", JsonValueKind.Array), ("Spells", JsonValueKind.Array))) return false;
+                if (!Members(variant, ("Index", JsonValueKind.Number), ("RewardApplyType", JsonValueKind.String),
+                    ("Rewards", JsonValueKind.Array), ("Spells", JsonValueKind.Array))) return false;
+                foreach (var reward in variant.GetProperty("Rewards").EnumerateArray())
+                    if (!Members(reward, ("Type", JsonValueKind.String), ("Parameters", JsonValueKind.Array))) return false;
                 foreach (var spell in variant.GetProperty("Spells").EnumerateArray())
                     if (!Members(spell, ("Sid", JsonValueKind.String), ("NameRu", JsonValueKind.String), ("NameEn", JsonValueKind.String))) return false;
             }
@@ -160,17 +219,25 @@ public sealed class GameCatalogService
         var source = catalog.Source; var profile = source?.Profile;
         if (source is null || profile is null || source.Warnings is null || source.Warnings.Any(w => w is null)
             || profile.ConfirmedCapabilities is null || !Enum.IsDefined(profile.Status) || profile.ConfirmedCapabilities.Any(c => !Enum.IsDefined(c))
-            || catalog.Heroes is null || catalog.Content is null || catalog.Warnings is null || catalog.Warnings.Any(w => w is null)
+            || catalog.Heroes is null || catalog.Content is null || !Strings(catalog.Warnings) || !Strings(catalog.SharedWarnings)
             || catalog.References is not { } references) return false;
         if (catalog.Heroes.Any(h => h is null || h.Sid.Length == 0)
             || catalog.Heroes.Select(h => h.Sid).Distinct(StringComparer.Ordinal).Count() != catalog.Heroes.Count) return false;
-        if (catalog.Content.Any(c => c is null || c.Sid.Length == 0 || !Enum.IsDefined(c.Kind) || c.PlacementVerified || !Strings(c.GrantedSpells)
-            || c.RewardVariants is null || c.RewardVariants.Any(v => v is null || v.Index < 0 || !Strings(v.RewardTypes) || !Strings(v.RewardParameters)
+        if (catalog.Content.Any(c => c is null || c.Sid.Length == 0 || !Enum.IsDefined(c.Kind) || c.PlacementVerified ||
+            c.HasMapPickup && c.Kind != GameContentKind.Artifact || !Strings(c.GrantedSpells)
+            || c.RewardVariants is null || c.RewardVariants.Any(v => v is null || v.Index < 0 ||
+                v.Rewards is null || v.Rewards.Any(r => r is null || r.Type.Length == 0 || !Strings(r.Parameters))
                 || v.RollChance is { } chance && !double.IsFinite(chance) || v.Value is { } value && !double.IsFinite(value)
                 || v.Spells is null || v.Spells.Any(s => s is null || s.Sid.Length == 0))
             || c.RewardVariants.Select(v => v.Index).Distinct().Count() != c.RewardVariants.Count)
             || catalog.Content.Select(c => (c.Kind, c.Sid)).Distinct().Count() != catalog.Content.Count) return false;
+        if (catalog.RmgTemplateStamps is not { Count: > 0 } stamps ||
+            stamps.Any(stamp => stamp is null || !stamp.FileName.EndsWith(".rmg.json", StringComparison.OrdinalIgnoreCase) ||
+                stamp.FileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                stamp.LastWriteUtcTicks < 0 || stamp.Length < -1) ||
+            stamps.Select(stamp => stamp.FileName).Distinct(StringComparer.OrdinalIgnoreCase).Count() != stamps.Count) return false;
         return Identifiers(references.Pools) && Identifiers(references.Lists) && Identifiers(references.Layouts) && Identifiers(references.Objects)
+            && Identifiers(references.Skills) && (!references.SkillCompleteness || references.Skills.Count > 0)
             && Identifiers(references.NativeLayouts) && Identifiers(references.NativeMandatory) && Identifiers(references.NativeCountLimits)
             && (references.CustomAI is null || Identifiers(references.CustomAI));
         static bool Strings(IEnumerable<string>? values) => values is not null && values.All(value => value is not null);
@@ -185,6 +252,12 @@ public sealed class GameCatalogService
     private static bool SameSource(GameInstallation? a, GameInstallation? b) => a is null ? b is null : b is not null &&
         string.Equals(a.CoreZipPath, b.CoreZipPath, StringComparison.OrdinalIgnoreCase) && a.SourceFingerprint == b.SourceFingerprint &&
         a.SteamBuildId == b.SteamBuildId && a.VersionMarker == b.VersionMarker && a.SchemaFingerprint == b.SchemaFingerprint && a.Profile.Id == b.Profile.Id;
+    private static bool SameTemplates(GameCatalog catalog, GameInstallation? source) =>
+        source is null || SameTemplates(catalog.RmgTemplateStamps, source);
+
+    private static bool SameTemplates(IEnumerable<RmgTemplateStamp> stamps, GameInstallation source) =>
+        stamps.All(stamp => stamp == RmgTemplateStamp.Read(source.TemplatesPath, stamp.FileName));
+
     private static string NormalizeLanguage(string? language) => string.IsNullOrWhiteSpace(language)
         ? (Localization.LocalizationManager.Instance.CurrentLanguage == Localization.AppLanguage.En ? "english" : "russian")
         : language.Equals("russian", StringComparison.OrdinalIgnoreCase) ? "russian" : "english";

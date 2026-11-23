@@ -62,21 +62,41 @@ namespace Olden_Era___Template_Editor.Services
                 : Path.ChangeExtension(rmgJsonPath, ".png");
 
         public static void Save(RmgTemplate template, string previewPath, MapTopology topology = MapTopology.Default)
+            => Save(Render(template, topology), previewPath);
+
+        public static void Save(BitmapSource bitmap, string previewPath)
         {
             string? directory = Path.GetDirectoryName(previewPath);
             if (!string.IsNullOrEmpty(directory))
                 Directory.CreateDirectory(directory);
 
-            var bitmap = Render(template, topology);
+            string tempPath = $"{previewPath}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                using (var stream = File.Create(tempPath))
+                    Write(bitmap, stream);
+                File.Move(tempPath, previewPath, overwrite: true);
+            }
+            finally
+            {
+                try { File.Delete(tempPath); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
+        }
 
+        public static byte[] Encode(BitmapSource bitmap)
+        {
+            using var stream = new MemoryStream();
+            Write(bitmap, stream);
+            return stream.ToArray();
+        }
+
+        private static void Write(BitmapSource bitmap, Stream stream)
+        {
             var encoder = new PngBitmapEncoder();
             encoder.Frames.Add(BitmapFrame.Create(bitmap));
-
-            string tempPath = $"{previewPath}.{Guid.NewGuid():N}.tmp";
-            using (var stream = File.Create(tempPath))
-                encoder.Save(stream);
-
-            File.Move(tempPath, previewPath, overwrite: true);
+            encoder.Save(stream);
         }
 
         /// <summary>Renders the preview to a <see cref="BitmapSource"/> without writing any files.</summary>
@@ -97,8 +117,10 @@ namespace Olden_Era___Template_Editor.Services
         /// <paramref name="template"/>, keyed by zone name.
         /// </summary>
         public static Dictionary<string, Point> ComputeLayout(RmgTemplate template, MapTopology topology = MapTopology.Default)
+            => ComputeVariantLayout(template.Variants?.FirstOrDefault(), topology);
+
+        internal static Dictionary<string, Point> ComputeVariantLayout(Variant? variant, MapTopology topology)
         {
-            Variant? variant = template.Variants?.FirstOrDefault();
             List<Zone> zones = variant?.Zones ?? [];
             if (zones.Count == 0) return [];
             var orderedZones = OrderZones(zones, variant?.Orientation?.ZeroAngleZone);

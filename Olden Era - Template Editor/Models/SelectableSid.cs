@@ -3,9 +3,9 @@ using System.ComponentModel;
 namespace Olden_Era___Template_Editor.Models;
 
 /// <summary>Selection survives filtering and virtualized item-container recycling.</summary>
-public sealed class SelectableSid(string id) : INotifyPropertyChanged
+public sealed class SelectableSid(string id, Func<string>? displayName = null) : INotifyPropertyChanged
 {
-    public string DisplayName => Olden_Era___Template_Editor.Services.Localization.GameLabels.Name(Id);
+    public string DisplayName => displayName?.Invoke() ?? Olden_Era___Template_Editor.Services.Localization.GameLabels.Name(Id);
     public void RefreshLanguage() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
     public string Id { get; } = id;
     private bool _isSelected;

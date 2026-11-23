@@ -380,7 +380,7 @@ public class PatchSchemaCompatibilityTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Validator_RejectsUnknownConfiguredRewardIndicesAcrossMandatoryListsAndPools(bool collapsed)
+    public void Validator_RejectsUnknownConfiguredRewardIndicesAcrossTemplateDefinitions(bool collapsed)
     {
         var template = ValidTemplate();
         template.MandatoryContent = [new() { Name = "configured", Content = [new() { Sid = "scroll_box", Variant = 999 }] }];
@@ -395,13 +395,14 @@ public class PatchSchemaCompatibilityTests
         var catalog = RewardVariantCatalog();
         var errors = TemplateCompatibilityValidator.Validate(template, catalog: catalog)
             .Where(issue => issue.Code == "content.unknownVariant").ToArray();
-        Assert.Equal(3, errors.Length);
+        Assert.Equal(4, errors.Length);
         Assert.All(errors, issue => Assert.Equal(TemplateIssueSeverity.Error, issue.Severity));
         Assert.Contains(errors, issue => issue.Path == "mandatoryContent[0].content[0].variant");
         Assert.Contains(errors, issue => issue.Path == "contentLists[0].content[0].variant");
         Assert.Contains(errors, issue => issue.Path == "contentPools[0].groups[0].content[0].variant");
+        Assert.Contains(errors, issue => issue.Path == "valueOverrides[0].variant");
         var imported = TemplateCompatibilityValidator.Validate(template, TemplateValidationMode.TolerantImport, catalog);
-        Assert.Equal(3, imported.Count(issue => issue.Code == "content.unknownVariant" && issue.Severity == TemplateIssueSeverity.Warning));
+        Assert.Equal(4, imported.Count(issue => issue.Code == "content.unknownVariant" && issue.Severity == TemplateIssueSeverity.Warning));
         Assert.DoesNotContain(imported, issue => issue.Severity == TemplateIssueSeverity.Error);
         Assert.Equal(before, JsonSerializer.Serialize(template, JsonExport.Options));
     }

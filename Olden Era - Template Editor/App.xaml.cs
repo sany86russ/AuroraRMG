@@ -10,9 +10,12 @@ namespace Olden_Era___Template_Editor
     /// </summary>
     public partial class App : Application
     {
+        internal static bool IsPatchVerificationCommand(string arg) => arg.ToLowerInvariant() is
+            "--shoot-patch" or "--shoot-docs" or "--make-patch-kit" or "--gen-readymaps";
+
         protected override void OnStartup(StartupEventArgs e)
         {
-            if (e.Args.Any(a => a is "--shoot-patch" or "--shoot-docs" or "--make-patch-kit"))
+            if (e.Args.Any(IsPatchVerificationCommand))
             {
                 System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
                 string? requested = Environment.GetEnvironmentVariable("AURORARMG_DATA_DIRECTORY");

@@ -6,7 +6,9 @@ public static partial class Strings
     {
         foreach (var (key, ru, en) in PatchLabels)
         { Ru.Add(key, ru); En.Add(key, en); }
-        foreach (var (key, ru, en) in NativeEditorLabels.Concat(PatchWorkflowLabels).Concat(TemplatePropertiesLabels))
+        foreach (var (key, ru, en) in NativeEditorLabels.Concat(PatchWorkflowLabels).Concat(TemplatePropertiesLabels).Concat(Patch08210Labels))
+        { Ru.Add(key, ru); En.Add(key, en); }
+        foreach (var (key, ru, en) in SettingsWorkflowLabels)
         { Ru.Add(key, ru); En.Add(key, en); }
         foreach (var (key, ru, en) in PatchOverrides)
         { Ru[key] = ru; En[key] = en; }
@@ -38,7 +40,7 @@ public static partial class Strings
         ("S.Patch.TeamSlot", "Игрок {0}", "Player {0}"),
         ("S.Patch.TeamHelp", "Номер альянса начинается с 1. −1 означает отдельного игрока FFA. Тип человека/ИИ задаётся в игре.", "Alliance numbers start at 1. −1 is a separate FFA player. Human/AI slots are selected in game."),
         ("S.Patch.CalendarHelp", "Даты вводятся как дни партии, начиная с 1; турнир начинается со дня 2. Объявление и длительность рассчитываются отдельно.", "Enter game days starting at 1; tournaments start from day 2. Announcement and duration are computed separately."),
-        ("S.Patch.ProfileHelp", "Профиль Aurora 1.11 сохраняет прежние настройки. Профиль Olden Era 0.81.04 добавляет новые правила наполнения. Сложность ИИ выбирается в игре.", "Aurora 1.11 preserves previous settings. Olden Era 0.81.04 adds new content rules. AI difficulty is selected in game."),
+        ("S.Patch.ProfileHelp", "Для новых шаблонов используйте профиль Olden Era 0.82.10. Для повторения старого шаблона оставьте профиль, с которым он был создан. Сложность ИИ выбирается в игре.", "Use the Olden Era 0.82.10 profile for new templates. Keep the original profile to reproduce an existing template. AI difficulty is selected in game."),
         ("S.Patch.AreaHelp", "Движок добавляет коэффициент бюджета на каждые 10 пригодных свободных клеток. Точное число доступных клеток известно после генерации карты.", "The engine adds the budget coefficient per 10 eligible free cells. Their exact count is known after map generation."),
         ("S.Patch.PortalsHelp", "Настройка управляет дополнительными порталами Aurora. Игра может заменить Direct/Default порталом, если обычный проход не получился.", "Controls extra Aurora portals. The game can replace Direct/Default with a portal when a passage cannot be built."),
         ("S.Patch.GamePath", "Папка установленной игры (пусто — найти автоматически)", "Installed game folder (empty — auto-discover)"),
@@ -46,7 +48,8 @@ public static partial class Strings
         ("S.Patch.GameMissing", "Установка игры не найдена. Можно настроить шаблон с встроенным каталогом Aurora.", "Game installation was not found. Aurora's bundled catalogue remains available."),
         ("S.Patch.Unknown", "Не установлено", "Unknown"),
         ("S.Patch.Legacy", "Aurora 1.11", "Aurora 1.11"),
-        ("S.Patch.Current", "Olden Era 0.81.04", "Olden Era 0.81.04"),
+        ("S.Patch.Previous", "Olden Era 0.81.04", "Olden Era 0.81.04"),
+        ("S.Patch.Current", "Olden Era 0.82.10", "Olden Era 0.82.10"),
         ("S.Patch.Field.ProfileId", "Профиль генерации", "Generation profile"),
         ("S.Patch.Field.TemplateSeed", "Seed шаблона (пусто — случайный)", "Template seed (empty — random)"),
         ("S.Patch.Field.Richness", "Богатство карты", "Map richness"),
@@ -107,6 +110,7 @@ public static partial class Strings
         ("S.Patch.CatalogSearch", "Поиск по RU/EN названию, SID, категории и уровню", "Search RU/EN name, SID, category and level"),
         ("S.Patch.CatalogAll", "Все", "All"), ("S.Patch.CatalogObjects", "Объекты", "Objects"),
         ("S.Patch.CatalogSpells", "Заклинания", "Spells"), ("S.Patch.CatalogArtifacts", "Артефакты", "Artifacts"),
+        ("S.Patch.CatalogSkills", "Навыки", "Skills"),
         ("S.Patch.CatalogRmgOnly", "Используется в RMG", "Referenced by RMG"),
         ("S.Patch.CatalogRefresh", "Обновить", "Refresh"), ("S.Patch.CatalogChoose", "Выбрать", "Choose"),
         ("S.Patch.CatalogClose", "Закрыть", "Close"),
@@ -115,7 +119,11 @@ public static partial class Strings
         ("S.Patch.CatalogCategory", "Категория", "Category"), ("S.Patch.CatalogLevel", "Уровень", "Level"),
         ("S.Patch.CatalogStatus", "Статус", "Status"), ("S.Patch.CatalogVariant", "Вариант", "Variant"),
         ("S.Patch.CatalogValue", "Ценность", "Value"), ("S.Patch.CatalogWeight", "Вес", "Weight"),
-        ("S.Patch.CatalogReward", "Награда", "Reward"), ("S.Patch.CatalogParameters", "Параметры", "Parameters"),
+        ("S.Patch.CatalogRewardMode", "Выдача", "Reward mode"),
+        ("S.Patch.CatalogRewardChooseOne", "Выбор одной", "Choose one"),
+        ("S.Patch.CatalogRewardGrantAll", "Все награды", "Grant all"),
+        ("S.Patch.CatalogRewardZeroWeight", "0 · без розыгрыша", "0 · no roll"),
+        ("S.Patch.CatalogParameters", "Награды и параметры", "Rewards and parameters"),
         ("S.Patch.CatalogSource", "Источник", "Source"),
         ("S.Patch.CatalogStatusRmg", "Есть в RMG, размещение не проверено", "Referenced by RMG; placement unverified"),
         ("S.Patch.CatalogStatusData", "Есть в данных; RMG не подтверждён", "Present in data; RMG unconfirmed"),

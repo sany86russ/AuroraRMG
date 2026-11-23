@@ -34,17 +34,20 @@ namespace Olden_Era___Template_Editor.Services
         ];
         /// <summary>
         /// Per-generation RNG for all placement randomisation. Seeded from
-        /// <see cref="GeneratorSettings.Seed"/> at the start of <see cref="Generate"/> so a given seed
+        /// <see cref="GeneratorSettings.Seed"/> at the start of <see cref="Generate(GeneratorSettings)"/> so a given seed
         /// reproduces the same map; falls back to a time-based RNG when no seed is set (manual mode).
-        /// <c>[ThreadStatic]</c> keeps parallel test runs isolated — a single <see cref="Generate"/>
+        /// <c>[ThreadStatic]</c> keeps parallel test runs isolated — a single <see cref="Generate(GeneratorSettings)"/>
         /// call runs entirely on one thread.
         /// </summary>
         [System.ThreadStatic] private static Random? _rng;
         private static Random Rng => _rng ??= new Random();
 
-        public static RmgTemplate Generate(GeneratorSettings settings)
+        public static RmgTemplate Generate(GeneratorSettings settings) => Generate(settings, out _);
+
+        internal static RmgTemplate Generate(GeneratorSettings settings, out MapTopology effectiveTopology)
         {
             settings = GenerationProfileApplier.Prepare(settings);
+            effectiveTopology = settings.Topology;
             _rng = settings.Seed.HasValue ? new Random(settings.Seed.Value) : new Random();
 
             var playerLetters = ZoneLetters.Take(settings.PlayerCount).ToList();
@@ -95,8 +98,8 @@ namespace Olden_Era___Template_Editor.Services
                 SizeX = settings.MapSize,
                 SizeZ = settings.MapSize,
                 GameRules = BuildGameRules(settings, effectiveVictoryCondition),
-                ValueOverrides = BuildValueOverrides(settings.ValueOverridesText),
-                GlobalBans = BuildGlobalBans(settings.BannedItems, settings.BannedMagics, settings.BannedHeroes),
+                ValueOverrides = ValueOverrideText.Parse(settings.ValueOverridesText),
+                GlobalBans = BuildGlobalBans(settings),
                 Variants = [BuildVariant(settings, playerLetters, neutralZones, tuning, holdCityNeutralLetter, useCityHold && settings.Topology == MapTopology.HubAndSpoke)],
                 ZoneLayouts = BuildZoneLayouts(settings),
                 MandatoryContent = BuildAllMandatoryContent(playerLetters, neutralZones, settings),
@@ -106,6 +109,12 @@ namespace Olden_Era___Template_Editor.Services
             };
 
             GenerationProfileApplier.Apply(template, settings);
+            if (UsesChampionSpire(settings) && template.GameRules?.WinConditions is { } win
+                && (win.GladiatorArena == true || win.Tournament == true))
+            {
+                win.ChampionSelectRule = ChampionSpirePlacement.SelectedRule;
+                ChampionSpirePlacement.AddToStarts(template);
+            }
             return template;
         }
 
@@ -410,7 +419,7 @@ namespace Olden_Era___Template_Editor.Services
             return (int)Math.Clamp(baseline, 0, int.MaxValue);
         }
 
-        private static int StartingHeroBaseline(GeneratorSettings settings) => settings.ProfileOptions.IsCurrentProfile
+        private static int StartingHeroBaseline(GeneratorSettings settings) => settings.ProfileOptions.UsesVersionedRules
             ? EffectiveHeroCountMin(settings.HeroSettings, settings.PlayerStartsWithCastles ? Math.Max(1, settings.ZoneCfg.PlayerZoneCastles) : 1)
             : EffectiveHeroCountMin(settings.HeroSettings);
 
@@ -440,32 +449,10 @@ namespace Olden_Era___Template_Editor.Services
         }
 
         /// <summary>
-        /// Parses newline-separated "sid=guardValue" lines into a ValueOverride list.
-        /// Lines that are blank or unparseable are silently skipped.
-        /// </summary>
-        private static List<ValueOverride>? BuildValueOverrides(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) return null;
-            var list = new List<ValueOverride>();
-            foreach (var line in raw.Split('\n'))
-            {
-                var trimmed = line.Trim();
-                if (string.IsNullOrEmpty(trimmed)) continue;
-                var eq = trimmed.IndexOf('=');
-                if (eq <= 0) continue;
-                var sid = trimmed[..eq].Trim();
-                if (string.IsNullOrEmpty(sid)) continue;
-                if (!int.TryParse(trimmed[(eq + 1)..].Trim(), out int gv)) continue;
-                list.Add(new ValueOverride { Sid = sid, Variant = -1, GuardValue = gv });
-            }
-            return list.Count > 0 ? list : null;
-        }
-
-        /// <summary>
-        /// Builds a GlobalBans object from newline-separated item, magic and hero ID strings.
+        /// Builds the optional native bans block from the configured identifiers.
         /// Returns null when all are empty.
         /// </summary>
-        private static GlobalBans? BuildGlobalBans(string rawItems, string rawMagics, string rawHeroes)
+        private static GlobalBans? BuildGlobalBans(GeneratorSettings settings)
         {
             static List<string>? ParseLines(string raw)
             {
@@ -477,14 +464,18 @@ namespace Olden_Era___Template_Editor.Services
                 return list.Count > 0 ? list : null;
             }
 
-            var items  = ParseLines(rawItems);
-            var magics = ParseLines(rawMagics);
-            var heroes = ParseLines(rawHeroes);
-            if (items == null && magics == null && heroes == null) return null;
-            return new GlobalBans { Items = items, Magics = magics, Heroes = heroes };
+            var items = ParseLines(settings.BannedItems);
+            var magics = ParseLines(settings.BannedMagics);
+            var heroes = ParseLines(settings.BannedHeroes);
+            var skills = settings.ProfileOptions.ProfileId == GenerationProfileOptions.CurrentProfile
+                && settings.ProfileOptions.BannedSkills is { Count: > 0 } bannedSkills ? bannedSkills.ToList() : null;
+            if (items is null && magics is null && heroes is null && skills is null) return null;
+            return new GlobalBans { Items = items, Magics = magics, Heroes = heroes, Skills = skills };
         }
 
-
+        private static bool UsesChampionSpire(GeneratorSettings settings) =>
+            settings.ProfileOptions.ProfileId == GenerationProfileOptions.CurrentProfile
+            && settings.ProfileOptions.ChampionSelection == ChampionSelection.HellLightSpire;
 
         private static WinConditions BuildAdvancedWinConditions(GeneratorSettings settings, string effectiveVictoryCondition)
         {
@@ -505,7 +496,8 @@ namespace Olden_Era___Template_Editor.Services
                     : 1,
                 LostStartCity = useLostStartCity,
                 LostStartCityDay = Math.Clamp(settings.GameEndConditions.LostStartCityDay, 1, 30),
-                LostStartHero = settings.GameEndConditions.LostStartHero || useGladiator || effectiveVictoryCondition == "win_condition_8",
+                LostStartHero = settings.GameEndConditions.LostStartHero || useGladiator && !UsesChampionSpire(settings)
+                    || effectiveVictoryCondition == "win_condition_8",
                 CityHold = useCityHold,
                 CityHoldDays = Math.Clamp(settings.GameEndConditions.CityHoldDays, 1, 30)
             };
@@ -1081,13 +1073,22 @@ namespace Olden_Era___Template_Editor.Services
 
             if (settings.RandomPortals)
             {
-                // Add portals scoped to each cluster individually so they never cross
-                // the isolation boundary between the two players.
+                // Split the global allowance between the two isolated clusters, spilling
+                // unused capacity to the other cluster and varying who gets an odd extra.
+                int firstCapacity = neutralsForPlayer[0].Count > 0 ? neutralsForPlayer[0].Count + 1 : 0;
+                int secondCapacity = neutralsForPlayer[1].Count > 0 ? neutralsForPlayer[1].Count + 1 : 0;
+                int budget = Math.Clamp(settings.MaxPortalConnections, 0, firstCapacity + secondCapacity);
+                int minimumFirst = Math.Max(0, budget - secondCapacity);
+                int maximumFirst = Math.Min(firstCapacity, budget);
+                int intendedFirst = budget / 2;
+                if (budget % 2 == 1 && minimumFirst <= intendedFirst && maximumFirst > intendedFirst)
+                    intendedFirst += rng.Next(2);
+                int firstBudget = Math.Clamp(intendedFirst, minimumFirst, maximumFirst);
                 for (int p = 0; p < 2; p++)
                 {
                     var clusterLetters = new List<string> { playerLetters[p] };
                     clusterLetters.AddRange(neutralsForPlayer[p].Select(n => n.Letter));
-                    connections.AddRange(BuildRandomPortalConnections(playerLetters, clusterLetters, tuning, settings.MaxPortalConnections));
+                    connections.AddRange(BuildRandomPortalConnections(playerLetters, clusterLetters, tuning, p == 0 ? firstBudget : budget - firstBudget));
                 }
             }
 
@@ -3689,9 +3690,9 @@ namespace Olden_Era___Template_Editor.Services
         {
             var content = quality switch
             {
-                NeutralZoneQuality.Low    => ZoneContentManager.BuildLowNeutralMandatoryContent(settings),
-                NeutralZoneQuality.High   => ZoneContentManager.BuildHighNeutralMandatoryContent(settings),
-                _                         => ZoneContentManager.BuildMediumNeutralMandatoryContent(settings),
+                NeutralZoneQuality.Low    => ZoneContentManager.BuildLowNeutralMandatoryContent(settings, castleCount),
+                NeutralZoneQuality.High   => ZoneContentManager.BuildHighNeutralMandatoryContent(settings, castleCount),
+                _                         => ZoneContentManager.BuildMediumNeutralMandatoryContent(settings, castleCount),
             };
 
             if (castleCount == 0)

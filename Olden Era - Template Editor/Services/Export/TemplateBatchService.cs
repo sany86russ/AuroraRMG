@@ -2,10 +2,16 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Olden_Era___Template_Editor.Models;
 using Olden_Era___Template_Editor.Services.Analysis;
+using Olden_Era___Template_Editor.Services.Generation;
 
 namespace Olden_Era___Template_Editor.Services.Export;
 
 public sealed record TemplateBatchRequest(GeneratorSettings Settings, IReadOnlyList<int> Seeds, string OutputDirectory)
+{
+    public TemplateReferenceCatalog? ValidationCatalog { get; init; }
+    public bool OverwriteExisting { get; init; }
+}
+public sealed record QuickTemplateBatchRequest(QuickGenerateOptions Options, IReadOnlyList<int> Seeds, string OutputDirectory)
 {
     public TemplateReferenceCatalog? ValidationCatalog { get; init; }
     public bool OverwriteExisting { get; init; }
@@ -29,20 +35,52 @@ public static class TemplateBatchService
     public static Task<TemplateBatchReceipt> GenerateAsync(TemplateBatchRequest request, CancellationToken cancellationToken = default,
         IProgress<TemplateBatchProgress>? progress = null)
     {
-        ArgumentNullException.ThrowIfNull(request); ArgumentNullException.ThrowIfNull(request.Settings); ArgumentNullException.ThrowIfNull(request.Seeds);
-        if (request.Seeds.Count is < 1 or > MaximumCases) throw new ArgumentOutOfRangeException(nameof(request), $"A batch must contain 1–{MaximumCases} seeds.");
-        if (request.Seeds.Distinct().Count() != request.Seeds.Count) throw new ArgumentException("Batch seeds must be unique.", nameof(request));
-        string directory = Path.GetFullPath(request.OutputDirectory);
-        ExportDestination.EnsureOutsideGame(directory);
-        if (!Directory.Exists(directory)) throw new DirectoryNotFoundException("The selected batch directory does not exist.");
-        var seeds = request.Seeds.ToArray();
-        // Serialize before dispatch so UI edits during generation cannot change later batch cases.
-        byte[] settingsSnapshot = JsonSerializer.SerializeToUtf8Bytes(request.Settings, CloneOptions);
-        return Task.Run(() => Generate(request, directory, seeds, settingsSnapshot, cancellationToken, progress), CancellationToken.None);
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.Settings);
+        byte[] snapshot = JsonSerializer.SerializeToUtf8Bytes(request.Settings, CloneOptions);
+        return GenerateAsync(request.Seeds, request.OutputDirectory, request.ValidationCatalog, request.OverwriteExisting, seed =>
+        {
+            var settings = RestoreSnapshot<GeneratorSettings>(snapshot);
+            settings.Seed = seed;
+            settings.ProfileOptions.TemplateSeed = seed;
+            return settings;
+        }, cancellationToken, progress);
     }
 
-    private static TemplateBatchReceipt Generate(TemplateBatchRequest request, string directory, int[] seeds, byte[] settingsSnapshot,
+    public static Task<TemplateBatchReceipt> GenerateQuickAsync(QuickTemplateBatchRequest request, CancellationToken cancellationToken = default,
+        IProgress<TemplateBatchProgress>? progress = null)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(request.Options);
+        byte[] snapshot = JsonSerializer.SerializeToUtf8Bytes(request.Options, CloneOptions);
+        return GenerateAsync(request.Seeds, request.OutputDirectory, request.ValidationCatalog, request.OverwriteExisting, seed =>
+        {
+            var options = RestoreSnapshot<QuickGenerateOptions>(snapshot);
+            options.Seed = seed;
+            return RandomTemplateBuilder.Build(options);
+        }, cancellationToken, progress);
+    }
+
+    private static T RestoreSnapshot<T>(byte[] snapshot) where T : class =>
+        JsonSerializer.Deserialize<T>(snapshot, CloneOptions)
+            ?? throw new InvalidOperationException("Generator settings snapshot could not be restored.");
+
+    private static Task<TemplateBatchReceipt> GenerateAsync(IReadOnlyList<int> seeds, string outputDirectory,
+        TemplateReferenceCatalog? catalog, bool overwriteExisting, Func<int, GeneratorSettings> buildSettings,
         CancellationToken token, IProgress<TemplateBatchProgress>? progress)
+    {
+        ArgumentNullException.ThrowIfNull(seeds);
+        var seedSnapshot = seeds.ToArray();
+        if (seedSnapshot.Length is < 1 or > MaximumCases) throw new ArgumentOutOfRangeException(nameof(seeds), $"A batch must contain 1–{MaximumCases} seeds.");
+        if (seedSnapshot.Distinct().Count() != seedSnapshot.Length) throw new ArgumentException("Batch seeds must be unique.", nameof(seeds));
+        string directory = Path.GetFullPath(outputDirectory);
+        ExportDestination.EnsureOutsideGame(directory);
+        if (!Directory.Exists(directory)) throw new DirectoryNotFoundException("The selected batch directory does not exist.");
+        return Task.Run(() => Generate(directory, seedSnapshot, catalog, overwriteExisting, buildSettings, token, progress), CancellationToken.None);
+    }
+
+    private static TemplateBatchReceipt Generate(string directory, int[] seeds, TemplateReferenceCatalog? catalog, bool overwriteExisting,
+        Func<int, GeneratorSettings> buildSettings, CancellationToken token, IProgress<TemplateBatchProgress>? progress)
     {
         var results = new List<TemplateBatchCaseResult>();
         foreach (int seed in seeds)
@@ -51,13 +89,9 @@ public static class TemplateBatchService
             TemplateBatchCaseResult result;
             try
             {
-                var settings = JsonSerializer.Deserialize<GeneratorSettings>(settingsSnapshot, CloneOptions)
-                    ?? throw new InvalidOperationException("Generator settings snapshot could not be restored.");
-                settings.Seed = seed;
-                // Current generation resolves this explicit property; keep the legacy seed in sync too.
-                settings.ProfileOptions.TemplateSeed = seed;
+                var settings = buildSettings(seed);
                 var template = TemplateGenerator.Generate(settings);
-                var issues = TemplateCompatibilityValidator.Validate(template, TemplateValidationMode.StrictExport, request.ValidationCatalog);
+                var issues = TemplateCompatibilityValidator.Validate(template, TemplateValidationMode.StrictExport, catalog);
                 var errors = issues.Where(i => i.Severity == TemplateIssueSeverity.Error).ToArray();
                 if (errors.Length > 0)
                     result = new(seed, false, null, null, issues, "Validation failed: " + string.Join("; ", errors.Select(i => i.Path + ": " + i.Message)));
@@ -65,10 +99,10 @@ public static class TemplateBatchService
                 {
                     string filename = "template-" + SafeName(settings.TemplateName) + "-" + seed.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".rmg.json";
                     string destination = Path.Combine(directory, filename);
-                    if (File.Exists(destination) && !request.OverwriteExisting) throw new IOException("A batch destination already exists: " + filename);
+                    if (File.Exists(destination) && !overwriteExisting) throw new IOException("A batch destination already exists: " + filename);
                     byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(template, JsonExport.Options);
                     token.ThrowIfCancellationRequested();
-                    AtomicFile.WriteAllText(destination, System.Text.Encoding.UTF8.GetString(bytes), overwrite: request.OverwriteExisting,
+                    AtomicFile.WriteAllText(destination, System.Text.Encoding.UTF8.GetString(bytes), overwrite: overwriteExisting,
                         validateDestination: path => ExportDestination.EnsureOutsideGame(path));
                     result = new(seed, true, destination, Convert.ToHexString(SHA256.HashData(bytes)), issues, null);
                 }
